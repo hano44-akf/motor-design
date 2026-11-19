@@ -1,0 +1,50 @@
+[
+  {
+    "class": "TComboBox",
+    "items": [
+      "Surface Radial"
+    ]
+  },
+  {
+    "class": "TComboBox",
+    "items": [
+      "Surface Radial",
+      "Surface Parallel",
+      "Surface Breadloaf",
+      "Surface Flat",
+      "Inset Radial",
+      "Inset Parallel",
+      "Inset Breadloaf",
+      "Embedded Radial",
+      "Embedded Parallel",
+      "Embedded Breadloaf",
+      "Interior Flat (web)",
+      "Interior Flat (simple)",
+      "Interior V (web)",
+      "Interior V (simple)",
+      "Interior U-Shape",
+      "Spoke"
+    ]
+  },
+  {
+    "class": "TComboBox",
+    "items": [
+      "Surface Radial",
+      "Surface Parallel",
+      "Surface Breadloaf",
+      "Surface Flat",
+      "Inset Radial",
+      "Inset Parallel",
+      "Inset Breadloaf",
+      "Embedded Radial",
+      "Embedded Parallel",
+      "Embedded Breadloaf",
+      "Interior Flat (web)",
+      "Interior Flat (simple)",
+      "Interior V (web)",
+      "Interior V (simple)",
+      "Interior U-Shape",
+      "Spoke"
+    ]
+  }
+]

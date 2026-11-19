@@ -1,0 +1,10 @@
+{
+  "source_radial": "C:\\work\\codex\\motor design\\validation\\jobs\\20261022_132138\\calibration.json",
+  "new_fea_solves": 1,
+  "launch_s": 5.045992799918167,
+  "wall_s": 68.84140450006817,
+  "solver_s": 10.65193900000304,
+  "shape": "Parallel",
+  "magnetisation": "Parallel",
+  "paired_geometry_passed": true
+}

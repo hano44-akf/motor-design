@@ -1,0 +1,119 @@
+{
+  "status": "predicted_target_met",
+  "efficiency_target_pct": 88,
+  "dc_voltage_V": 9.0,
+  "estimated_crest_factor": 1.8204921388657882,
+  "validation_status": "not_FEA_validated",
+  "fallback_policy": "Physical screens remain mandatory; minimize efficiency shortfall at fixed torque/speed before secondary objectives. Best found within bounds/budget, not a proven global maximum.",
+  "method": "Differential evolution, 32 individuals x 100 generations x 3 objectives; FEA-calibrated scaling surrogate; no global optimum guarantee",
+  "calibration": "pilot_arc120.json",
+  "bounds": [
+    [
+      55,
+      100
+    ],
+    [
+      20,
+      65
+    ],
+    [
+      1,
+      8
+    ],
+    [
+      0.8,
+      2.2
+    ]
+  ],
+  "evaluations": 9696,
+  "optimization_compute_s": 0.06890260003274307,
+  "predictions": [
+    {
+      "diameter_mm": 74.262,
+      "length_mm": 20.244,
+      "turns_per_coil": 6,
+      "wire_diameter_mm": 1.641,
+      "phase_peak_A": 21.236002304486234,
+      "line_peak_A": 36.781834941019916,
+      "resistance_ohm": 0.026039983940267727,
+      "back_emf_phase_rms_V": 4.124644628665712,
+      "terminal_line_rms_V": 4.563112376266767,
+      "estimated_terminal_peak_V": 8.307110209754837,
+      "efficiency_pct": 88.00541520235431,
+      "copper_loss_W": 17.61479116516916,
+      "other_loss_W": 7.362336262680702,
+      "fill": 0.31182187643010206,
+      "volume_mm3": 87685.15030632254,
+      "wire_fits": true,
+      "objective": "compact",
+      "score": [
+        false,
+        0,
+        false,
+        0,
+        0.5845676687088169
+      ],
+      "physical_screen_pass": true,
+      "target_met": true,
+      "efficiency_shortfall_percentage_points": 0
+    },
+    {
+      "diameter_mm": 84.035,
+      "length_mm": 20,
+      "turns_per_coil": 5,
+      "wire_diameter_mm": 1.869,
+      "phase_peak_A": 22.79477000173994,
+      "line_peak_A": 39.48169978986048,
+      "resistance_ohm": 0.017981453695408343,
+      "back_emf_phase_rms_V": 3.8425903324686304,
+      "terminal_line_rms_V": 4.160591505788895,
+      "estimated_terminal_peak_V": 7.574324129320456,
+      "efficiency_pct": 88.7076865109802,
+      "copper_loss_W": 14.014786532045118,
+      "other_loss_W": 9.313795377560528,
+      "fill": 0.26315062786741666,
+      "volume_mm3": 110926.9555838468,
+      "wire_fits": true,
+      "objective": "balanced",
+      "score": [
+        false,
+        0,
+        false,
+        0,
+        0.9529710663529638
+      ],
+      "physical_screen_pass": true,
+      "target_met": true,
+      "efficiency_shortfall_percentage_points": 0
+    },
+    {
+      "diameter_mm": 98.367,
+      "length_mm": 22.203,
+      "turns_per_coil": 4,
+      "wire_diameter_mm": 2.2,
+      "phase_peak_A": 21.926309333455652,
+      "line_peak_A": 37.977481788016874,
+      "resistance_ohm": 0.01192735431411833,
+      "back_emf_phase_rms_V": 3.9947882476456535,
+      "terminal_line_rms_V": 4.192745951807384,
+      "estimated_terminal_peak_V": 7.6328610455267,
+      "efficiency_pct": 88.94865102633183,
+      "copper_loss_W": 8.601346696466399,
+      "other_loss_W": 14.167581821215204,
+      "fill": 0.21282403049496046,
+      "volume_mm3": 168735.3711032547,
+      "wire_fits": true,
+      "objective": "efficient",
+      "score": [
+        false,
+        0,
+        false,
+        0,
+        1.13844642588408
+      ],
+      "physical_screen_pass": true,
+      "target_met": true,
+      "efficiency_shortfall_percentage_points": 0
+    }
+  ]
+}

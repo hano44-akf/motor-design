@@ -1,0 +1,16 @@
+{
+  "schema": "spm-study-v1",
+  "core": "POSCO | 50PN470",
+  "magnet": "JL Mag Rare-Earth | N48UH",
+  "spm": {"shape": "Radial", "magnetisation": "Radial"},
+  "connection": "delta",
+  "strands": 1,
+  "paths": 1,
+  "control": "FOC_Id0_SVPWM",
+  "switching_frequency_hz": 10000,
+  "pwm_current_ripple_max_pct": 15,
+  "temperatures_C": [20],
+  "operating_point": {"torque_Nm": 0.5, "speed_rpm": 3500, "efficiency_min_pct": 88, "torque_ripple_max_pct": 20, "voltages_V": [9, 12, 16]},
+  "bounds": [[55, 100], [20, 65], [1, 8], [0.8, 2.2]],
+  "search_rounds": 2
+}

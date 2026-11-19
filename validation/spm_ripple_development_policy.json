@@ -1,0 +1,76 @@
+{
+  "schema": "spm-ripple-development-policy-v1",
+  "updated": "2026-11-05",
+  "production_optimizer_connected": false,
+  "rotors": {
+    "surface_radial": {
+      "registered": true,
+      "development_status": "active",
+      "ripple_qualified": false
+    },
+    "surface_parallel": {
+      "registered": true,
+      "development_status": "active",
+      "ripple_qualified": false
+    },
+    "surface_breadloaf": {
+      "registered": true,
+      "development_status": "active_priority",
+      "ripple_qualified": false,
+      "candidate_evidence": {
+        "source": "outputs/breadloaf_shape_verification_20261104/verification_review.json",
+        "selected_candidates": 3,
+        "practical_ripple_passed": 3,
+        "actual_ripple_le20": 3,
+        "electromagnetic_torque_target_passed": 0,
+        "scope": "Three nearby shapes at fixed development point only; no family-wide qualification."
+      },
+      "current_feedback_evidence": {
+        "source": "outputs/breadloaf_current_feedback_20261104/workflow_review.json",
+        "additional_same_geometry_cases": 1,
+        "native_electromagnetic_torque_Nm": 0.49988,
+        "native_shaft_torque_Nm": 0.48245,
+        "native_ripple_pct": 13.683,
+        "strict_torque_target_passed": false,
+        "feedback_budget_used": 1
+      },
+      "staged_cli": "validation/breadloaf_workflow.py",
+      "local_loss_B_model": {
+        "path": "outputs/breadloaf_loss_B_validation_20261104/local_loss_B_model.json",
+        "status": "experimental_local_native_calibration",
+        "training_cases": 10,
+        "frozen_shape_holdouts": 2,
+        "speed_checks": 2,
+        "supported_speed_rpm": 3500,
+        "domain": "development convex hull",
+        "family_qualified": false
+      },
+      "shaft_and_ripple_evidence": {
+        "source": "outputs/breadloaf_fine_verification_20261105/workflow_review.json",
+        "candidate_id": "breadloaf_search_13_614_1",
+        "independent_native_cases": 1,
+        "native_shaft_torque_Nm": 0.50012,
+        "native_efficiency_pct": 88.122,
+        "native_ripple_pct": 13.068,
+        "native_max_B_T": 1.674,
+        "predicted_ripple_pct": 20.63283938694202,
+        "known_requirements_passed": true,
+        "fully_verified": false,
+        "practical_prediction20_native50_passed": false,
+        "family_qualified": false,
+        "remaining_unverified": [
+          "PWM current ripple",
+          "additional DC bus voltages"
+        ],
+        "scope": "One fixed Breadloaf candidate at 3500rpm/20C/9V, D85 L20 4p12s Delta. No refit; not family-wide qualification."
+      }
+    },
+    "surface_flat": {
+      "registered": true,
+      "development_status": "deferred_by_user",
+      "ripple_qualified": false,
+      "automatic_new_fea_allowed": false,
+      "reason": "User deferred Flat ripple improvement on 2026-11-04; preserve existing artifacts."
+    }
+  }
+}

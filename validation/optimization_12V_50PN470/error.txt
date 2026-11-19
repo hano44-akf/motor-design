@@ -1,0 +1,14 @@
+Traceback (most recent call last):
+  File "C:\work\codex\motor design\validation\low_voltage.py", line 62, in <module>
+    mc,launch=start();prepare(mc)
+                      ~~~~~~~^^^^
+  File "C:\work\codex\motor design\validation\low_voltage.py", line 19, in prepare
+    seed=(ROOT/'baseline.mot').read_text(encoding='utf-8-sig')
+  File "C:\Users\jo061\AppData\Local\Python\pythoncore-3.14-64\Lib\pathlib\__init__.py", line 788, in read_text
+    return f.read()
+           ~~~~~~^^
+  File "<frozen codecs>", line 325, in decode
+  File "C:\Users\jo061\AppData\Local\Python\pythoncore-3.14-64\Lib\encodings\utf_8_sig.py", line 69, in _buffer_decode
+    return codecs.utf_8_decode(input, errors, final)
+           ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^
+UnicodeDecodeError: 'utf-8' codec can't decode byte 0xbf in position 178: invalid start byte

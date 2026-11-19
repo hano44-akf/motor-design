@@ -1,0 +1,70 @@
+{
+  "status": "completed",
+  "runs": [
+    {
+      "model": "A",
+      "voltage_V": 9,
+      "label": "A_final_9V",
+      "passed": true,
+      "solver_s": 31.261095500027295
+    },
+    {
+      "model": "A",
+      "voltage_V": 12,
+      "label": "A_final_12V",
+      "passed": true,
+      "solver_s": 31.789494100026786
+    },
+    {
+      "model": "A",
+      "voltage_V": 16,
+      "label": "A_final_16V",
+      "passed": true,
+      "solver_s": 31.555856699997094
+    },
+    {
+      "model": "B",
+      "voltage_V": 9,
+      "label": "B_final_9V",
+      "passed": true,
+      "solver_s": 31.845674199983478
+    },
+    {
+      "model": "B",
+      "voltage_V": 12,
+      "label": "B_final_12V",
+      "passed": true,
+      "solver_s": 31.79818800004432
+    },
+    {
+      "model": "B",
+      "voltage_V": 16,
+      "label": "B_final_16V",
+      "passed": true,
+      "solver_s": 31.878628999984358
+    },
+    {
+      "model": "C",
+      "voltage_V": 9,
+      "label": "C_final_9V",
+      "passed": false,
+      "solver_s": 34.24361239996506
+    },
+    {
+      "model": "C",
+      "voltage_V": 12,
+      "label": "C_final_12V",
+      "passed": false,
+      "solver_s": 34.224743900005706
+    },
+    {
+      "model": "C",
+      "voltage_V": 16,
+      "label": "C_final_16V",
+      "passed": false,
+      "solver_s": 34.505478199978825
+    }
+  ],
+  "launch_s": 5.050798100011889,
+  "wall_s": 321.38418130000355
+}

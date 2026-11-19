@@ -1,0 +1,110 @@
+[
+  {
+    "shape": "Radial",
+    "magnetisation": "Parallel",
+    "readback": {
+      "BPMRotor": 0,
+      "Magnetization": 0,
+      "ShaftSpeed": 3500,
+      "WindingConnection": 1,
+      "NumberStrandsHand": 1,
+      "ParallelPaths": 1,
+      "Magnet_Arc_[ED]": 120,
+      "Magnet_Temperature": 20,
+      "StatorConductor_Temperature": 20,
+      "StatorLam_Temperature": 20,
+      "RotorLam_Temperature": 20
+    },
+    "save_reload_pass": true
+  },
+  {
+    "shape": "Radial",
+    "magnetisation": "Radial",
+    "readback": {
+      "BPMRotor": 0,
+      "Magnetization": 1,
+      "ShaftSpeed": 3500,
+      "WindingConnection": 1,
+      "NumberStrandsHand": 1,
+      "ParallelPaths": 1,
+      "Magnet_Arc_[ED]": 120,
+      "Magnet_Temperature": 20,
+      "StatorConductor_Temperature": 20,
+      "StatorLam_Temperature": 20,
+      "RotorLam_Temperature": 20
+    },
+    "save_reload_pass": true
+  },
+  {
+    "shape": "Parallel",
+    "magnetisation": "Parallel",
+    "readback": {
+      "BPMRotor": 1,
+      "Magnetization": 0,
+      "ShaftSpeed": 3500,
+      "WindingConnection": 1,
+      "NumberStrandsHand": 1,
+      "ParallelPaths": 1,
+      "Magnet_Arc_[ED]": 120,
+      "Magnet_Temperature": 20,
+      "StatorConductor_Temperature": 20,
+      "StatorLam_Temperature": 20,
+      "RotorLam_Temperature": 20
+    },
+    "save_reload_pass": true
+  },
+  {
+    "shape": "Parallel",
+    "magnetisation": "Radial",
+    "readback": {
+      "BPMRotor": 1,
+      "Magnetization": 1,
+      "ShaftSpeed": 3500,
+      "WindingConnection": 1,
+      "NumberStrandsHand": 1,
+      "ParallelPaths": 1,
+      "Magnet_Arc_[ED]": 120,
+      "Magnet_Temperature": 20,
+      "StatorConductor_Temperature": 20,
+      "StatorLam_Temperature": 20,
+      "RotorLam_Temperature": 20
+    },
+    "save_reload_pass": true
+  },
+  {
+    "shape": "Breadloaf",
+    "magnetisation": "Parallel",
+    "readback": {
+      "BPMRotor": 2,
+      "Magnetization": 0,
+      "ShaftSpeed": 3500,
+      "WindingConnection": 1,
+      "NumberStrandsHand": 1,
+      "ParallelPaths": 1,
+      "Magnet_Arc_[ED]": 120,
+      "Magnet_Temperature": 20,
+      "StatorConductor_Temperature": 20,
+      "StatorLam_Temperature": 20,
+      "RotorLam_Temperature": 20
+    },
+    "save_reload_pass": true
+  },
+  {
+    "shape": "Breadloaf",
+    "magnetisation": "Radial",
+    "readback": {
+      "BPMRotor": 2,
+      "Magnetization": 1,
+      "ShaftSpeed": 3500,
+      "WindingConnection": 1,
+      "NumberStrandsHand": 1,
+      "ParallelPaths": 1,
+      "Magnet_Arc_[ED]": 120,
+      "Magnet_Temperature": 20,
+      "StatorConductor_Temperature": 20,
+      "StatorLam_Temperature": 20,
+      "RotorLam_Temperature": 20
+    },
+    "save_reload_pass": true
+  }
+]

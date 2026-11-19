@@ -1,0 +1,83 @@
+{
+  "method": "Differential evolution, 32 individuals x 100 generations x 3 objectives; FEA-calibrated scaling surrogate; no global optimum guarantee",
+  "calibration": "pilot_4p.json",
+  "bounds": [
+    [
+      55,
+      100
+    ],
+    [
+      20,
+      65
+    ],
+    [
+      1,
+      8
+    ],
+    [
+      0.8,
+      2.2
+    ]
+  ],
+  "evaluations": 9696,
+  "optimization_compute_s": 0.07473319995915517,
+  "predictions": [
+    {
+      "diameter_mm": 69.451,
+      "length_mm": 20.015,
+      "turns_per_coil": 8,
+      "wire_diameter_mm": 1.533,
+      "phase_peak_A": 16.995441514896516,
+      "line_peak_A": 29.436968200866133,
+      "resistance_ohm": 0.035479463379841175,
+      "back_emf_phase_rms_V": 5.263100451689593,
+      "terminal_line_rms_V": 5.76728628263844,
+      "efficiency_pct": 89.50000234095262,
+      "copper_loss_W": 15.372100118174526,
+      "other_loss_W": 6.127620786763414,
+      "fill": 0.4144721405676511,
+      "volume_mm3": 75825.87893378799,
+      "wire_fits": false,
+      "objective": "compact",
+      "score": 0.5055151630020441
+    },
+    {
+      "diameter_mm": 73.16,
+      "length_mm": 20,
+      "turns_per_coil": 8,
+      "wire_diameter_mm": 1.618,
+      "phase_peak_A": 16.146468629002783,
+      "line_peak_A": 27.966504028249812,
+      "resistance_ohm": 0.032819380231231,
+      "back_emf_phase_rms_V": 5.539831524092232,
+      "terminal_line_rms_V": 5.982067063748465,
+      "efficiency_pct": 90.32539545003536,
+      "copper_loss_W": 12.834434585062342,
+      "other_loss_W": 6.794196709958814,
+      "fill": 0.41637665507567695,
+      "volume_mm3": 84074.38304513483,
+      "wire_fits": true,
+      "objective": "balanced",
+      "score": 0.7709637258593116
+    },
+    {
+      "diameter_mm": 95.58,
+      "length_mm": 20,
+      "turns_per_coil": 6,
+      "wire_diameter_mm": 2.136,
+      "phase_peak_A": 16.47861745694758,
+      "line_peak_A": 28.54180267392465,
+      "resistance_ohm": 0.016741002203966588,
+      "back_emf_phase_rms_V": 5.428168725162274,
+      "terminal_line_rms_V": 5.64672888957323,
+      "efficiency_pct": 90.86874647644608,
+      "copper_loss_W": 6.818898978936149,
+      "other_loss_W": 11.596559278182294,
+      "fill": 0.3186610011236166,
+      "volume_mm3": 143500.9329845295,
+      "wire_fits": false,
+      "objective": "efficient",
+      "score": 0.920773167837306
+    }
+  ]
+}

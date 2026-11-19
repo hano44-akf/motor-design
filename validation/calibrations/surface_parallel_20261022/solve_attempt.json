@@ -1,0 +1,40 @@
+{
+  "authorized_max_solves": 1,
+  "reference_source": "C:\\work\\codex\\motor design\\validation\\jobs\\20261022_132138\\calibration.json",
+  "design": {
+    "diameter_mm": 85,
+    "length_mm": 20,
+    "turns_per_coil": 6,
+    "wire_diameter_mm": 1.8,
+    "input_peak_current_A": 40,
+    "voltage_V": 9
+  },
+  "options": {
+    "shape": "Parallel",
+    "magnetisation": "Parallel",
+    "speed_rpm": 3500,
+    "temperature_C": 20,
+    "connection": "delta",
+    "strands": 1,
+    "paths": 1,
+    "magnet_arc_deg": 120,
+    "phase_advance_deg": 0.0
+  },
+  "geometry_mm": {
+    "Housing_Dia": 91.5,
+    "Stator_Lam_Dia": 85,
+    "Stator_Bore": 52.3,
+    "Shaft_Dia": 16.3,
+    "Tooth_Width": 6.9,
+    "Slot_Depth": 11.8,
+    "Slot_Opening": 2,
+    "Tooth_Tip_Depth": 0.7,
+    "Magnet_Thickness": 2.6,
+    "Airgap": 0.7,
+    "Stator_Lam_Length": 20,
+    "Rotor_Lam_Length": 20,
+    "Magnet_Length": 20,
+    "Shaft_Dia_[F]": 16.3,
+    "Shaft_Dia_[R]": 16.3
+  }
+}

@@ -1,0 +1,248 @@
+﻿source_file,category,field,value,data_status
+pilot_arc120.json,motorcad,DC Bus Voltage,9.0,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Line-Line Supply Voltage (rms),6.364,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Phase Supply Voltage (rms),6.364,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Line-Line Terminal Voltage (peak),9.277,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Line-Line Terminal Voltage (rms),5.139,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Phase Terminal Voltage (peak),9.277,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Phase Terminal Voltage (rms),5.139,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Harmonic Distortion Line-Line Terminal Voltage,18.49,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Harmonic Distortion Phase Terminal Voltage,18.49,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Back EMF Line-Line Voltage (peak),8.693,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Back EMF Line-Line Voltage (peak) (fundamental),6.596,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Back EMF Phase Voltage (peak),8.693,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Back EMF Line-Line Voltage (rms),4.757,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Back EMF Phase Voltage (rms),4.757,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Harmonic Distortion Back EMF Line-Line Voltage,20.04,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Harmonic Distortion Back EMF Phase Voltage,20.04,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Max Line-Line / Phase Voltage Ratio,1.0,saved_MotorCAD_output
+pilot_arc120.json,motorcad,DC Supply Current (mean),27.19,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Line Current (peak),40.0,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Line Current (rms),28.28,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Phase Current (peak),23.09,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Phase Current (rms),16.33,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Phase Advance,0.0,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Drive Offset Angle (Open Circuit),0.0,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Drive Offset Angle (On load),0.0,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Phase Advance to give maximum torque,5.822,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Phasor Offset Angle,330.0,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Phasor Angle (Ph1),0.0,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Phasor Angle (Ph2),120.0,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Phasor Angle (Ph3),240.0,saved_MotorCAD_output
+pilot_arc120.json,motorcad,D Axis Inductance,0.01958,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Q Axis Inductance,0.05889,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Line-Line Inductance (DQ),0.02616,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Armature End Winding Inductance_(Hanselman),0.006067,saved_MotorCAD_output
+pilot_arc120.json,motorcad,D Axis Phase Current (average rms),0.0,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Q Axis Phase Current (average rms),16.33,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Torque Constant (Kt),0.01542,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Motor Constant (Km),0.1424,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Back EMF Constant (Ke),0.02372,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Back EMF Constant (Ke) (fundamental),0.018,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Electrical Constant,1.674,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Mechanical Constant,6.012,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Electrical Loading,24790.0,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Stall Current,576.0,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Stall Torque,8.879,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Short Circuit Line Current (peak),467.6,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Short Circuit Current Density (peak),106.1,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Short Circuit Current Density (rms),75.02,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Short Circuit Braking Torque,-6.991,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Short Circuit Max Braking Torque,-7.487,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Short Circuit Max Braking Torque Speed,4839.0,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Fundamental Frequency,116.7,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Shaft Speed,3500.0,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Maximum torque possible (DQ)_(For Phase Advance of 5.822 EDeg),0.61048,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Average torque (MsVw),0.61662,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Average torque (DQ),0.6209,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Average torque (loop torque),0.61977,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Average reluctance torque,0.0,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Average alignment torque,0.6209,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Torque Ripple (MsVw),1.042,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Torque Ripple (MsVw) [%],168.98,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Speed limit for constant torque_(For Phase Advance of 0 EDeg),4556.5,saved_MotorCAD_output
+pilot_arc120.json,motorcad,No load speed,3623.4,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Speed limit for zero q axis current,inf,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Electromagnetic Power,226.0,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Input Power,244.75,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Total Losses (on load),28.279,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Output Power,216.47,saved_MotorCAD_output
+pilot_arc120.json,motorcad,System Efficiency,88.446,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Shaft Torque,0.59062,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Power Factor [Waveform] (lagging),0.99392,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Power Factor Angle [Waveform],6.3198,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Power Factor [THD],0.97736,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Power Factor [Phasor] (lagging),0.99027,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Power Factor Angle [Phasor],8.0,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Load Angle [Phasor],7.8096,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Phase Terminal Voltage (rms) [Phasor],5.188,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Rotor Inertia,9.3791e-05,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Shaft Inertia,6.9892e-05,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Total Inertia,0.00016368,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Torque per rotor volume,15.092,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Rotor peripheral velocity (on load),9.3462,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Flux Linkage D (Q axis current),8.76509,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Flux Linkage Q (Q axis current),1.34887,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Flux linkage D (On load),8.96195,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Flux linkage Q (On load),1.0733,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Cogging Period,30.0,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Cogging Frequency,700.0,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Mechanical Frequency,58.3333,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Optimum Skewing Angle,30.0,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Magnetic Symmetry Factor_(Automatic calculation),4.0,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Magnetic Length (S1),20.0,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Magnetic Axial Length Multiplier,1.0,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Lamination Stacking Factor (Stator),0.97,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Lamination Stacking Factor (Rotor),0.97,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Phase Resistance,0.02344,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Stator Slot Leakage Inductance,0.01457,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Stator Differential Leakage Inductance,0.02357,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Stator Leakage Inductance (Total),0.04421,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Magnetizing Inductance (D Axis),-0.02463,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Magnetizing Inductance (Q Axis),0.01468,saved_MotorCAD_output
+pilot_arc120.json,motorcad,D Axis Reactance,0.01436,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Q Axis Reactance,0.04317,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Stator Slot Leakage Reactance,0.01068,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Stator Differential Leakage Reactance,0.01728,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Armature End Winding Reactance,0.004447,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Stator Leakage Reactance (Total),0.03241,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Magnetizing Reactance (D Axis),1e-12,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Magnetizing Reactance (Q Axis),0.01076,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Rotor Referred Resistance,0.5637,saved_MotorCAD_output
+pilot_arc120.json,motorcad,First Order Transient Reactance (D Axis),0.03241,saved_MotorCAD_output
+pilot_arc120.json,motorcad,First Order Transient Reactance (Q Axis),0.04317,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Excitation Time Constant (Te),-4.369e-05,saved_MotorCAD_output
+pilot_arc120.json,motorcad,First Order Transient Time Constant (Td'),-9.862e-05,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Armature Time Constant (Ta),0.002199,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Airgap Flux Density (average),0.6375,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Airgap Flux Density (maximum),1.146,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Stator Tooth Flux Density (maximum),1.78,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Stator Tooth Tip Flux Density (maximum),1.828,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Stator Back Iron Flux Density (maximum),2.057,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Rotor Back Iron Flux Density (maximum),0.784,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Armature DC Copper Loss (on load),18.75,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Magnet Loss (on load),0.4646,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Stator iron Loss [total] (on load),9.026,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Rotor iron Loss [total] (on load),0.03747,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Wedge Loss (on load),0.0,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Windage Loss (user input),0.0,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Friction Loss (user input),0.0,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Shaft Loss [total] (on load),0.0,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Magnet Block Width,27.39,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Magnet 2D3D Loss Factor,0.2608,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Stator back iron Loss [hysteresis - fundamental] (on load),2.144,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Stator back iron Loss [hysteresis - minor loops] (on load),0.006305,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Stator back iron Loss [hysteresis] (on load),2.15,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Stator back iron Loss [eddy] (on load),3.079,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Stator back iron Loss [excess] (on load),0.0,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Stator back iron Loss [total] (on load),5.229,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Stator tooth Loss [hysteresis - fundamental] (on load),1.468,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Stator tooth Loss [hysteresis - minor loops] (on load),0.09019,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Stator tooth Loss [hysteresis] (on load),1.558,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Stator tooth Loss [eddy] (on load),2.24,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Stator tooth Loss [excess] (on load),0.0,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Stator tooth Loss [total] (on load),3.798,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Rotor back iron Loss [hysteresis - fundamental] (on load),0.002788,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Rotor back iron Loss [hysteresis - minor loops] (on load),0.01249,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Rotor back iron Loss [hysteresis] (on load),0.01528,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Rotor back iron Loss [eddy] (on load),0.02219,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Rotor back iron Loss [excess] (on load),0.0,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Rotor back iron Loss [total] (on load),0.03747,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Shaft Width,6.419,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Shaft 2D3D Loss Factor,1.0,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Armature DC Copper Loss (open circuit),0.0,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Magnet Loss (open circuit),0.4452,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Stator iron Loss [total] (open circuit),8.942,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Rotor iron Loss [total] (open circuit),0.0317,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Wedge Loss (open circuit),0.0,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Shaft Loss [total] (open circuit),0.0,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Total Losses (open circuit),9.419,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Stator back iron Loss [hysteresis - fundamental] (open circuit),2.11,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Stator back iron Loss [hysteresis - minor loops] (open circuit),0.003771,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Stator back iron Loss [hysteresis] (open circuit),2.114,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Stator back iron Loss [eddy] (open circuit),3.071,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Stator back iron Loss [excess] (open circuit),0.0,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Stator back iron Loss [total] (open circuit),5.185,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Stator tooth Loss [hysteresis - fundamental] (open circuit),1.445,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Stator tooth Loss [hysteresis - minor loops] (open circuit),0.07889,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Stator tooth Loss [hysteresis] (open circuit),1.524,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Stator tooth Loss [eddy] (open circuit),2.233,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Stator tooth Loss [excess] (open circuit),0.0,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Stator tooth Loss [total] (open circuit),3.757,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Rotor back iron Loss [hysteresis] (open circuit),0.01342,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Rotor back iron Loss [eddy] (open circuit),0.01827,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Rotor back iron Loss [excess] (open circuit),0.0,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Rotor back iron Loss [total] (open circuit),0.0317,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Armature Conductor CSA,2.545,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Armature Conductor Current Density,6.417,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Armature Conductor MLT,144.2,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Armature Turns per Phase,24.0,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Armature Turns per Coil,6.0,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Length of phase,3460.0,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Line-Line Resistance,0.01563,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Armature Conductor Temperature,20.0,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Mean Coil Pitch (Calculated),33.15,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Mean Coil Pitch (Used),33.15,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Fundamental Winding Factor,0.866,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Winding Factor Sum,0.09009,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Wire Ins Thickness,0.035,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Copper Diameter,1.8,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Conductors/Slot,12.0,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Armature EWdg MLT (Used),104.2,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Copper Slot Fill (Wdg Area),0.3399,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Wire Slot Fill (Slot Area),0.3089,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Copper Slot Fill (Slot Area),0.2862,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Heavy Build Slot Fill,0.4671,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Slot Area (Slot 1),106.7,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Winding Area (+ Liner) (Slot 1),97.5,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Slot Area (FEA),97.46,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Wedge Area,9.189,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Slot Opening Area,1.258,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Impreg Area (Slot 1),56.88,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Liner Area (Slot 1),7.656,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Volume Copper EWdg Front,10670.0,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Volume Copper Active,7329.0,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Volume Copper EWdg Rear,10670.0,saved_MotorCAD_output
+pilot_arc120.json,motorcad,FEA Mesh Nodes,2143.0,saved_MotorCAD_output
+pilot_arc120.json,motorcad,FEA Mesh Elements,4006.0,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Airgap Mesh Layers Used,4.0,saved_MotorCAD_output
+pilot_arc120.json,motorcad,FEA Max Element Length,0.8173,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Armature Conductor Resistivity,1.724e-08,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Armature Conductor Resistivity at Ref Temp (20¡ÆC),1.724e-08,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Stator Lamination Resistivity,3.8e-07,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Number of stator laminations,40.0,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Rotor Lamination Resistivity,3.8e-07,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Number of rotor laminations,40.0,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Shaft Resistivity,0.0,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Shaft Resistivity at Ref Temp (20¡ÆC),0.0,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Shaft Temperature,20.0,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Magnet Resistivity,1.5e-06,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Magnet Resistivity at Ref Temp (20¡ÆC),1.5e-06,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Magnet Temperature,20.0,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Total Motor Weight,3.163,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Weight Stator Lam,0.3435,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Armature Copper [Total] Weight,0.2359,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Slot Wedge Weight,0.002205,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Weight Rotor Lam,0.2211,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Weight Magnet,0.04055,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Weight Shaft Total,0.9134,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Magnet Br at reference temperature (20 ¡ÆC),1.4,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Magnet Br (Calculated),1.4,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Magnet Br Adjustment Factor,1.0,saved_MotorCAD_output
+pilot_arc120.json,motorcad,Magnet Br (Used),1.4,saved_MotorCAD_output
+pilot_arc120.json,metadata,metadata.label,pilot_arc120,source_metadata
+pilot_arc120.json,metadata,metadata.voltage_limit_exceeded,False,source_metadata
+pilot_arc120.json,metadata,metadata.readback.WindingConnection,1,source_metadata
+pilot_arc120.json,metadata,metadata.readback.NumberStrandsHand,1,source_metadata
+pilot_arc120.json,metadata,metadata.readback.ParallelPaths,1,source_metadata
+pilot_arc120.json,metadata,metadata.readback.MagTurnsConductor,6,source_metadata
+pilot_arc120.json,metadata,metadata.readback.Copper_Diameter,1.8,source_metadata
+pilot_arc120.json,metadata,metadata.readback.Wire_Diameter,1.87,source_metadata
+pilot_arc120.json,metadata,metadata.readback.PeakCurrent,40,source_metadata
+pilot_arc120.json,metadata,metadata.readback.DCBusVoltage,9,source_metadata
+pilot_arc120.json,metadata,metadata.readback.Slot_Number,12,source_metadata
+pilot_arc120.json,metadata,metadata.readback.Pole_Number,4,source_metadata
+pilot_arc120.json,metadata,metadata.timings.setup_s,1.7482292000204325,source_metadata
+pilot_arc120.json,metadata,metadata.timings.solver_s,10.563285899988841,source_metadata
+pilot_arc120.json,metadata,metadata.timings.export_save_s,0.9043766999966465,source_metadata
+pilot_arc120.json,metadata,metadata.timings.total_s,13.215895500034094,source_metadata

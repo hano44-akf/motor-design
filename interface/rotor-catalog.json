@@ -1,0 +1,1196 @@
+{
+  "schema": "motor-rotor-catalog-v1",
+  "version": 1,
+  "date": "2026-10-23",
+  "scope": "Installed inner-rotor radial-flux BPM standard rotor types; axial/outer/adaptive templates separate",
+  "evidence": "validation/automation/rotor_enum_evidence.json",
+  "rotors": [
+    {
+      "id": "surface_radial",
+      "label": "Surface Radial",
+      "family": "Surface",
+      "input_value": "Radial",
+      "aliases": [
+        "Surface Radial",
+        "Radial"
+      ],
+      "display_order": 0,
+      "motorcad_rotor_value": 0,
+      "input_mapping_status": "verified",
+      "verified_magnetisation": [
+        "Radial",
+        "Parallel"
+      ],
+      "direction_policy": "explicit",
+      "parameters": [
+        "magnet_thickness_mm",
+        "pole_arc_ed",
+        "magnet_segments"
+      ],
+      "layered": false,
+      "layer_parameters": [],
+      "parameter_schema_status": "initial_definition_pending_template_validation",
+      "geometry_adapter": "surface_proportional_v1",
+      "verification_ready_directions": [
+        "Radial"
+      ],
+      "constraint_ids": [
+        "parameter_domain",
+        "dimension_grid",
+        "geometry_interference",
+        "assembly_clearance",
+        "material_validity",
+        "flux_density",
+        "torque_ripple",
+        "voltage_current",
+        "demagnetization"
+      ],
+      "design_qualified": false
+    },
+    {
+      "id": "surface_parallel",
+      "label": "Surface Parallel",
+      "family": "Surface",
+      "input_value": "Parallel",
+      "aliases": [
+        "Surface Parallel",
+        "Parallel"
+      ],
+      "display_order": 1,
+      "motorcad_rotor_value": 1,
+      "input_mapping_status": "verified",
+      "verified_magnetisation": [
+        "Radial",
+        "Parallel"
+      ],
+      "direction_policy": "explicit",
+      "parameters": [
+        "magnet_thickness_mm",
+        "pole_arc_ed",
+        "magnet_segments"
+      ],
+      "layered": false,
+      "layer_parameters": [],
+      "parameter_schema_status": "initial_definition_pending_template_validation",
+      "geometry_adapter": "surface_proportional_v1",
+      "verification_ready_directions": [
+        "Parallel"
+      ],
+      "constraint_ids": [
+        "parameter_domain",
+        "dimension_grid",
+        "geometry_interference",
+        "assembly_clearance",
+        "material_validity",
+        "flux_density",
+        "torque_ripple",
+        "voltage_current",
+        "demagnetization"
+      ],
+      "design_qualified": false
+    },
+    {
+      "id": "surface_breadloaf",
+      "label": "Surface Breadloaf",
+      "family": "Surface",
+      "input_value": "Breadloaf",
+      "aliases": [
+        "Surface Breadloaf",
+        "Breadloaf"
+      ],
+      "display_order": 2,
+      "motorcad_rotor_value": 2,
+      "input_mapping_status": "verified",
+      "verified_magnetisation": [
+        "Radial",
+        "Parallel"
+      ],
+      "direction_policy": "explicit",
+      "parameters": [
+        "magnet_thickness_mm",
+        "pole_arc_ed",
+        "magnet_segments",
+        "magnet_reduction_mm"
+      ],
+      "layered": false,
+      "layer_parameters": [],
+      "parameter_schema_status": "initial_definition_pending_template_validation",
+      "geometry_adapter": null,
+      "verification_ready_directions": [],
+      "constraint_ids": [
+        "parameter_domain",
+        "dimension_grid",
+        "geometry_interference",
+        "assembly_clearance",
+        "material_validity",
+        "flux_density",
+        "torque_ripple",
+        "voltage_current",
+        "demagnetization"
+      ],
+      "design_qualified": false
+    },
+    {
+      "id": "surface_flat",
+      "label": "Surface Flat",
+      "family": "Surface",
+      "input_value": "surface_flat",
+      "aliases": [
+        "Surface Flat"
+      ],
+      "display_order": 3,
+      "motorcad_rotor_value": null,
+      "input_mapping_status": "pending",
+      "verified_magnetisation": [],
+      "direction_policy": "template_pending",
+      "parameters": [
+        "magnet_thickness_mm",
+        "pole_arc_ed",
+        "magnet_segments"
+      ],
+      "layered": false,
+      "layer_parameters": [],
+      "parameter_schema_status": "initial_definition_pending_template_validation",
+      "geometry_adapter": null,
+      "verification_ready_directions": [],
+      "constraint_ids": [
+        "parameter_domain",
+        "dimension_grid",
+        "geometry_interference",
+        "assembly_clearance",
+        "material_validity",
+        "flux_density",
+        "torque_ripple",
+        "voltage_current",
+        "demagnetization"
+      ],
+      "design_qualified": false
+    },
+    {
+      "id": "inset_radial",
+      "label": "Inset Radial",
+      "family": "Inset",
+      "input_value": "inset_radial",
+      "aliases": [
+        "Inset Radial"
+      ],
+      "display_order": 4,
+      "motorcad_rotor_value": null,
+      "input_mapping_status": "pending",
+      "verified_magnetisation": [],
+      "direction_policy": "template_pending",
+      "parameters": [
+        "magnet_thickness_mm",
+        "pole_arc_ed",
+        "magnet_segments",
+        "magnet_inset_mm"
+      ],
+      "layered": false,
+      "layer_parameters": [],
+      "parameter_schema_status": "initial_definition_pending_template_validation",
+      "geometry_adapter": null,
+      "verification_ready_directions": [],
+      "constraint_ids": [
+        "parameter_domain",
+        "dimension_grid",
+        "geometry_interference",
+        "assembly_clearance",
+        "material_validity",
+        "flux_density",
+        "torque_ripple",
+        "voltage_current",
+        "demagnetization"
+      ],
+      "design_qualified": false
+    },
+    {
+      "id": "inset_parallel",
+      "label": "Inset Parallel",
+      "family": "Inset",
+      "input_value": "inset_parallel",
+      "aliases": [
+        "Inset Parallel"
+      ],
+      "display_order": 5,
+      "motorcad_rotor_value": null,
+      "input_mapping_status": "pending",
+      "verified_magnetisation": [],
+      "direction_policy": "template_pending",
+      "parameters": [
+        "magnet_thickness_mm",
+        "pole_arc_ed",
+        "magnet_segments",
+        "magnet_inset_mm"
+      ],
+      "layered": false,
+      "layer_parameters": [],
+      "parameter_schema_status": "initial_definition_pending_template_validation",
+      "geometry_adapter": null,
+      "verification_ready_directions": [],
+      "constraint_ids": [
+        "parameter_domain",
+        "dimension_grid",
+        "geometry_interference",
+        "assembly_clearance",
+        "material_validity",
+        "flux_density",
+        "torque_ripple",
+        "voltage_current",
+        "demagnetization"
+      ],
+      "design_qualified": false
+    },
+    {
+      "id": "inset_breadloaf",
+      "label": "Inset Breadloaf",
+      "family": "Inset",
+      "input_value": "inset_breadloaf",
+      "aliases": [
+        "Inset Breadloaf"
+      ],
+      "display_order": 6,
+      "motorcad_rotor_value": null,
+      "input_mapping_status": "pending",
+      "verified_magnetisation": [],
+      "direction_policy": "template_pending",
+      "parameters": [
+        "magnet_thickness_mm",
+        "pole_arc_ed",
+        "magnet_segments",
+        "magnet_inset_mm",
+        "magnet_reduction_mm"
+      ],
+      "layered": false,
+      "layer_parameters": [],
+      "parameter_schema_status": "initial_definition_pending_template_validation",
+      "geometry_adapter": null,
+      "verification_ready_directions": [],
+      "constraint_ids": [
+        "parameter_domain",
+        "dimension_grid",
+        "geometry_interference",
+        "assembly_clearance",
+        "material_validity",
+        "flux_density",
+        "torque_ripple",
+        "voltage_current",
+        "demagnetization"
+      ],
+      "design_qualified": false
+    },
+    {
+      "id": "embedded_radial",
+      "label": "Embedded Radial",
+      "family": "Embedded",
+      "input_value": "embedded_radial",
+      "aliases": [
+        "Embedded Radial"
+      ],
+      "display_order": 7,
+      "motorcad_rotor_value": null,
+      "input_mapping_status": "pending",
+      "verified_magnetisation": [],
+      "direction_policy": "template_pending",
+      "parameters": [
+        "magnet_thickness_mm",
+        "pole_arc_ed",
+        "magnet_segments",
+        "magnet_inset_mm",
+        "bridge_thickness_mm"
+      ],
+      "layered": false,
+      "layer_parameters": [],
+      "parameter_schema_status": "initial_definition_pending_template_validation",
+      "geometry_adapter": null,
+      "verification_ready_directions": [],
+      "constraint_ids": [
+        "parameter_domain",
+        "dimension_grid",
+        "geometry_interference",
+        "assembly_clearance",
+        "material_validity",
+        "flux_density",
+        "torque_ripple",
+        "voltage_current",
+        "demagnetization",
+        "minimum_structural_section"
+      ],
+      "design_qualified": false
+    },
+    {
+      "id": "embedded_parallel",
+      "label": "Embedded Parallel",
+      "family": "Embedded",
+      "input_value": "embedded_parallel",
+      "aliases": [
+        "Embedded Parallel"
+      ],
+      "display_order": 8,
+      "motorcad_rotor_value": null,
+      "input_mapping_status": "pending",
+      "verified_magnetisation": [],
+      "direction_policy": "template_pending",
+      "parameters": [
+        "magnet_thickness_mm",
+        "pole_arc_ed",
+        "magnet_segments",
+        "magnet_inset_mm",
+        "bridge_thickness_mm"
+      ],
+      "layered": false,
+      "layer_parameters": [],
+      "parameter_schema_status": "initial_definition_pending_template_validation",
+      "geometry_adapter": null,
+      "verification_ready_directions": [],
+      "constraint_ids": [
+        "parameter_domain",
+        "dimension_grid",
+        "geometry_interference",
+        "assembly_clearance",
+        "material_validity",
+        "flux_density",
+        "torque_ripple",
+        "voltage_current",
+        "demagnetization",
+        "minimum_structural_section"
+      ],
+      "design_qualified": false
+    },
+    {
+      "id": "embedded_breadloaf",
+      "label": "Embedded Breadloaf",
+      "family": "Embedded",
+      "input_value": "embedded_breadloaf",
+      "aliases": [
+        "Embedded Breadloaf"
+      ],
+      "display_order": 9,
+      "motorcad_rotor_value": null,
+      "input_mapping_status": "pending",
+      "verified_magnetisation": [],
+      "direction_policy": "template_pending",
+      "parameters": [
+        "magnet_thickness_mm",
+        "pole_arc_ed",
+        "magnet_segments",
+        "magnet_inset_mm",
+        "bridge_thickness_mm",
+        "magnet_reduction_mm"
+      ],
+      "layered": false,
+      "layer_parameters": [],
+      "parameter_schema_status": "initial_definition_pending_template_validation",
+      "geometry_adapter": null,
+      "verification_ready_directions": [],
+      "constraint_ids": [
+        "parameter_domain",
+        "dimension_grid",
+        "geometry_interference",
+        "assembly_clearance",
+        "material_validity",
+        "flux_density",
+        "torque_ripple",
+        "voltage_current",
+        "demagnetization",
+        "minimum_structural_section"
+      ],
+      "design_qualified": false
+    },
+    {
+      "id": "interior_flat_web",
+      "label": "Interior Flat (web)",
+      "family": "Interior",
+      "input_value": "interior_flat_web",
+      "aliases": [
+        "Interior Flat (web)"
+      ],
+      "display_order": 10,
+      "motorcad_rotor_value": null,
+      "input_mapping_status": "pending",
+      "verified_magnetisation": [],
+      "direction_policy": "template_pending",
+      "parameters": [
+        "magnet_thickness_mm",
+        "pole_arc_ed",
+        "magnet_segments",
+        "bridge_thickness_mm",
+        "web_thickness_mm",
+        "magnet_post_mm",
+        "magnet_clearance_mm",
+        "magnet_width_mm"
+      ],
+      "layered": false,
+      "layer_parameters": [],
+      "parameter_schema_status": "initial_definition_pending_template_validation",
+      "geometry_adapter": null,
+      "verification_ready_directions": [],
+      "constraint_ids": [
+        "parameter_domain",
+        "dimension_grid",
+        "geometry_interference",
+        "assembly_clearance",
+        "material_validity",
+        "flux_density",
+        "torque_ripple",
+        "voltage_current",
+        "demagnetization",
+        "minimum_structural_section"
+      ],
+      "design_qualified": false
+    },
+    {
+      "id": "interior_flat_simple",
+      "label": "Interior Flat (simple)",
+      "family": "Interior",
+      "input_value": "interior_flat_simple",
+      "aliases": [
+        "Interior Flat (simple)"
+      ],
+      "display_order": 11,
+      "motorcad_rotor_value": null,
+      "input_mapping_status": "pending",
+      "verified_magnetisation": [],
+      "direction_policy": "template_pending",
+      "parameters": [
+        "magnet_thickness_mm",
+        "magnet_width_mm",
+        "magnet_inset_mm",
+        "magnet_segments"
+      ],
+      "layered": false,
+      "layer_parameters": [],
+      "parameter_schema_status": "initial_definition_pending_template_validation",
+      "geometry_adapter": null,
+      "verification_ready_directions": [],
+      "constraint_ids": [
+        "parameter_domain",
+        "dimension_grid",
+        "geometry_interference",
+        "assembly_clearance",
+        "material_validity",
+        "flux_density",
+        "torque_ripple",
+        "voltage_current",
+        "demagnetization",
+        "minimum_structural_section"
+      ],
+      "design_qualified": false
+    },
+    {
+      "id": "interior_v_web",
+      "label": "Interior V (web)",
+      "family": "Interior",
+      "input_value": "interior_v_web",
+      "aliases": [
+        "Interior V (web)"
+      ],
+      "display_order": 12,
+      "motorcad_rotor_value": null,
+      "input_mapping_status": "pending",
+      "verified_magnetisation": [],
+      "direction_policy": "template_pending",
+      "parameters": [
+        "magnet_layers",
+        "magnet_thickness_mm",
+        "pole_arc_ed",
+        "pole_v_angle_md",
+        "magnet_bar_width_mm",
+        "magnet_separation_mm",
+        "bridge_thickness_mm",
+        "web_thickness_mm",
+        "web_length_mm",
+        "magnet_post_mm",
+        "magnet_segments",
+        "mag_gap_inner_mm",
+        "mag_gap_outer_mm"
+      ],
+      "layered": true,
+      "layer_parameters": [
+        "magnet_thickness_mm",
+        "pole_arc_ed",
+        "pole_v_angle_md",
+        "magnet_bar_width_mm",
+        "magnet_separation_mm",
+        "bridge_thickness_mm",
+        "web_thickness_mm",
+        "web_length_mm",
+        "magnet_post_mm",
+        "magnet_segments",
+        "mag_gap_inner_mm",
+        "mag_gap_outer_mm"
+      ],
+      "parameter_schema_status": "initial_definition_pending_template_validation",
+      "geometry_adapter": null,
+      "verification_ready_directions": [],
+      "constraint_ids": [
+        "parameter_domain",
+        "dimension_grid",
+        "geometry_interference",
+        "assembly_clearance",
+        "material_validity",
+        "flux_density",
+        "torque_ripple",
+        "voltage_current",
+        "demagnetization",
+        "minimum_structural_section"
+      ],
+      "design_qualified": false
+    },
+    {
+      "id": "interior_v_simple",
+      "label": "Interior V (simple)",
+      "family": "Interior",
+      "input_value": "interior_v_simple",
+      "aliases": [
+        "Interior V (simple)"
+      ],
+      "display_order": 13,
+      "motorcad_rotor_value": null,
+      "input_mapping_status": "pending",
+      "verified_magnetisation": [],
+      "direction_policy": "template_pending",
+      "parameters": [
+        "magnet_thickness_mm",
+        "pole_v_angle_md",
+        "magnet_bar_width_mm",
+        "magnet_inset_mm",
+        "magnet_segments"
+      ],
+      "layered": false,
+      "layer_parameters": [],
+      "parameter_schema_status": "initial_definition_pending_template_validation",
+      "geometry_adapter": null,
+      "verification_ready_directions": [],
+      "constraint_ids": [
+        "parameter_domain",
+        "dimension_grid",
+        "geometry_interference",
+        "assembly_clearance",
+        "material_validity",
+        "flux_density",
+        "torque_ripple",
+        "voltage_current",
+        "demagnetization",
+        "minimum_structural_section"
+      ],
+      "design_qualified": false
+    },
+    {
+      "id": "interior_u",
+      "label": "Interior U-Shape",
+      "family": "Interior",
+      "input_value": "interior_u",
+      "aliases": [
+        "Interior U-Shape"
+      ],
+      "display_order": 14,
+      "motorcad_rotor_value": null,
+      "input_mapping_status": "pending",
+      "verified_magnetisation": [],
+      "direction_policy": "template_pending",
+      "parameters": [
+        "magnet_layers",
+        "magnet_thickness_mm",
+        "pole_arc_ed",
+        "magnet_width_mm",
+        "bridge_thickness_mm",
+        "web_thickness_mm",
+        "magnet_segments"
+      ],
+      "layered": true,
+      "layer_parameters": [
+        "magnet_thickness_mm",
+        "pole_arc_ed",
+        "magnet_width_mm",
+        "bridge_thickness_mm",
+        "web_thickness_mm",
+        "magnet_segments"
+      ],
+      "parameter_schema_status": "initial_definition_pending_template_validation",
+      "geometry_adapter": null,
+      "verification_ready_directions": [],
+      "constraint_ids": [
+        "parameter_domain",
+        "dimension_grid",
+        "geometry_interference",
+        "assembly_clearance",
+        "material_validity",
+        "flux_density",
+        "torque_ripple",
+        "voltage_current",
+        "demagnetization",
+        "minimum_structural_section"
+      ],
+      "design_qualified": false
+    },
+    {
+      "id": "spoke",
+      "label": "Spoke",
+      "family": "Spoke",
+      "input_value": "spoke",
+      "aliases": [
+        "Spoke"
+      ],
+      "display_order": 15,
+      "motorcad_rotor_value": null,
+      "input_mapping_status": "pending",
+      "verified_magnetisation": [],
+      "direction_policy": "template_pending",
+      "parameters": [
+        "magnet_inset_mm",
+        "magnet_depth_mm",
+        "magnet_opening_mm",
+        "magnet_thickness_mm",
+        "magnet_segments",
+        "rotor_lamination_inset_mm"
+      ],
+      "layered": false,
+      "layer_parameters": [],
+      "parameter_schema_status": "initial_definition_pending_template_validation",
+      "geometry_adapter": null,
+      "verification_ready_directions": [],
+      "constraint_ids": [
+        "parameter_domain",
+        "dimension_grid",
+        "geometry_interference",
+        "assembly_clearance",
+        "material_validity",
+        "flux_density",
+        "torque_ripple",
+        "voltage_current",
+        "demagnetization",
+        "minimum_structural_section"
+      ],
+      "design_qualified": false
+    }
+  ],
+  "parameter_definitions": {
+    "magnet_thickness_mm": {
+      "id": "magnet_thickness_mm",
+      "label": "Magnet Thickness",
+      "unit": "mm",
+      "kind": "number",
+      "minimum": 0,
+      "minimum_inclusive": false,
+      "maximum": null,
+      "step": 0.1,
+      "structural_section": false,
+      "zero_means_absent": false,
+      "scope": "rotor",
+      "motorcad_variable": "Magnet_Thickness",
+      "mapping_status": "existing_geometry_input",
+      "optimizer_connected": false
+    },
+    "pole_arc_ed": {
+      "id": "pole_arc_ed",
+      "label": "Pole Arc",
+      "unit": "deg electrical",
+      "kind": "number",
+      "minimum": 0,
+      "minimum_inclusive": false,
+      "maximum": 180,
+      "step": null,
+      "structural_section": false,
+      "zero_means_absent": false,
+      "scope": "rotor",
+      "motorcad_variable": "Magnet_Arc_[ED]",
+      "mapping_status": "existing_input_readback",
+      "optimizer_connected": false
+    },
+    "magnet_reduction_mm": {
+      "id": "magnet_reduction_mm",
+      "label": "Magnet Reduction",
+      "unit": "mm",
+      "kind": "number",
+      "minimum": 0,
+      "minimum_inclusive": true,
+      "maximum": null,
+      "step": 0.1,
+      "structural_section": false,
+      "zero_means_absent": false,
+      "scope": "rotor",
+      "motorcad_variable": null,
+      "mapping_status": "pending",
+      "optimizer_connected": false
+    },
+    "magnet_width_mm": {
+      "id": "magnet_width_mm",
+      "label": "Magnet Width",
+      "unit": "mm",
+      "kind": "number",
+      "minimum": 0,
+      "minimum_inclusive": false,
+      "maximum": null,
+      "step": 0.1,
+      "structural_section": false,
+      "zero_means_absent": false,
+      "scope": "rotor",
+      "motorcad_variable": null,
+      "mapping_status": "pending",
+      "optimizer_connected": false
+    },
+    "magnet_inset_mm": {
+      "id": "magnet_inset_mm",
+      "label": "Magnet Inset",
+      "unit": "mm",
+      "kind": "number",
+      "minimum": 0,
+      "minimum_inclusive": true,
+      "maximum": null,
+      "step": 0.1,
+      "structural_section": false,
+      "zero_means_absent": false,
+      "scope": "rotor",
+      "motorcad_variable": null,
+      "mapping_status": "pending",
+      "optimizer_connected": false
+    },
+    "magnet_depth_mm": {
+      "id": "magnet_depth_mm",
+      "label": "Magnet Depth",
+      "unit": "mm",
+      "kind": "number",
+      "minimum": 0,
+      "minimum_inclusive": false,
+      "maximum": null,
+      "step": 0.1,
+      "structural_section": false,
+      "zero_means_absent": false,
+      "scope": "rotor",
+      "motorcad_variable": null,
+      "mapping_status": "pending",
+      "optimizer_connected": false
+    },
+    "magnet_opening_mm": {
+      "id": "magnet_opening_mm",
+      "label": "Magnet Opening",
+      "unit": "mm",
+      "kind": "number",
+      "minimum": 0,
+      "minimum_inclusive": true,
+      "maximum": null,
+      "step": 0.1,
+      "structural_section": false,
+      "zero_means_absent": false,
+      "scope": "rotor",
+      "motorcad_variable": null,
+      "mapping_status": "pending",
+      "optimizer_connected": false
+    },
+    "rotor_lamination_inset_mm": {
+      "id": "rotor_lamination_inset_mm",
+      "label": "Rotor Lamination Inset",
+      "unit": "mm",
+      "kind": "number",
+      "minimum": 0,
+      "minimum_inclusive": true,
+      "maximum": null,
+      "step": 0.1,
+      "structural_section": false,
+      "zero_means_absent": false,
+      "scope": "rotor",
+      "motorcad_variable": null,
+      "mapping_status": "pending",
+      "optimizer_connected": false
+    },
+    "bridge_thickness_mm": {
+      "id": "bridge_thickness_mm",
+      "label": "Bridge Thickness",
+      "unit": "mm",
+      "kind": "number",
+      "minimum": 0,
+      "minimum_inclusive": false,
+      "maximum": null,
+      "step": 0.1,
+      "structural_section": true,
+      "zero_means_absent": false,
+      "scope": "rotor",
+      "motorcad_variable": null,
+      "mapping_status": "pending",
+      "optimizer_connected": false
+    },
+    "web_thickness_mm": {
+      "id": "web_thickness_mm",
+      "label": "Web / Rib Thickness",
+      "unit": "mm",
+      "kind": "number",
+      "minimum": 0,
+      "minimum_inclusive": false,
+      "maximum": null,
+      "step": 0.1,
+      "structural_section": true,
+      "zero_means_absent": false,
+      "scope": "rotor",
+      "motorcad_variable": null,
+      "mapping_status": "pending",
+      "optimizer_connected": false
+    },
+    "web_length_mm": {
+      "id": "web_length_mm",
+      "label": "Web Length",
+      "unit": "mm",
+      "kind": "number",
+      "minimum": 0,
+      "minimum_inclusive": true,
+      "maximum": null,
+      "step": 0.1,
+      "structural_section": false,
+      "zero_means_absent": false,
+      "scope": "rotor",
+      "motorcad_variable": null,
+      "mapping_status": "pending",
+      "optimizer_connected": false
+    },
+    "magnet_post_mm": {
+      "id": "magnet_post_mm",
+      "label": "Magnet Post",
+      "unit": "mm",
+      "kind": "number",
+      "minimum": 0,
+      "minimum_inclusive": true,
+      "maximum": null,
+      "step": 0.1,
+      "structural_section": true,
+      "zero_means_absent": true,
+      "scope": "rotor",
+      "motorcad_variable": null,
+      "mapping_status": "pending",
+      "optimizer_connected": false
+    },
+    "magnet_clearance_mm": {
+      "id": "magnet_clearance_mm",
+      "label": "Magnet Clearance",
+      "unit": "mm",
+      "kind": "number",
+      "minimum": 0,
+      "minimum_inclusive": true,
+      "maximum": null,
+      "step": 0.1,
+      "structural_section": false,
+      "zero_means_absent": false,
+      "scope": "rotor",
+      "motorcad_variable": null,
+      "mapping_status": "pending",
+      "optimizer_connected": false
+    },
+    "magnet_bar_width_mm": {
+      "id": "magnet_bar_width_mm",
+      "label": "Magnet Bar Width",
+      "unit": "mm",
+      "kind": "number",
+      "minimum": 0,
+      "minimum_inclusive": false,
+      "maximum": null,
+      "step": 0.1,
+      "structural_section": false,
+      "zero_means_absent": false,
+      "scope": "rotor",
+      "motorcad_variable": null,
+      "mapping_status": "pending",
+      "optimizer_connected": false
+    },
+    "magnet_separation_mm": {
+      "id": "magnet_separation_mm",
+      "label": "Magnet Separation",
+      "unit": "mm",
+      "kind": "number",
+      "minimum": 0,
+      "minimum_inclusive": true,
+      "maximum": null,
+      "step": 0.1,
+      "structural_section": false,
+      "zero_means_absent": false,
+      "scope": "rotor",
+      "motorcad_variable": null,
+      "mapping_status": "pending",
+      "optimizer_connected": false
+    },
+    "pole_v_angle_md": {
+      "id": "pole_v_angle_md",
+      "label": "Pole V Angle",
+      "unit": "deg mechanical",
+      "kind": "number",
+      "minimum": 0,
+      "minimum_inclusive": false,
+      "maximum": 180,
+      "step": null,
+      "structural_section": false,
+      "zero_means_absent": false,
+      "scope": "rotor",
+      "motorcad_variable": null,
+      "mapping_status": "pending",
+      "optimizer_connected": false
+    },
+    "mag_gap_inner_mm": {
+      "id": "mag_gap_inner_mm",
+      "label": "Mag Gap Inner",
+      "unit": "mm",
+      "kind": "number",
+      "minimum": 0,
+      "minimum_inclusive": true,
+      "maximum": null,
+      "step": 0.1,
+      "structural_section": false,
+      "zero_means_absent": false,
+      "scope": "rotor",
+      "motorcad_variable": null,
+      "mapping_status": "pending",
+      "optimizer_connected": false
+    },
+    "mag_gap_outer_mm": {
+      "id": "mag_gap_outer_mm",
+      "label": "Mag Gap Outer",
+      "unit": "mm",
+      "kind": "number",
+      "minimum": 0,
+      "minimum_inclusive": true,
+      "maximum": null,
+      "step": 0.1,
+      "structural_section": false,
+      "zero_means_absent": false,
+      "scope": "rotor",
+      "motorcad_variable": null,
+      "mapping_status": "pending",
+      "optimizer_connected": false
+    },
+    "magnet_layers": {
+      "id": "magnet_layers",
+      "label": "Magnet Layers",
+      "unit": "count",
+      "kind": "integer",
+      "minimum": 1,
+      "minimum_inclusive": true,
+      "maximum": null,
+      "step": 1,
+      "structural_section": false,
+      "zero_means_absent": false,
+      "scope": "rotor",
+      "motorcad_variable": null,
+      "mapping_status": "pending",
+      "optimizer_connected": false
+    },
+    "magnet_segments": {
+      "id": "magnet_segments",
+      "label": "Magnet Segments",
+      "unit": "count",
+      "kind": "integer",
+      "minimum": 1,
+      "minimum_inclusive": true,
+      "maximum": null,
+      "step": 1,
+      "structural_section": false,
+      "zero_means_absent": false,
+      "scope": "rotor",
+      "motorcad_variable": null,
+      "mapping_status": "pending",
+      "optimizer_connected": false
+    }
+  },
+  "reference_models": [
+    {
+      "id": "radial",
+      "rotor_id": "surface_radial",
+      "magnetisation": "Radial",
+      "relative_path": "validation/jobs/20261022_132138/calibration.json",
+      "temperature_C": 20,
+      "core": "POSCO | 50PN470",
+      "magnet": "JL Mag Rare-Earth | N48UH",
+      "poles": 4,
+      "slots": 12,
+      "connection": "delta",
+      "strands": 1,
+      "paths": 1,
+      "model": "local_surface_proxy_v1"
+    },
+    {
+      "id": "parallel",
+      "rotor_id": "surface_parallel",
+      "magnetisation": "Parallel",
+      "relative_path": "validation/calibrations/surface_parallel_20261022/calibration.json",
+      "temperature_C": 20,
+      "core": "POSCO | 50PN470",
+      "magnet": "JL Mag Rare-Earth | N48UH",
+      "poles": 4,
+      "slots": 12,
+      "connection": "delta",
+      "strands": 1,
+      "paths": 1,
+      "model": "local_surface_proxy_v1"
+    }
+  ],
+  "policy": {
+    "dimension_step_mm": 0.1,
+    "skew_enabled": false,
+    "pole_slot_selection_enabled": true,
+    "thermal_analysis_enabled": false,
+    "structural_analysis_enabled": false,
+    "demagnetization_review_enabled": true,
+    "minimum_structural_section_mm": 0.5,
+    "minimum_section_rule": "max(0.5 mm, actual lamination thickness)",
+    "manufacturing_rule_source": "User instruction, 2026-10-23; not a mechanical stress qualification",
+    "default_pole_slot_pairs": [
+      {
+        "poles": 4,
+        "slots": 12
+      }
+    ]
+  },
+  "sources": {
+    "rotor_types": "https://ansyshelp.ansys.com/public/Views/Secured/MotorCAD/v252/en/Motor-CAD_UG/MotorCAD/topics/rotortype.html",
+    "breadloaf": "https://ansyshelp.ansys.com/public/Views/Secured/MotorCAD/v252/en/Motor-CAD_UG/MotorCAD/topics/surface_breadloaf_magnet_geome.html",
+    "spoke": "https://ansyshelp.ansys.com/public/Views/Secured/MotorCAD/v252/en/Motor-CAD_UG/MotorCAD/topics/spoke_magnet_geometry.html",
+    "ipm_v": "https://ansyshelp.ansys.com/public/Views/Secured/MotorCAD/v252/en/Motor-CAD_UG/MotorCAD/topics/interior_v_web_magnet_geometry.html",
+    "ipm_flat": "https://ansyshelp.ansys.com/public/Views/Secured/MotorCAD/v252/en/Motor-CAD_UG/MotorCAD/topics/interior_flat_web_magnet_geome.html"
+  },
+  "notes": [
+    "Parameter schemas are initial family definitions, not complete SDK mappings.",
+    "Thermal and structural analyses excluded by user. Manufacturing minimum dimensions retained.",
+    "Slot/pole candidates are not proof of a balanced valid winding."
+  ],
+  "detailed_spm_geometry": {
+    "registered_rotor_ids": [
+      "surface_radial",
+      "surface_parallel",
+      "surface_breadloaf"
+    ],
+    "stator_parameters": {
+      "stator_bore_mm": {
+        "label": "스테이터 내경",
+        "native_variable": "Stator_Bore",
+        "unit": "mm",
+        "step": 0.1
+      },
+      "shaft_diameter_mm": {
+        "label": "축경",
+        "native_variable": "Shaft_Dia",
+        "unit": "mm",
+        "step": 0.1
+      },
+      "tooth_width_mm": {
+        "label": "치폭",
+        "native_variable": "Tooth_Width",
+        "unit": "mm",
+        "step": 0.1
+      },
+      "slot_depth_mm": {
+        "label": "슬롯 깊이",
+        "native_variable": "Slot_Depth",
+        "unit": "mm",
+        "step": 0.1
+      },
+      "slot_opening_mm": {
+        "label": "슬롯 입구 폭",
+        "native_variable": "Slot_Opening",
+        "unit": "mm",
+        "step": 0.1
+      },
+      "tooth_tip_depth_mm": {
+        "label": "치끝 두께",
+        "native_variable": "Tooth_Tip_Depth",
+        "unit": "mm",
+        "step": 0.1
+      },
+      "housing_diameter_mm": {
+        "label": "하우징 외경",
+        "native_variable": "Housing_Dia",
+        "unit": "mm",
+        "step": 0.1
+      }
+    },
+    "optimizer_connected": false,
+    "breadloaf_native_corner_geometry_verified": false
+  },
+  "spm_ripple_modules": {
+    "scope": [
+      "surface_radial",
+      "surface_parallel",
+      "surface_breadloaf",
+      "surface_flat"
+    ],
+    "module": "validation/spm_ripple.py",
+    "status": "experimental_uncalibrated",
+    "production_optimizer_connected": false,
+    "geometry_input": "native boundary snapshot for each Surface type",
+    "acceptance": {
+      "predicted_max_pct": 20,
+      "native_max_pct": 50,
+      "actual20pct_certification": false
+    },
+    "development_policy": {
+      "schema": "spm-ripple-development-policy-v1",
+      "updated": "2026-11-05",
+      "production_optimizer_connected": false,
+      "rotors": {
+        "surface_radial": {
+          "registered": true,
+          "development_status": "active",
+          "ripple_qualified": false
+        },
+        "surface_parallel": {
+          "registered": true,
+          "development_status": "active",
+          "ripple_qualified": false
+        },
+        "surface_breadloaf": {
+          "registered": true,
+          "development_status": "active_priority",
+          "ripple_qualified": false,
+          "candidate_evidence": {
+            "source": "outputs/breadloaf_shape_verification_20261104/verification_review.json",
+            "selected_candidates": 3,
+            "practical_ripple_passed": 3,
+            "actual_ripple_le20": 3,
+            "electromagnetic_torque_target_passed": 0,
+            "scope": "Three nearby shapes at fixed development point only; no family-wide qualification."
+          },
+          "current_feedback_evidence": {
+            "source": "outputs/breadloaf_current_feedback_20261104/workflow_review.json",
+            "additional_same_geometry_cases": 1,
+            "native_electromagnetic_torque_Nm": 0.49988,
+            "native_shaft_torque_Nm": 0.48245,
+            "native_ripple_pct": 13.683,
+            "strict_torque_target_passed": false,
+            "feedback_budget_used": 1
+          },
+          "staged_cli": "validation/breadloaf_workflow.py",
+          "local_loss_B_model": {
+            "path": "outputs/breadloaf_loss_B_validation_20261104/local_loss_B_model.json",
+            "status": "experimental_local_native_calibration",
+            "training_cases": 10,
+            "frozen_shape_holdouts": 2,
+            "speed_checks": 2,
+            "supported_speed_rpm": 3500,
+            "domain": "development convex hull",
+            "family_qualified": false
+          },
+          "shaft_and_ripple_evidence": {
+            "source": "outputs/breadloaf_fine_verification_20261105/workflow_review.json",
+            "candidate_id": "breadloaf_search_13_614_1",
+            "independent_native_cases": 1,
+            "native_shaft_torque_Nm": 0.50012,
+            "native_efficiency_pct": 88.122,
+            "native_ripple_pct": 13.068,
+            "native_max_B_T": 1.674,
+            "predicted_ripple_pct": 20.63283938694202,
+            "known_requirements_passed": true,
+            "fully_verified": false,
+            "practical_prediction20_native50_passed": false,
+            "family_qualified": false,
+            "remaining_unverified": [
+              "PWM current ripple",
+              "additional DC bus voltages"
+            ],
+            "scope": "One fixed Breadloaf candidate at 3500rpm/20C/9V, D85 L20 4p12s Delta. No refit; not family-wide qualification."
+          }
+        },
+        "surface_flat": {
+          "registered": true,
+          "development_status": "deferred_by_user",
+          "ripple_qualified": false,
+          "automatic_new_fea_allowed": false,
+          "reason": "User deferred Flat ripple improvement on 2026-11-04; preserve existing artifacts."
+        }
+      }
+    }
+  }
+}

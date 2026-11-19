@@ -1,0 +1,307 @@
+{
+  "model": {
+    "Stator_Lam_Dia": 130,
+    "Stator_Bore": 80,
+    "Airgap": 1,
+    "Slot_Number": 18,
+    "Pole_Number": 6,
+    "Magnet_Thickness": 4,
+    "Magnet_Arc_[ED]": 140,
+    "MagTurnsConductor": 40,
+    "ParallelPaths": 1,
+    "WindingConnection": 0
+  },
+  "settings": {
+    "Stator_Lam_Length": 75,
+    "Rotor_Lam_Length": 75,
+    "Magnet_Length": 75,
+    "ShaftSpeed": 1500,
+    "CurrentDefinition": 0,
+    "PeakCurrent": 5,
+    "PhaseAdvance": 0,
+    "DCBusVoltage": 400,
+    "TorquePointsPerCycle": 60,
+    "TorqueNumberCycles": 1,
+    "BackEMFPointsPerCycle": 60,
+    "BackEMFNumberCycles": 1,
+    "BackEMFCalculation": true,
+    "TorqueCalculation": true,
+    "CoggingTorqueCalculation": false,
+    "ElectromagneticForcesCalc_OC": false,
+    "ElectromagneticForcesCalc_Load": false,
+    "TorqueSpeedCalculation": false,
+    "DemagnetizationCalc": false,
+    "InductanceCalc": false,
+    "BPMShortCircuitCalc": false
+  },
+  "summaries": [
+    {
+      "temperature_C": 20,
+      "phase_resistance_ohm": 1.03,
+      "back_emf_LL_rms_total_V": 219.5,
+      "back_emf_LL_rms_fundamental_V": 217.29391385862604,
+      "shaft_torque_Nm": 8.1912,
+      "shaft_power_W": 1286.7,
+      "system_efficiency_pct": 94.195,
+      "total_loss_W": 79.301,
+      "dc_copper_loss_W": 38.62,
+      "Ld_mH": 8.258,
+      "Lq_mH": 11.87,
+      "voltage_limit_exceeded": false
+    },
+    {
+      "temperature_C": 60,
+      "phase_resistance_ohm": 1.189,
+      "back_emf_LL_rms_total_V": 211.6,
+      "back_emf_LL_rms_fundamental_V": 209.65716062181133,
+      "shaft_torque_Nm": 7.9214,
+      "shaft_power_W": 1244.3,
+      "system_efficiency_pct": 93.797,
+      "total_loss_W": 82.282,
+      "dc_copper_loss_W": 44.59,
+      "Ld_mH": 8.634,
+      "Lq_mH": 11.91,
+      "voltage_limit_exceeded": false
+    },
+    {
+      "temperature_C": 100,
+      "phase_resistance_ohm": 1.348,
+      "back_emf_LL_rms_total_V": 202.9,
+      "back_emf_LL_rms_fundamental_V": 201.24258992569142,
+      "shaft_torque_Nm": 7.6162,
+      "shaft_power_W": 1196.4,
+      "system_efficiency_pct": 93.357,
+      "total_loss_W": 85.132,
+      "dc_copper_loss_W": 50.55,
+      "Ld_mH": 9.779,
+      "Lq_mH": 11.94,
+      "voltage_limit_exceeded": false
+    }
+  ],
+  "checks": [
+    {
+      "temperature_C": 20,
+      "name": "상 저항 ρ×MLT×N/A",
+      "calculated": 1.029802666666667,
+      "motorcad": 1.03,
+      "error_pct": 0.019158576051741608,
+      "basis": "Motor-CAD에서 산출한 MLT·단면적을 사용한 일관성 검사"
+    },
+    {
+      "temperature_C": 20,
+      "name": "동손 3×Irms²×R",
+      "calculated": 38.635184640000006,
+      "motorcad": 38.62,
+      "error_pct": 0.03931807353704865,
+      "basis": "Motor-CAD 전류·저항 기반 일관성 검사"
+    },
+    {
+      "temperature_C": 20,
+      "name": "축 출력 T×ω",
+      "calculated": 1286.6706872042357,
+      "motorcad": 1286.7,
+      "error_pct": 0.002278137542886954,
+      "basis": "단위·출력 정의 검사"
+    },
+    {
+      "temperature_C": 20,
+      "name": "전력 수지 Pout+loss",
+      "calculated": 1366.001,
+      "motorcad": 1366.0,
+      "error_pct": 7.320644216517958e-05,
+      "basis": "전력 수지 검사"
+    },
+    {
+      "temperature_C": 20,
+      "name": "효율 Pout/Pin",
+      "calculated": 94.19472913616399,
+      "motorcad": 94.195,
+      "error_pct": 0.0002875564902676432,
+      "basis": "효율 정의 검사"
+    },
+    {
+      "temperature_C": 20,
+      "name": "dq 토크 1.5×p×ψd×Iq",
+      "calculated": 8.443395,
+      "motorcad": 8.4434,
+      "error_pct": 5.921785062665172e-05,
+      "basis": "Motor-CAD 쇄교자속 사용, Id=0; 독립 자속 예측 검증 아님"
+    },
+    {
+      "temperature_C": 20,
+      "name": "Kt(첨두 전류 기준)×Ipeak",
+      "calculated": 8.45,
+      "motorcad": 8.4502,
+      "error_pct": 0.002366807886219382,
+      "basis": "Motor-CAD Kt는 이 모델에서 상 첨두전류 기준"
+    },
+    {
+      "temperature_C": 20,
+      "name": "Ke(선간 기본파 첨두)×ω",
+      "calculated": 307.40484115376125,
+      "motorcad": 307.3,
+      "error_pct": 0.03411687398673686,
+      "basis": "CSV 반올림 영향 포함; 선간 전체 RMS와 구분"
+    },
+    {
+      "temperature_C": 20,
+      "name": "Br 선형 온도 보정",
+      "calculated": 1.105,
+      "motorcad": 1.105,
+      "error_pct": 0.0,
+      "basis": "예제 자석의 αBr=-0.12%/°C 가정; 제조사 다온도 곡선 검증 아님"
+    },
+    {
+      "temperature_C": 60,
+      "name": "상 저항 ρ×MLT×N/A",
+      "calculated": 1.1886933333333338,
+      "motorcad": 1.189,
+      "error_pct": 0.025791982057715154,
+      "basis": "Motor-CAD에서 산출한 MLT·단면적을 사용한 일관성 검사"
+    },
+    {
+      "temperature_C": 60,
+      "name": "동손 3×Irms²×R",
+      "calculated": 44.59925683200001,
+      "motorcad": 44.59,
+      "error_pct": 0.020759883381936507,
+      "basis": "Motor-CAD 전류·저항 기반 일관성 검사"
+    },
+    {
+      "temperature_C": 60,
+      "name": "축 출력 T×ω",
+      "calculated": 1244.2906023073094,
+      "motorcad": 1244.3,
+      "error_pct": 0.0007552593980974876,
+      "basis": "단위·출력 정의 검사"
+    },
+    {
+      "temperature_C": 60,
+      "name": "전력 수지 Pout+loss",
+      "calculated": 1326.5819999999999,
+      "motorcad": 1326.6,
+      "error_pct": 0.001356852103122954,
+      "basis": "전력 수지 검사"
+    },
+    {
+      "temperature_C": 60,
+      "name": "효율 Pout/Pin",
+      "calculated": 93.79617066184231,
+      "motorcad": 93.797,
+      "error_pct": 0.0008841840972379349,
+      "basis": "효율 정의 검사"
+    },
+    {
+      "temperature_C": 60,
+      "name": "dq 토크 1.5×p×ψd×Iq",
+      "calculated": 8.14725,
+      "motorcad": 8.1472,
+      "error_pct": 0.0006137077769035186,
+      "basis": "Motor-CAD 쇄교자속 사용, Id=0; 독립 자속 예측 검증 아님"
+    },
+    {
+      "temperature_C": 60,
+      "name": "Kt(첨두 전류 기준)×Ipeak",
+      "calculated": 8.16,
+      "motorcad": 8.1614,
+      "error_pct": 0.017153919670648294,
+      "basis": "Motor-CAD Kt는 이 모델에서 상 첨두전류 기준"
+    },
+    {
+      "temperature_C": 60,
+      "name": "Ke(선간 기본파 첨두)×ω",
+      "calculated": 296.409266866197,
+      "motorcad": 296.5,
+      "error_pct": 0.030601394199994896,
+      "basis": "CSV 반올림 영향 포함; 선간 전체 RMS와 구분"
+    },
+    {
+      "temperature_C": 60,
+      "name": "Br 선형 온도 보정",
+      "calculated": 1.05196,
+      "motorcad": 1.052,
+      "error_pct": 0.003802281368825095,
+      "basis": "예제 자석의 αBr=-0.12%/°C 가정; 제조사 다온도 곡선 검증 아님"
+    },
+    {
+      "temperature_C": 100,
+      "name": "상 저항 ρ×MLT×N/A",
+      "calculated": 1.348181333333334,
+      "motorcad": 1.348,
+      "error_pct": 0.013452027695386552,
+      "basis": "Motor-CAD에서 산출한 MLT·단면적을 사용한 일관성 검사"
+    },
+    {
+      "temperature_C": 100,
+      "name": "동손 3×Irms²×R",
+      "calculated": 50.563329024000005,
+      "motorcad": 50.55,
+      "error_pct": 0.026368000000015643,
+      "basis": "Motor-CAD 전류·저항 기반 일관성 검사"
+    },
+    {
+      "temperature_C": 100,
+      "name": "축 출력 T×ω",
+      "calculated": 1196.3498984135292,
+      "motorcad": 1196.4,
+      "error_pct": 0.004187695291781458,
+      "basis": "단위·출력 정의 검사"
+    },
+    {
+      "temperature_C": 100,
+      "name": "전력 수지 Pout+loss",
+      "calculated": 1281.5320000000002,
+      "motorcad": 1281.5,
+      "error_pct": 0.002497073741720858,
+      "basis": "전력 수지 검사"
+    },
+    {
+      "temperature_C": 100,
+      "name": "효율 Pout/Pin",
+      "calculated": 93.35934451814282,
+      "motorcad": 93.357,
+      "error_pct": 0.0025113469186243205,
+      "basis": "효율 정의 검사"
+    },
+    {
+      "temperature_C": 100,
+      "name": "dq 토크 1.5×p×ψd×Iq",
+      "calculated": 7.823700000000001,
+      "motorcad": 7.8237,
+      "error_pct": 2.2704817917356884e-14,
+      "basis": "Motor-CAD 쇄교자속 사용, Id=0; 독립 자속 예측 검증 아님"
+    },
+    {
+      "temperature_C": 100,
+      "name": "Kt(첨두 전류 기준)×Ipeak",
+      "calculated": 7.835,
+      "motorcad": 7.8364,
+      "error_pct": 0.017865346332503314,
+      "basis": "Motor-CAD Kt는 이 모델에서 상 첨두전류 기준"
+    },
+    {
+      "temperature_C": 100,
+      "name": "Ke(선간 기본파 첨두)×ω",
+      "calculated": 284.6282944152353,
+      "motorcad": 284.6,
+      "error_pct": 0.009941818424202303,
+      "basis": "CSV 반올림 영향 포함; 선간 전체 RMS와 구분"
+    },
+    {
+      "temperature_C": 100,
+      "name": "Br 선형 온도 보정",
+      "calculated": 0.99892,
+      "motorcad": 0.9989,
+      "error_pct": 0.002002202422666934,
+      "basis": "예제 자석의 αBr=-0.12%/°C 가정; 제조사 다온도 곡선 검증 아님"
+    }
+  ],
+  "limitations": [
+    "Template derivative, not optimized or independently sized from targets",
+    "Generic template materials; not JL MAG/POSCO qualification",
+    "20/60/100 C are prescribed uniform component temperatures, not a thermal solution",
+    "Higher-temperature magnet values use a linear coefficient, not measured multi-temperature curves",
+    "Consistency checks partly reuse Motor-CAD geometry/flux/results; independent analytical electromagnetic prediction is not validated",
+    "Single current angle and speed, no mesh/time-step convergence study, demagnetization or 6-step verification"
+  ]
+}

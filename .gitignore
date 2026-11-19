@@ -1,0 +1,58 @@
+# Python and editor caches
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.vscode/
+.idea/
+
+# Local credentials and machine configuration
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.pfx
+*.p12
+
+# Generated execution state, third-party material data and solver archives
+/outputs/
+/validation/jobs/
+/material_library/
+/material_packages/
+/material_runs/
+/granta_runs/
+/granta_batches/
+*.log
+*.lock
+*.tmp
+*.sqlite
+*.sqlite-*
+*.db
+
+# Native solver models/results and large binary archives
+*.mot
+*.mes
+FEResultsData/
+MessageLogs/
+feasys/
+*.mdb
+*.ugf
+*.bh
+*.zip
+*.7z
+*.gz
+*.pdf
+*.xlsx
+*.docx
+*.pptx
+
+# JavaScript dependencies and browser-test output
+node_modules/
+playwright-report/
+test-results/
+/interface/*-check.json
+/interface/*-review.png

@@ -1,0 +1,23 @@
+const {chromium}=require('C:/Users/jo061/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');
+const assert=require('node:assert/strict');
+(async()=>{const b=await chromium.launch({channel:'msedge',headless:true});try{
+ const p=await b.newPage({viewport:{width:1440,height:1000}}),errors=[];p.on('pageerror',e=>errors.push(e.message));
+ await p.goto('http://127.0.0.1:8765/?job=20261022_091847');await p.waitForFunction(()=>!!realJob?.result);
+ await p.locator('#engine-open').click();await p.locator('#engine-example').click();await p.locator('#engine-close').click();
+ let request=await p.evaluate(()=>toStudyRequest());assert.equal(request.switching_frequency_hz,10000);assert.equal(request.operating_point.torque_ripple_max_pct,20);
+ assert.equal(request.pwm_current_ripple_max_pct,15);
+ await p.locator('[data-page="2"]').click();assert.match(await p.locator('#switching-limit-summary').innerText(),/16극/);
+ await p.locator('[data-key="pwmCurrentRipplePct"]').fill('10');assert.equal(await p.evaluate(()=>toStudyRequest().pwm_current_ripple_max_pct),10);
+ await p.locator('[data-key="pwmCurrentRipplePct"]').fill('0');assert.match(await p.evaluate(()=>{try{toStudyRequest();return '';}catch(e){return e.message;}}),/양수/);
+ await p.locator('[data-key="pwmCurrentRipplePct"]').fill('');assert.equal(await p.evaluate(()=>toStudyRequest().pwm_current_ripple_max_pct),15);
+ await p.locator('[data-key="switchingKHz"]').fill('20');assert.match(await p.locator('#switching-limit-summary').innerText(),/34극/);
+ await p.locator('[data-key="switchingKHz"]').fill('');assert.equal(await p.evaluate(()=>toStudyRequest().switching_frequency_hz),10000);
+ await p.locator('[data-key="switchingKHz"]').fill('0');assert.match(await p.evaluate(()=>{try{toStudyRequest();return '';}catch(e){return e.message;}}),/양수/);
+ await p.locator('[data-key="switchingKHz"]').fill('');await p.locator('[data-page="3"]').click();await p.locator('[data-key="ripple"]').fill('21');
+ assert.match(await p.evaluate(()=>{try{toStudyRequest();return '';}catch(e){return e.message;}}),/0~20/);
+ await p.locator('[data-key="ripple"]').fill('');assert.equal(await p.evaluate(()=>toStudyRequest().operating_point.torque_ripple_max_pct),20);
+ await p.locator('[data-page="4"]').click();assert.match(await p.locator('#content').innerText(),/목표 미달/);assert.match(await p.locator('#content').innerText(),/인덕턴스 전압 상한/);
+ assert.equal(await p.evaluate(()=>realJob.result.results.filter(c=>c.target_met).length),0);
+ await p.screenshot({path:__dirname+'/controller-review.png',fullPage:true});assert.deepEqual(errors,[]);
+ console.log('PASS: PWM current ripple default 15%/override/rejection, switching default, pole cap, torque ripple <=20%, result advisory');
+}finally{await b.close();}})();

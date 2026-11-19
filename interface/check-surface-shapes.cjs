@@ -1,0 +1,26 @@
+const {chromium}=require('C:/Users/jo061/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+(async()=>{const browser=await chromium.launch({channel:'msedge',headless:true});try{
+ const p=await browser.newPage({viewport:{width:1550,height:1050}}),errors=[];
+ p.on('pageerror',e=>errors.push(e.message));
+ await p.route('**/api/verify',r=>r.abort());await p.route('**/api/motorcad/open',r=>r.abort());
+ await p.goto('http://127.0.0.1:8765/?job=20261022_165708');await p.waitForFunction(()=>!!realJob?.result);
+ await p.locator('[data-page="4"]').click();assert.match(await p.locator('#content').innerText(),/Surface Parallel \/ Parallel/);
+ assert.equal(await p.locator('[data-formula-model]').count(),3);
+ await p.locator('#engine-open').click();await p.locator('#engine-example').click();await p.locator('#engine-close').click();
+ await p.locator('[data-page="0"]').click();await p.locator('[data-spm="shape"]').selectOption('Parallel');await p.locator('[data-spm="magnetisation"]').selectOption('Parallel');
+ await p.locator('[data-page="3"]').click();await p.locator('#op-current-control').selectOption('MTPA');await p.locator('#op-field-weakening').check();
+ const req=await p.evaluate(()=>toStudyRequest());assert.deepEqual(req.spm,{shape:'Parallel',magnetisation:'Parallel'});
+ await p.locator('#engine-open').click();
+ const [started]=await Promise.all([p.waitForResponse(r=>r.url().endsWith('/api/optimize')&&r.request().method()==='POST'),p.locator('#engine-start').click()]);
+ assert.equal(started.status(),202);const expected=await started.json();
+ await p.waitForFunction(id=>realJob?.id===id&&realJob?.result?.request?.spm?.shape==='Parallel'&&realJob.result.stage==='formula',expected.id,{timeout:30000});
+ const record=await p.evaluate(()=>({job:realJob.id,stage:realJob.result.stage,calibration:realJob.result.calibration,statistics:realJob.result.search_statistics}));
+ assert.match(record.calibration.path,/surface_parallel_20261022/);assert.equal(record.statistics.motorcad_solves,0);
+ const bad={...req,spm:{shape:'Breadloaf',magnetisation:'Parallel'}};
+ const response=await p.request.post('http://127.0.0.1:8765/api/optimize',{data:bad});assert.equal(response.status(),400);
+ await p.screenshot({path:__dirname+'/surface-parallel-review.png',fullPage:true});
+ assert.deepEqual(errors,[]);fs.writeFileSync(__dirname+'/surface-shapes-check.json',JSON.stringify({PASS:true,...record,page_errors:errors,candidate_FEA_started:false},null,2));
+ console.log(JSON.stringify({PASS:true,...record}));
+}finally{await browser.close();}})().catch(e=>{console.error(e);process.exitCode=1;});

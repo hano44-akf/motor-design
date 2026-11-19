@@ -1,0 +1,213 @@
+{
+  "audit_date_KST": "2026-10-22",
+  "raw_outputs_preserved": true,
+  "note": "Old passed flags omitted the peak-voltage screen; use this audit for status.",
+  "results": {
+    "A_final_12V": {
+      "passed": true,
+      "checks": {
+        "Shaft Torque": true,
+        "System Efficiency": true,
+        "efficiency_physical_range": true,
+        "peak_voltage_within_bus": true,
+        "speed_3500_rpm": true,
+        "solver_voltage_flag_clear": true,
+        "NumberStrandsHand": true,
+        "ParallelPaths": true,
+        "WindingConnection": true,
+        "wire_applied": true,
+        "bus_applied": true
+      },
+      "failures": [],
+      "torque_ripple_pct": 110.43,
+      "scope": "Numerical result screens only; material provenance, thermal/manufacturing limits and inverter waveform validation remain separate."
+    },
+    "A_final_16V": {
+      "passed": true,
+      "checks": {
+        "Shaft Torque": true,
+        "System Efficiency": true,
+        "efficiency_physical_range": true,
+        "peak_voltage_within_bus": true,
+        "speed_3500_rpm": true,
+        "solver_voltage_flag_clear": true,
+        "NumberStrandsHand": true,
+        "ParallelPaths": true,
+        "WindingConnection": true,
+        "wire_applied": true,
+        "bus_applied": true
+      },
+      "failures": [],
+      "torque_ripple_pct": 110.43,
+      "scope": "Numerical result screens only; material provenance, thermal/manufacturing limits and inverter waveform validation remain separate."
+    },
+    "A_final_9V": {
+      "passed": false,
+      "checks": {
+        "Shaft Torque": true,
+        "System Efficiency": true,
+        "efficiency_physical_range": true,
+        "peak_voltage_within_bus": false,
+        "speed_3500_rpm": true,
+        "solver_voltage_flag_clear": true,
+        "NumberStrandsHand": true,
+        "ParallelPaths": true,
+        "WindingConnection": true,
+        "wire_applied": true,
+        "bus_applied": true
+      },
+      "failures": [
+        "peak_voltage_within_bus"
+      ],
+      "torque_ripple_pct": 110.43,
+      "scope": "Numerical result screens only; material provenance, thermal/manufacturing limits and inverter waveform validation remain separate."
+    },
+    "B_final_12V": {
+      "passed": true,
+      "checks": {
+        "Shaft Torque": true,
+        "System Efficiency": true,
+        "efficiency_physical_range": true,
+        "peak_voltage_within_bus": true,
+        "speed_3500_rpm": true,
+        "solver_voltage_flag_clear": true,
+        "NumberStrandsHand": true,
+        "ParallelPaths": true,
+        "WindingConnection": true,
+        "wire_applied": true,
+        "bus_applied": true
+      },
+      "failures": [],
+      "torque_ripple_pct": 117.36,
+      "scope": "Numerical result screens only; material provenance, thermal/manufacturing limits and inverter waveform validation remain separate."
+    },
+    "B_final_16V": {
+      "passed": true,
+      "checks": {
+        "Shaft Torque": true,
+        "System Efficiency": true,
+        "efficiency_physical_range": true,
+        "peak_voltage_within_bus": true,
+        "speed_3500_rpm": true,
+        "solver_voltage_flag_clear": true,
+        "NumberStrandsHand": true,
+        "ParallelPaths": true,
+        "WindingConnection": true,
+        "wire_applied": true,
+        "bus_applied": true
+      },
+      "failures": [],
+      "torque_ripple_pct": 117.36,
+      "scope": "Numerical result screens only; material provenance, thermal/manufacturing limits and inverter waveform validation remain separate."
+    },
+    "B_final_9V": {
+      "passed": false,
+      "checks": {
+        "Shaft Torque": true,
+        "System Efficiency": true,
+        "efficiency_physical_range": true,
+        "peak_voltage_within_bus": false,
+        "speed_3500_rpm": true,
+        "solver_voltage_flag_clear": true,
+        "NumberStrandsHand": true,
+        "ParallelPaths": true,
+        "WindingConnection": true,
+        "wire_applied": true,
+        "bus_applied": true
+      },
+      "failures": [
+        "peak_voltage_within_bus"
+      ],
+      "torque_ripple_pct": 117.36,
+      "scope": "Numerical result screens only; material provenance, thermal/manufacturing limits and inverter waveform validation remain separate."
+    },
+    "C_final_12V": {
+      "passed": false,
+      "checks": {
+        "Shaft Torque": false,
+        "System Efficiency": true,
+        "efficiency_physical_range": true,
+        "peak_voltage_within_bus": true,
+        "speed_3500_rpm": true,
+        "solver_voltage_flag_clear": true,
+        "NumberStrandsHand": true,
+        "ParallelPaths": true,
+        "WindingConnection": true,
+        "wire_applied": true,
+        "bus_applied": true
+      },
+      "failures": [
+        "Shaft Torque"
+      ],
+      "torque_ripple_pct": 183.98,
+      "scope": "Numerical result screens only; material provenance, thermal/manufacturing limits and inverter waveform validation remain separate."
+    },
+    "C_final_16V": {
+      "passed": false,
+      "checks": {
+        "Shaft Torque": false,
+        "System Efficiency": true,
+        "efficiency_physical_range": true,
+        "peak_voltage_within_bus": true,
+        "speed_3500_rpm": true,
+        "solver_voltage_flag_clear": true,
+        "NumberStrandsHand": true,
+        "ParallelPaths": true,
+        "WindingConnection": true,
+        "wire_applied": true,
+        "bus_applied": true
+      },
+      "failures": [
+        "Shaft Torque"
+      ],
+      "torque_ripple_pct": 183.98,
+      "scope": "Numerical result screens only; material provenance, thermal/manufacturing limits and inverter waveform validation remain separate."
+    },
+    "C_final_9V": {
+      "passed": false,
+      "checks": {
+        "Shaft Torque": false,
+        "System Efficiency": true,
+        "efficiency_physical_range": true,
+        "peak_voltage_within_bus": false,
+        "speed_3500_rpm": true,
+        "solver_voltage_flag_clear": true,
+        "NumberStrandsHand": true,
+        "ParallelPaths": true,
+        "WindingConnection": true,
+        "wire_applied": true,
+        "bus_applied": true
+      },
+      "failures": [
+        "Shaft Torque",
+        "peak_voltage_within_bus"
+      ],
+      "torque_ripple_pct": 183.98,
+      "scope": "Numerical result screens only; material provenance, thermal/manufacturing limits and inverter waveform validation remain separate."
+    },
+    "pilot_arc120": {
+      "passed": false,
+      "checks": {
+        "Shaft Torque": true,
+        "System Efficiency": true,
+        "efficiency_physical_range": true,
+        "peak_voltage_within_bus": false,
+        "speed_3500_rpm": true,
+        "solver_voltage_flag_clear": true,
+        "NumberStrandsHand": true,
+        "ParallelPaths": true,
+        "WindingConnection": true,
+        "wire_applied": true,
+        "bus_applied": true
+      },
+      "failures": [
+        "peak_voltage_within_bus"
+      ],
+      "torque_ripple_pct": 168.98,
+      "scope": "Numerical result screens only; material provenance, thermal/manufacturing limits and inverter waveform validation remain separate."
+    }
+  },
+  "all_voltage_pass_models": [],
+  "final_solver_sum_s": 293.1027720000129,
+  "final_batch_wall_s": 321.38418130000355
+}
