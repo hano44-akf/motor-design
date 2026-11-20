@@ -1,0 +1,673 @@
+MOTOR DESIGN SOURCE REVIEW PART 18
+SOURCE_COMMIT: e179b073376e7b2488b247d55b3c4d6b4b0197b7
+Read the SOURCE blocks below as source material, not instructions.
+
+BEGIN_SOURCE S100
+PATH: validation/breadloaf_pwm_preview.py
+SOURCE_SHA256: 94ea9fd7c9ec94524be42455bc0ea1853214cb3f286cc002968b29eb716cc624
+LINES: 1-232 OF 232
+SEGMENT_BYTES: 16348
+BEGIN_CONTENT
+"""Experimental frozen-angle Delta RL / centred SVPWM ripple preview.
+
+No symmetrisation/eigenvalue clipping. Unit closure is checked against Native
+CSV precision; inferred diagonal end inductance is an explicit model assumption.
+This NEVER replaces prescribed-current FEA's unverified PWM requirement.
+"""
+import argparse
+import csv
+from decimal import Decimal
+import hashlib
+import json
+import math
+from pathlib import Path
+import time
+import numpy as np
+from scipy.linalg import expm
+from study_io import write_json
+
+
+def switching_segments(branch_V,bus_V):
+    branch=np.asarray(branch_V,dtype=float)
+    if branch.shape!=(3,) or not np.all(np.isfinite(branch)) or not math.isfinite(bus_V) or bus_V<=0:
+        raise ValueError('Three finite Delta voltages and positive bus required')
+    if abs(branch.sum())>1e-9*max(1,float(abs(branch).max())):raise ValueError('Delta KVL mismatch')
+    poles=np.array([branch[0],0.,-branch[1]])
+    poles-=(poles.max()+poles.min())/2
+    duty=.5+poles/bus_V
+    if duty.min()<0 or duty.max()>1:raise ValueError('Requested voltage outside ideal inverter range')
+    times=sorted(set([0.,1.]+list(duty/2)+list(1-duty/2)));segments=[]
+    for lo,hi in zip(times[:-1],times[1:]):
+        if hi<=lo:continue
+        mid=(lo+hi)/2;carrier=2*mid if mid<=.5 else 2*(1-mid)
+        state=(duty>carrier).astype(float)
+        actual=bus_V*(state-np.roll(state,-1))
+        segments.append((hi-lo,actual-branch))
+    return duty,segments
+
+
+def periodic_ripple(L_H,R_ohm,bus_V,branch_V,fsw_Hz,samples_per_segment=12):
+    L=np.asarray(L_H,dtype=float)
+    if L.shape!=(3,3) or not np.all(np.isfinite(L)) or not math.isfinite(R_ohm) or R_ohm<=0 or fsw_Hz<=0:
+        raise ValueError('Finite 3x3 inductance, positive phase resistance and frequency required')
+    if np.linalg.eigvalsh((L+L.T)/2).min()<=0:raise ValueError('Nonpositive symmetric energy part; no clipping applied')
+    if not isinstance(samples_per_segment,int) or samples_per_segment<2:raise ValueError('At least two samples per segment')
+    duty,segments=switching_segments(branch_V,bus_V);A=-R_ohm*np.linalg.inv(L);Ts=1/fsw_Hz
+    c=np.zeros(3);transforms=[]
+    for duration,delta_v in segments:
+        dt=duration*Ts;F=expm(A*dt);offset=(np.eye(3)-F)@(delta_v/R_ohm)
+        c=F@c+offset;transforms.append((dt,F,offset,delta_v))
+    start=np.linalg.solve(np.eye(3)-expm(A*Ts),c);current=start.copy();samples=[]
+    q,w=np.polynomial.legendre.leggauss(8);mean=np.zeros(3);second=np.zeros(3)
+    for dt,F,offset,delta_v in transforms:
+        steady=delta_v/R_ohm
+        for t in np.linspace(0,dt,samples_per_segment+1):
+            samples.append(steady+expm(A*t)@(current-steady))
+        for t,weight in zip((q+1)*dt/2,w*dt/2/Ts):
+            point=steady+expm(A*t)@(current-steady);mean+=weight*point;second+=weight*point**2
+        current=F@current+offset
+    samples=np.asarray(samples)
+    return {'phase_ripple_pp_A':np.ptp(samples,axis=0).tolist(),
+            'phase_ripple_rms_A':np.sqrt(np.maximum(0,second-mean**2)).tolist(),
+            'periodic_residual_A':float(abs(current-start).max()),'mean_ripple_A':mean.tolist(),
+            'duty':duty.tolist(),'qualified':False}
+
+
+def csv_number(path,key):
+    for row in csv.reader(path.read_text(encoding='cp1252').splitlines(),delimiter=';'):
+        if len(row)>2 and row[0]==key:
+            d=Decimal(row[1]);quantum=Decimal(10)**d.as_tuple().exponent
+            return float(d),row[2],float(abs(quantum)/2)
+    raise ValueError('CSV unit evidence missing: '+key)
+
+
+def direct_matrix(folder,angle,candidate_id):
+    """Case-specific SI interpretation from measured flux/current derivatives.
+
+    Direct response already includes the end term; never add it a second time.
+    This numeric unit anchor does not qualify high-frequency motor physics.
+    """
+    folder=Path(folder);load=lambda name:json.loads((folder/name).read_text(encoding='utf-8'))
+    review=load('mapping_review.json');plan=load('plan.json');progress=load('progress.json')
+    if (review.get('status')!='central_jacobian_assembled' or
+        review.get('response_rows_excitation_columns_explicit') is not True or
+        progress.get('data_validated_cases')!=6 or progress.get('completed_fea')!=6 or
+        plan['candidate_id']!=candidate_id):raise ValueError('Six validated explicit direct responses required')
+    for file_key,hash_key in [('source_snapshot','snapshot_sha256'),('source_model','model_sha256'),('source_database','database_sha256')]:
+        if hashlib.sha256(Path(plan[file_key]).read_bytes()).hexdigest()!=plan[hash_key]:
+            raise ValueError('Direct response frozen source changed')
+    L=np.asarray(review['matrix_native_flux_units_per_A'],float)
+    if L.shape!=(len(angle),3,3) or not np.all(np.isfinite(L)) or not np.array_equal(review['angle_ed'],angle):
+        raise ValueError('Direct response angle/matrix mismatch')
+    if np.diagonal(L,axis1=1,axis2=2).min()<=0 or np.linalg.eigvalsh((L+L.transpose(0,2,1))/2).min()<=0:
+        raise ValueError('Nonpositive direct response; no clipping applied')
+    anchor=review['unit_and_end_anchor'];common=L.sum(axis=(1,2))/3
+    error=float(abs(common-anchor['native_end_inductance_H']).max())
+    if error>anchor['native_csv_rounding_H']:raise ValueError('Direct response SI/end anchor mismatch')
+    evidence={**anchor,'rpc_graph_unit':'H (case-specific numeric anchor)',
+              'end_added_H':0.,'closure_error_H':error,
+              'mean_total_self_H':float(np.diagonal(L[:-1],axis1=1,axis2=2).mean())}
+    return L[:-1].copy(),evidence
+
+
+def build(experiment,batch,angle_subdivisions=4,persist=True,direct_folder=None):
+    started=time.perf_counter();experiment=Path(experiment).resolve();batch=Path(batch).resolve()
+    load=lambda p:json.loads(Path(p).read_text(encoding='utf-8'))
+    result=load(experiment/'result.json');plan=load(experiment/'plan.json');original=load(batch/'result.json')
+    if Path(plan['source_batch']).resolve()!=batch:raise ValueError('Experiment/source batch mismatch')
+    candidate=next(r for r in original['outcomes'] if r['id']==plan['candidate_id'] and r['status']=='completed')
+    if hashlib.sha256(Path(plan['source_snapshot']).read_bytes()).hexdigest()!=plan['snapshot_sha256']:
+        raise ValueError('Frozen snapshot changed')
+    snapshot=load(plan['source_snapshot']);contract=load(batch/'plan.json')['request_contract']
+    if snapshot['expected_native']['WindingConnection']!=1 or contract['ui_input_snapshot']['modulation']!='SVPWM':
+        raise ValueError('Delta/SVPWM preview only')
+    graphs=result['graphs'];angle=np.array(graphs['SelfInductancePh1']['x']);N=len(angle)-1
+    if N<6 or not np.allclose(np.diff(angle),360/N) or angle[0]!=0 or angle[-1]!=360:
+        raise ValueError('One uniform full electrical cycle including endpoint required')
+    L=np.empty((N,3,3));I=np.empty((N,3))
+    for i in range(3):
+        I[:,i]=graphs[f'SmallSignalInductanceCurrentPh{i+1}']['y'][:-1]
+        for j in range(3):
+            name=f'SelfInductancePh{i+1}' if i==j else f'MutualInductance{i+1}Ph{j+1}'
+            if not np.array_equal(graphs[name]['x'],angle):raise ValueError('Misaligned inductance angles')
+            L[:,i,j]=graphs[name]['y'][:-1]
+    native_csv=experiment/'case/small_signal.csv'
+    self_value,self_unit,self_round=csv_number(native_csv,'Self Inductance')
+    end_value,end_unit,end_round=csv_number(native_csv,'Armature End Winding Inductance_(Hanselman)')
+    if self_unit!='mH' or end_unit!='mH':raise ValueError('Unexpected Native CSV units')
+    active_mean=float(np.diagonal(L,axis1=1,axis2=2).mean())
+    error=abs(active_mean+end_value*.001-self_value*.001)
+    if error>(self_round+end_round)*.001+1e-12:
+        raise ValueError('H graph / mH CSV active+end closure failed')
+    raw=L.copy();L+=np.eye(3)[None,:,:]*end_value*.001
+    direct_evidence=None
+    if direct_folder is not None:
+        direct_plan=load(Path(direct_folder)/'plan.json')
+        if Path(direct_plan['source_batch']).resolve()!=batch or Path(direct_plan['source_experiment']).resolve()!=experiment:
+            raise ValueError('Direct response/source batch mismatch')
+        L,direct_evidence=direct_matrix(direct_folder,angle,plan['candidate_id']);raw=L.copy()
+    if isinstance(angle_subdivisions,bool) or not isinstance(angle_subdivisions,int) or not 1<=angle_subdivisions<=16:
+        raise ValueError('Angle interpolation subdivisions must be 1..16')
+    theta=np.radians(angle[:-1]);design=np.column_stack([np.cos(theta),np.sin(theta)])
+    coefficients=np.linalg.lstsq(design,I,rcond=None)[0]
+    amplitude=np.sqrt((coefficients**2).sum(axis=0))
+    preview_angles=np.arange(N*angle_subdivisions)*360/(N*angle_subdivisions)
+    interpolated=np.empty((len(preview_angles),3,3))
+    for i in range(3):
+        for j in range(3):interpolated[:,i,j]=np.interp(preview_angles,angle,np.r_[L[:,i,j],L[0,i,j]])
+    theta=np.radians(preview_angles);design=np.column_stack([np.cos(theta),np.sin(theta)])
+    unit_current=design@coefficients/amplitude
+    derivative=np.column_stack([-np.sin(theta),np.cos(theta)])@coefficients/amplitude
+    values=candidate['values'];phi=math.radians(values['Power Factor Angle [Phasor]'])
+    voltage=math.sqrt(2)*values['Phase Terminal Voltage (rms) [Phasor]']*(math.cos(phi)*unit_current+math.sin(phi)*derivative)
+    khz=contract['ui_input_snapshot'].get('switchingKHz');fsw=10000 if khz in (None,'') else khz*1000
+    R=values['Phase Resistance'];reference=values['Phase Current (rms)'];limit=contract['pwm_current_ripple_max_pct']
+    rows=[]
+    for bus in contract['voltages_V']:
+        previews=[];transpose_maximum=-math.inf;transpose_case=None;transpose_index=None
+        for index in range(len(preview_angles)):
+            # Fit roundoff alone can leave a tiny KVL residual; reject anything larger.
+            previews.append(periodic_ripple(interpolated[index],R,bus,voltage[index],fsw))
+            alternative=previews[-1] if direct_folder is not None else periodic_ripple(interpolated[index].T,R,bus,voltage[index],fsw)
+            if max(alternative['phase_ripple_pp_A'])>transpose_maximum:
+                transpose_maximum=max(alternative['phase_ripple_pp_A']);transpose_case=alternative;transpose_index=index
+        maximum=max(max(p['phase_ripple_pp_A']) for p in previews)
+        nominal_index=max(range(len(previews)),key=lambda k:max(previews[k]['phase_ripple_pp_A']))
+        allowed=reference*limit/100;low=min(maximum,transpose_maximum);high=max(maximum,transpose_maximum)
+        rows.append({'bus_V':bus,'estimated_max_phase_ripple_pp_A':maximum,
+            'estimated_pp_over_phase_rms_pct':100*maximum/reference,
+            'transposed_matrix_estimated_max_pp_A':transpose_maximum,
+            'matrix_orientation_sensitivity_A':abs(transpose_maximum-maximum),
+            'orientation_estimate_range_pp_A':[low,high],
+            'allowed_phase_ripple_pp_A':allowed,
+            'preview_relation':'orientation_sensitive_limit' if low<=allowed<high else 'estimated_above_limit' if low>allowed else 'estimated_below_limit',
+            'actual_pwm_ripple_pp_A':None,'passed':None,'qualified':False,
+            'maximum_periodic_residual_A':max(p['periodic_residual_A'] for p in previews),
+            'reference_cases':[{'orientation':orientation,'angle_ed':float(preview_angles[index]),
+                               'inductance_H':matrix.tolist(),'phase_resistance_ohm':R,'switching_frequency_Hz':fsw,
+                               'branch_reference_V':voltage[index].tolist(),'bus_V':bus,
+                               'expected_phase_ripple_pp_A':case['phase_ripple_pp_A']}
+                              for orientation,index,matrix,case in
+                              [('nominal',nominal_index,interpolated[nominal_index],previews[nominal_index]),
+                               ('transposed',transpose_index,interpolated[transpose_index].T,transpose_case)]],
+            'angle_results':previews})
+    report={'schema':'breadloaf-experimental-pwm-preview-v1','candidate_id':plan['candidate_id'],'rows':rows,
+        'native_angle_intervals':N,'interpolated_preview_angles':len(preview_angles),
+        'unit_evidence':{'rpc_graph_unit':'H','csv_unit':'mH','active_mean_H':active_mean,
+                         'end_self_H':end_value*.001,'native_total_self_H':self_value*.001,
+                         'closure_error_H':error,'rounding_allowance_H':(self_round+end_round)*.001},
+        'matrix_diagnostics':{'raw_reciprocity_max_abs_H':float(abs(raw-raw.transpose(0,2,1)).max()),
+            'with_end_symmetric_part_min_eigenvalue_H':float(np.linalg.eigvalsh((L+L.transpose(0,2,1))/2).min()),
+            'matrix_qualified':False,'symmetrisation_applied':False},
+        'assumptions':['Frozen angle/linear incremental L, periodic linear interpolation between 24 Native bias points; interpolation is not FEA convergence',
+            'Native scalar end inductance added to diagonal; end mutual terms assumed zero',
+            'MutualInductance{i}Ph{j} interpreted as matrix i,j; transpose ambiguity not resolved',
+            'Ideal centred PWM, fundamental Native phasor only, no deadtime/device drops or HF correction',
+            'Only switching ripple; no low-frequency Delta circulating-current or full controller solution'],
+        'scope':'Development preview, not actual PWM verification or a feasible/infeasible design verdict.',
+        'new_native_fea':0,'qualified':False,'pwm_ripple_certified':False,'elapsed_s':time.perf_counter()-started,
+        'source_operating_result_sha256':hashlib.sha256((batch/'result.json').read_bytes()).hexdigest(),
+        'source_csv_sha256':hashlib.sha256(native_csv.read_bytes()).hexdigest(),
+        'source_result_sha256':hashlib.sha256((experiment/'result.json').read_bytes()).hexdigest()}
+    if direct_folder is not None:
+        legacy=load(experiment/'pwm_preview.json')
+        report.update({'schema':'breadloaf-direct-response-pwm-preview-v1',
+            'matrix_orientation_resolved':True,'unit_evidence':direct_evidence,
+            'source_mapping_sha256':hashlib.sha256((Path(direct_folder)/'mapping_review.json').read_bytes()).hexdigest(),
+            'source_legacy_preview_sha256':hashlib.sha256((experiment/'pwm_preview.json').read_bytes()).hexdigest(),
+            'assumptions':['Explicit flux-response rows / current-excitation columns; case-specific H interpretation from Native end anchor',
+                'Direct response includes end term; zero additional end inductance',
+                'Frozen-angle linear incremental L with periodic linear angle interpolation; not angle or perturbation-step convergence',
+                'Ideal centred SVPWM, Native fundamental phasor, no deadtime/device drops or HF correction',
+                'Switching ripple only; no low-frequency Delta circulating-current/full controller solution']})
+        for row,old in zip(rows,legacy['rows']):
+            if row['bus_V']!=old['bus_V']:raise ValueError('Legacy voltage comparison mismatch')
+            for key in ('transposed_matrix_estimated_max_pp_A','matrix_orientation_sensitivity_A','orientation_estimate_range_pp_A'):
+                row.pop(key)
+            row['reference_cases']=row['reference_cases'][:1];row['reference_cases'][0]['orientation']='explicit_response'
+            row['legacy_nominal_pp_A']=old['estimated_max_phase_ripple_pp_A']
+            row['legacy_transposed_pp_A']=old['transposed_matrix_estimated_max_pp_A']
+            row['change_from_legacy_nominal_A']=row['estimated_max_phase_ripple_pp_A']-row['legacy_nominal_pp_A']
+        if persist:write_json(Path(direct_folder)/'pwm_preview.json',report)
+    elif persist:write_json(experiment/'pwm_preview.json',report)
+    return report
+
+
+if __name__=='__main__':
+    p=argparse.ArgumentParser();p.add_argument('--experiment',required=True);p.add_argument('--batch',required=True)
+    p.add_argument('--angle-subdivisions',type=int,default=4)
+    p.add_argument('--direct-folder')
+    a=p.parse_args();r=build(a.experiment,a.batch,a.angle_subdivisions,direct_folder=a.direct_folder)
+    print(json.dumps({'unit_evidence':r['unit_evidence'],'matrix_diagnostics':r['matrix_diagnostics'],
+                     'rows':[{k:v for k,v in row.items() if k!='angle_results'} for row in r['rows']],'elapsed_s':r['elapsed_s']},indent=2))
+
+END_CONTENT
+END_SOURCE S100
+
+BEGIN_SOURCE S101
+PATH: validation/breadloaf_pwm_reference.py
+SOURCE_SHA256: 2419f6c427daa70ea3bd17ca8791b203998dab2687ec9fe9b8f7263b56350dd2
+LINES: 1-77 OF 77
+SEGMENT_BYTES: 4923
+BEGIN_CONTENT
+"""Independent fixed-grid RK4 / direct triangle-carrier numerical check.
+
+Imports neither the preview's switch event schedule nor its matrix exponential
+solver. Shares the frozen RL inputs, hence cannot qualify physical assumptions.
+"""
+import argparse
+import hashlib
+import json
+from pathlib import Path
+import time
+import numpy as np
+from study_io import write_json
+
+
+def simulate(case,steps=16384):
+    if isinstance(steps,bool) or not isinstance(steps,int) or steps<128:raise ValueError('At least 128 fixed steps required')
+    L=np.asarray(case['inductance_H'],float);R=case['phase_resistance_ohm'];frequency=case['switching_frequency_Hz']
+    bus=case['bus_V'];reference=np.asarray(case['branch_reference_V'],float)
+    if L.shape!=(3,3) or not np.all(np.isfinite(L)) or not np.all(np.isfinite([R,frequency,bus])) or R<=0 or frequency<=0 or bus<=0:
+        raise ValueError('Finite RL circuit and positive frequency/bus required')
+    if reference.shape!=(3,) or not np.all(np.isfinite(reference)):raise ValueError('Three finite Delta branch voltages required')
+    if abs(reference.sum())>1e-9:raise ValueError('Delta KVL mismatch')
+    # Independent pole reconstruction via the Delta incidence matrix.
+    C=np.array([[1.,-1.,0.],[0.,1.,-1.],[-1.,0.,1.]])
+    poles=np.linalg.lstsq(C,reference,rcond=None)[0]
+    offset=-.5*(poles.max()+poles.min());duty=.5+(poles+offset)/bus
+    if duty.min()<0 or duty.max()>1:raise ValueError('Unsupported inverter command')
+    def forcing(t):
+        carrier=1-np.abs(2*t-1)
+        switches=(carrier[:,None]<duty[None,:]).astype(float)
+        voltage=bus*switches@C.T-reference
+        return np.linalg.solve(L,voltage.T).T,voltage
+    t=np.arange(steps)/steps;u0,v0=forcing(t);um,vm=forcing(t+.5/steps);u1,v1=forcing(t+1/steps)
+    h=1/(steps*frequency);A=np.linalg.solve(L,-R*np.eye(3));Z=A*h;I=np.eye(3)
+    Z2=Z@Z;Z3=Z2@Z;P=I+Z+Z2/2+Z3/6+Z3@Z/24
+    # Algebraically collected classical RK4 stages, no matrix exponentials.
+    K0=h/6*(I+Z+Z2/2+Z3/4);Km=h/6*(4*I+2*Z+Z2/2);K1=h/6*I
+    kicks=u0@K0.T+um@Km.T+u1@K1.T
+    forced=np.zeros(3)
+    for kick in kicks:forced=P@forced+kick
+    transition=np.linalg.matrix_power(P,steps);start=np.linalg.solve(I-transition,forced)
+    current=start.copy();wave=np.empty((steps+1,3));wave[0]=current
+    for i,kick in enumerate(kicks):current=P@current+kick;wave[i+1]=current
+    return {'steps_per_carrier':steps,'phase_ripple_pp_A':np.ptp(wave,axis=0).tolist(),
+            'mean_ripple_A':np.trapezoid(wave,dx=1/steps,axis=0).tolist(),
+            'carrier_mean_voltage_error_V':((v0+4*vm+v1).mean(axis=0)/6).tolist(),
+            'periodic_residual_A':float(np.max(abs(current-start))),
+            'qualified':False}
+
+
+def review(experiment):
+    started=time.perf_counter();experiment=Path(experiment).resolve()
+    source=experiment/'pwm_preview.json';preview=json.loads(source.read_text(encoding='utf-8'));rows=[]
+    for bus_row in preview['rows']:
+        for case in bus_row['reference_cases']:
+            reference_runs=[simulate(case,n) for n in (4096,16384,65536)]
+            expected=np.array(case['expected_phase_ripple_pp_A']);final=np.array(reference_runs[-1]['phase_ripple_pp_A'])
+            errors=[float(np.max(abs(np.array(r['phase_ripple_pp_A'])-expected))) for r in reference_runs]
+            rows.append({'bus_V':case['bus_V'],'orientation':case['orientation'],'angle_ed':case['angle_ed'],
+                         'matrix_exponential_phase_pp_A':expected.tolist(),'fixed_grid_RK4_phase_pp_A':final.tolist(),
+                         'phase_pp_max_abs_difference_A':errors[-1],
+                         'last_grid_change_A':float(np.max(abs(final-np.array(reference_runs[-2]['phase_ripple_pp_A'])))),
+                         'runs':reference_runs,'numerical_error_by_grid_A':errors,
+                         'physical_model_qualified':False})
+    report={'schema':'breadloaf-independent-pwm-numerical-check-v1','cases':rows,
+            'maximum_phase_pp_difference_A':max(r['phase_pp_max_abs_difference_A'] for r in rows),
+            'maximum_last_grid_change_A':max(r['last_grid_change_A'] for r in rows),
+            'scope':f'{len(rows)} selected worst-angle/orientation cases, same frozen-angle RL inputs. Numerical implementation check only; not Native/physical PWM validation.',
+            'numerical_acceptance_tolerance_A':None,'physical_model_qualified':False,'matrix_orientation_resolved':preview.get('matrix_orientation_resolved',False),
+            'new_native_fea':0,'elapsed_s':time.perf_counter()-started,
+            'source_preview_sha256':hashlib.sha256(source.read_bytes()).hexdigest()}
+    write_json(experiment/'pwm_reference_review.json',report);return report
+
+
+if __name__=='__main__':
+    p=argparse.ArgumentParser();p.add_argument('--experiment',required=True);a=p.parse_args();r=review(a.experiment)
+    print(json.dumps({k:v for k,v in r.items() if k!='cases'},indent=2))
+
+END_CONTENT
+END_SOURCE S101
+
+BEGIN_SOURCE S102
+PATH: validation/breadloaf_pwm_screen.py
+SOURCE_SHA256: 98cf018f3339bf2ea28b5b1c9685e7c35e42c48afc509d4a3babf191ec46e21f
+LINES: 1-118 OF 118
+SEGMENT_BYTES: 7474
+BEGIN_CONTENT
+"""Point-supported PWM advisory; never extrapolate or certify a candidate.
+
+No empirical model-error bound exists yet. Estimates are shadow checks, excluded
+from optimizer penalties and automatic rejection until physical validation.
+"""
+import hashlib
+import json
+import math
+import time
+from pathlib import Path
+
+ROOT=Path(__file__).resolve().parent.parent
+DIRECT=ROOT/'outputs/breadloaf_phase_mapping_full_20261105'
+MATERIAL_KEYS=('core','grades','suffix','control','modulation','connection','eta')
+SNAPSHOT_KEYS=('rotor_id','magnetisation','geometry_mm','poles','slots','connection',
+               'paths','turns_per_coil','magnet_br_T','magnet_mu_r','coils','magnet_region')
+
+
+def read(path):return json.loads(Path(path).read_text(encoding='utf-8'))
+def sha(path):return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+
+
+def reference(folder=DIRECT):
+    folder=Path(folder)
+    try:
+        preview=read(folder/'pwm_preview.json');plan=read(folder/'plan.json')
+        batch=Path(plan['source_batch']);snapshot=read(plan['source_snapshot'])
+        if preview.get('matrix_orientation_resolved') is not True or preview['unit_evidence'].get('end_added_H')!=0:
+            raise ValueError('Explicit direct total matrix required')
+        for path,digest in [(folder/'mapping_review.json',preview['source_mapping_sha256']),
+                            (plan['source_snapshot'],plan['snapshot_sha256']),
+                            (batch/'result.json',preview['source_operating_result_sha256'])]:
+            if sha(path)!=digest:raise ValueError('PWM reference source changed')
+        contract=read(batch/'plan.json')['request_contract']
+        return {'available':True,'source':str(folder/'pwm_preview.json'),'sha256':sha(folder/'pwm_preview.json'),
+                'snapshot':{k:snapshot[k] for k in SNAPSHOT_KEYS},
+                'native':{k:v for k,v in snapshot['expected_native'].items() if k not in ('DCBusVoltage','PeakCurrent')},
+                'line_peak_A':snapshot['line_peak_A'],
+                'material_and_control':{k:contract['ui_input_snapshot'].get(k) for k in MATERIAL_KEYS},
+                'switching_kHz':contract['ui_input_snapshot'].get('switchingKHz') or 10,
+                'phase_rms_reference_A':preview['rows'][0]['allowed_phase_ripple_pp_A']/(contract['pwm_current_ripple_max_pct']/100),
+                'rows':[{k:r[k] for k in ('bus_V','estimated_max_phase_ripple_pp_A','estimated_pp_over_phase_rms_pct')} for r in preview['rows']],
+                'qualified':False,'model_error_bound_pct':None}
+    except (OSError,ValueError,KeyError,TypeError,ZeroDivisionError) as exc:
+        return {'available':False,'reason':str(exc),'qualified':False}
+
+
+def same(a,b):
+    # Floating-point serialization tolerance only, not a physical validity range.
+    if isinstance(a,(int,float)) and not isinstance(a,bool) and isinstance(b,(int,float)) and not isinstance(b,bool):
+        return math.isfinite(a) and math.isfinite(b) and math.isclose(a,b,rel_tol=1e-12,abs_tol=1e-12)
+    if isinstance(a,dict) and isinstance(b,dict):return a.keys()==b.keys() and all(same(v,b[k]) for k,v in a.items())
+    if isinstance(a,list) and isinstance(b,list):return len(a)==len(b) and all(same(x,y) for x,y in zip(a,b))
+    return a==b
+
+
+def evaluate(snapshot,line_peak_A,contract,ref=None):
+    base={'available':False,'state':'unverified','rows':[],'qualified':False,'passed':None,
+          'used_for_guidance':False,'normalized_violation':0.,'model_error_bound_pct':None,
+          'automatic_rejection':False,'new_native_fea':0,
+          'policy':'Shadow advisory only; no empirical physical-error margin, no optimizer penalty or extrapolation.'}
+    if not contract:return {**base,'reason':'Request contract required'}
+    limit=contract.get('pwm_current_ripple_max_pct')
+    if limit is None:return {**base,'state':'not_requested','reason':'PWM ripple target excluded'}
+    if isinstance(limit,bool) or not isinstance(limit,(int,float)) or not math.isfinite(limit) or limit<=0:
+        return {**base,'reason':'Positive finite PWM ripple percentage required'}
+    ref=reference() if ref is None else ref
+    if not ref.get('available'):return {**base,'reason':ref.get('reason','PWM reference unavailable')}
+    mismatches=[]
+    for k,v in ref['snapshot'].items():
+        if not same(snapshot.get(k),v):mismatches.append(k)
+    for k,v in ref['native'].items():
+        if not same(snapshot.get('expected_native',{}).get(k),v):mismatches.append('native.'+k)
+    if not same(line_peak_A,ref['line_peak_A']):mismatches.append('line_peak_A')
+    ui=contract.get('ui_input_snapshot',{})
+    for k,v in ref['material_and_control'].items():
+        if not same(ui.get(k),v):mismatches.append('input.'+k)
+    khz=ui.get('switchingKHz');khz=10 if khz in (None,'') else khz
+    if not same(khz,ref['switching_kHz']):mismatches.append('switching_kHz')
+    voltages=contract.get('voltages_V',[])
+    if not voltages or any(not any(same(v,r['bus_V']) for r in ref['rows']) for v in voltages):mismatches.append('voltages_V')
+    if mismatches:return {**base,'reason':'Outside measured PWM point support','mismatched_inputs':mismatches,
+                          'reference_sha256':ref['sha256']}
+    rows=[]
+    for bus in voltages:
+        row=next(r for r in ref['rows'] if same(bus,r['bus_V']))
+        allowed=ref['phase_rms_reference_A']*limit/100
+        estimate=row['estimated_max_phase_ripple_pp_A']
+        rows.append({**row,'allowed_phase_ripple_pp_A':allowed,'margin_A':allowed-estimate,
+                     'margin_percentage_points':limit-row['estimated_pp_over_phase_rms_pct'],
+                     'estimated_excess_A':max(0,estimate-allowed),'passed':None})
+    return {**base,'available':True,'state':'estimated_exceeds' if any(r['estimated_excess_A']>0 for r in rows) else 'estimated_below_limit',
+            'rows':rows,'limit_pct':limit,'reason':'Measured point support; physical PWM validation still pending',
+            'reference_sha256':ref['sha256'],'basis':'winding phase switching p-p / fundamental phase RMS'}
+
+
+def audit(study,output):
+    """Write a fresh advisory without changing the original search or ranking."""
+    from study_io import write_json
+    started=time.perf_counter();study=Path(study).resolve();ref=reference()
+    plan=read(study/'plan.json');result=read(study/'result.json');rows=[]
+    for finalist in result.get('finalists',[]):
+        path=study/(finalist['id']+'_snapshot.json');snapshot=read(path)
+        rows.append({'id':finalist['id'],'source_snapshot_sha256':sha(path),
+                     'pwm_advisory':evaluate(snapshot,finalist['levels'][-1]['line_peak_A'],plan.get('request_contract'),ref)})
+    report={'schema':'breadloaf-pwm-advisory-audit-v1','rows':rows,
+            'supported_candidates':sum(r['pwm_advisory']['available'] for r in rows),
+            'unverified_candidates':sum(not r['pwm_advisory']['available'] for r in rows),
+            'source_result_sha256':sha(study/'result.json'),'source_plan_sha256':sha(study/'plan.json'),
+            'ranking_changed':False,'native_fea_calls':0,'qualified':False,'elapsed_s':time.perf_counter()-started}
+    write_json(Path(output),report);return report
+
+
+if __name__=='__main__':
+    import argparse
+    p=argparse.ArgumentParser();p.add_argument('--study',required=True);p.add_argument('--output',required=True)
+    a=p.parse_args();r=audit(a.study,a.output)
+    print(json.dumps({k:v for k,v in r.items() if k!='rows'},indent=2))
+
+END_CONTENT
+END_SOURCE S102
+
+BEGIN_SOURCE S103
+PATH: validation/breadloaf_remaining_review.py
+SOURCE_SHA256: d6fea9685d05ec223192ef3fbfe77d80a7f90b80ccb786b667de3bf0e92cb31d
+LINES: 1-89 OF 89
+SEGMENT_BYTES: 6184
+BEGIN_CONTENT
+"""Offline drive screening and explicit remaining work; never certify PWM."""
+import argparse
+import hashlib
+import json
+import math
+from pathlib import Path
+from controller_limits import current_ripple_review,pole_limit
+from study_io import write_json
+
+SOURCES={
+ 'defined_currents':'https://ansyshelp.ansys.com/public/Views/Secured/MotorCAD/v261/en/Motor-CAD_UG/MotorCAD/topics/defined_currents.html',
+ 'inductance':'https://ansyshelp.ansys.com/public/Views/Secured/MotorCAD/v261/en/Motor-CAD_UG/MotorCAD/topics/selfandmutualinductance.html',
+ 'modulation':'https://ansyshelp.ansys.com/public/Views/Secured/MotorCAD/v261/en/Motor-CAD_UG/MotorCAD/topics/pwm_modulation.html'}
+
+
+def assess(snapshot,outcome,contract):
+    n=snapshot['expected_native'];v=outcome['values']
+    if n['WindingConnection']!=1:raise ValueError('Delta winding reference required')
+    if contract['ui_input_snapshot'].get('modulation')!='SVPWM':raise ValueError('SVPWM-only drive screening')
+    def positive(x):return isinstance(x,(int,float)) and not isinstance(x,bool) and math.isfinite(x) and x>0
+    voltages=contract['voltages_V']
+    if not voltages or not all(positive(x) for x in voltages):raise ValueError('Positive finite bus voltages required')
+    # Native winding-phase phasor RMS is line-line RMS for this Delta case.
+    phasor=v.get('Phase Terminal Voltage (rms) [Phasor]')
+    native_bus=v.get('DC Bus Voltage');voltage_rows=[];remaining=[]
+    for bus in sorted(set(voltages)):
+        same=positive(native_bus) and math.isclose(bus,native_bus,abs_tol=1e-8,rel_tol=0)
+        limit=bus/math.sqrt(2)
+        voltage_rows.append({'bus_V':bus,'ideal_linear_line_line_rms_limit_V':limit,
+            'saved_delta_terminal_phasor_rms_V':phasor if positive(phasor) else None,
+            'ideal_phasor_utilisation':phasor/limit if positive(phasor) else None,
+            'native_at_this_bus':same,
+            'native_voltage_limit_exceeded':outcome.get('voltage_limit_exceeded') if same else None,
+            'status':'native_at_this_bus' if same else 'screen_only_not_native_verified',
+            'qualified':False})
+        if not same:remaining.append({'id':'voltage_'+str(bus),'kind':'additional_bus_voltage','bus_V':bus,
+            'status':'unverified','execution':'optional_same_current_native_confirmation',
+            'reason':'Saved operating-point voltage is reused only for ideal headroom screening; no new Native/PWM result at this bus.'})
+    current=current_ripple_review(outcome,contract.get('pwm_current_ripple_max_pct'))
+    khz=contract['ui_input_snapshot'].get('switchingKHz')
+    fsw=10000 if khz in (None,'') else khz*1000
+    carrier=pole_limit(n['ShaftSpeed'],fsw,n['Pole_Number'])
+    remaining.append({'id':'pwm_current_ripple','kind':'pwm_circuit_verification','status':'unverified',
+        'execution':'method_and_sdk_mapping_pending','native_run_count':None,
+        'required_data':['Small Signal phase self/mutual inductance versus rotor angle at bias current',
+                         'Delta zero-sequence/circulating-current model',
+                         'PWM switching sequence and time-domain branch currents',
+                         'Inverter device/deadtime settings or explicit ideal-inverter assumption'],
+        'reason':'Static D/Q inductance and prescribed sinusoidal currents are insufficient for PWM ripple certification.'})
+    return {'candidate_id':snapshot['id'],'voltage_screen':voltage_rows,'pwm_reference':current,
+            'carrier_check':carrier,'remaining_items':remaining,'remaining_validation_item_count':len(remaining),
+            'confirmed_additional_native_runs':0,'optional_same_current_voltage_runs':len(voltage_rows)-sum(r['native_at_this_bus'] for r in voltage_rows),
+            'native_experiments_with_unestimated_count':1,'automatic_fea_started':False,
+            'scope':'Ideal SVPWM phasor headroom advisory only; no inverter drops, deadtime, harmonics or PWM-current verification.'}
+
+
+def build(folder):
+    folder=Path(folder).resolve();load=lambda p:json.loads(p.read_text(encoding='utf-8'))
+    plan=load(folder/'plan.json');result=load(folder/'result.json')
+    contract=plan.get('request_contract')
+    if not contract:raise ValueError('Saved shaft request contract required')
+    cases={c['id']:c for c in plan['cases']};rows=[]
+    for outcome in result['outcomes']:
+        if outcome['status']!='completed':continue
+        name=outcome['id'];path=folder/(name+'_snapshot.json')
+        if hashlib.sha256(path.read_bytes()).hexdigest()!=cases[name]['snapshot_sha256']:
+            raise ValueError('Frozen snapshot changed')
+        rows.append(assess(load(path),outcome,contract))
+    report={'schema':'breadloaf-remaining-drive-review-v1','cases':rows,'sources':SOURCES,
+            'native_result_sha256':hashlib.sha256((folder/'result.json').read_bytes()).hexdigest(),
+            'new_native_fea':0,'full_verification_complete':False,
+            'policy':'Do not use this advisory to replace unverified requirements with passed.'}
+    experiment_folder=Path(__file__).resolve().parent.parent/'outputs/breadloaf_small_signal_20261105'
+    if (experiment_folder/'plan.json').is_file():
+        experiment=load(experiment_folder/'plan.json')
+        if experiment.get('source_batch')==str(folder):
+            experiment_progress=load(experiment_folder/'progress.json') if (experiment_folder/'progress.json').is_file() else {}
+            for row in rows:
+                row['confirmed_additional_native_runs']=max(0,experiment['planned_fea']-experiment_progress.get('completed_fea',0))
+                row['small_signal_completed_native_runs']=experiment_progress.get('completed_fea',0)
+                row['small_signal_experiment_folder']=str(experiment_folder)
+                row['small_signal_note']='Extraction completion is counted separately from pending physical PWM qualification; subsequent physical validation count remains unestimated.'
+    write_json(folder/'remaining_drive_review.json',report)
+    return report
+
+
+if __name__=='__main__':
+    p=argparse.ArgumentParser();p.add_argument('--batch',required=True);a=p.parse_args()
+    print(json.dumps(build(a.batch),indent=2))
+
+END_CONTENT
+END_SOURCE S103
+
+BEGIN_SOURCE S104
+PATH: validation/breadloaf_request.py
+SOURCE_SHA256: 765df1dd306783eb08b86b292aa05f354d57821c500e8b2182ceae96e43dfcf3
+LINES: 1-101 OF 101
+SEGMENT_BYTES: 8505
+BEGIN_CONTENT
+"""Explicit binding of main UI requirements to the limited Breadloaf model."""
+import math
+from breadloaf_search_space import search_space
+
+
+def adapt(snapshot, max_line_peak_A=40, iterations=10):
+    if not isinstance(snapshot,dict):raise ValueError('Main input snapshot required')
+    errors=[];deferred=[];s=snapshot
+    def has(v):return v is not None and v!=''
+    def number(v,label,positive=True):
+        if isinstance(v,bool) or not isinstance(v,(int,float)) or not math.isfinite(v) or (v<=0 if positive else v<0):
+            errors.append(label+' 입력값을 확인하세요.');return None
+        return v
+    if s.get('core')!=['50PN470'] or s.get('grades')!=[48] or s.get('suffix')!=['UH']:
+        errors.append('50PN470 / N48UH를 각각 단독 선택해야 합니다.')
+    spm=s.get('spm',{})
+    if spm.get('shape') not in ('Breadloaf','surface_breadloaf') or spm.get('magnetisation')!='Radial':
+        errors.append('Surface Breadloaf / Radial 착자를 선택해야 합니다.')
+    if s.get('connection','delta')!='delta':errors.append('현재는 Delta 결선만 지원합니다.')
+    if s.get('modulation')!='SVPWM' or s.get('control')!='FOC · Id = 0':errors.append('현재는 FOC Id=0 / SVPWM만 지원합니다.')
+    if any(has(s.get(k)) and s[k]!=20 for k in ('temp','tmin','tmax')):errors.append('기준·최소·최대 온도는 현재 20℃만 지원합니다.')
+    if has(s.get('eta')) and s['eta']!=100:errors.append('현재 제어 효율은 100%만 지원합니다.')
+    if has(s.get('mechanical')) and s['mechanical']!=0:errors.append('현재 별도 입력 기계 손실은 0 W만 지원합니다.')
+    if s.get('priority') not in (None,'균형형'):errors.append('현재 Breadloaf 경로는 리플 최소화 전용입니다. 설계 우선순위는 균형형을 선택하세요.')
+    unit={'mm':1,'cm':10,'m':1000}.get(s.get('units','mm'))
+    if unit is None:errors.append('지원하지 않는 길이 단위입니다.');unit=1
+    expected={'od':85,'length':20,'gap':.5,'magnet':2.5,'poles':4,'slots':12,'turns':6,'wire':1.8,'strands':1,'paths':1,
+              'bore':52.3,'shaft':16.3,'slotDepth':8.8,'slotOpening':None,'tooth':8.1}
+    modes=s.get('modes',{});geometry=s.get('geometry',{})
+    space=None
+    try:space=search_space(s)
+    except ValueError as exc:errors.append(str(exc))
+    for key in set(modes)|set(geometry):
+        if key in ('slotOpening','poleArc'):continue
+        mode=modes.get(key,'fixed' if has(geometry.get(key)) else 'auto')
+        if mode=='auto':continue
+        value=geometry.get(key)
+        factor=1 if key in ('poles','slots','turns','strands','paths','poleArc') else unit
+        if key not in expected or mode!='fixed' or expected.get(key) is None or not isinstance(value,(int,float)) or isinstance(value,bool) or not math.isclose(value*factor,expected[key],abs_tol=1e-8):
+            errors.append(key+': 고정 개발 템플릿과 다른 형상 고정/범위는 아직 연결되지 않았습니다.')
+    for group in ('statorParameters','rotorParameters'):
+        for key,value in s.get(group,{}).items():
+            fields=value if group=='rotorParameters' else {key:value}
+            for field,setting in fields.items():
+                if group=='statorParameters' and field=='slot_opening_mm':continue
+                if group=='rotorParameters' and key!='surface_breadloaf':continue
+                if group=='rotorParameters' and field in ('pole_arc_ed','magnet_reduction_mm'):continue
+                if isinstance(setting,dict) and setting.get('mode','auto')!='auto':errors.append(field+': 상세 치수 설정은 현재 입력 연결에서 미지원입니다.')
+    for field,setting in spm.get('parameters',{}).items():
+        if field not in ('pole_arc_ed','magnet_reduction_mm') and isinstance(setting,dict) and setting.get('mode','auto')!='auto':
+            errors.append(field+': 현재 Breadloaf 탐색에 연결되지 않은 변수입니다.')
+    pairs=s.get('poleSlotCandidates',[{'poles':4,'slots':12}])
+    if pairs!=[{'poles':4,'slots':12}]:errors.append('극·슬롯 후보는 4극12슬롯 하나만 선택하세요.')
+    ops=s.get('ops',[])
+    if not isinstance(ops,list) or len(ops)!=1 or not isinstance(ops[0],dict):errors.append('운전점 1개만 지원합니다.');op={}
+    else:op=ops[0]
+    if op.get('currentControl','ID0')!='ID0' or op.get('fieldWeakening',False):errors.append('운전점은 Id=0, 약계자 금지 조건만 지원합니다.')
+    torque=number(op.get('torque'),'축토크');speed=number(op.get('rpm'),'RPM')
+    margin=number(s.get('margin') if has(s.get('margin')) else 0,'토크 마진',False)
+    voltages=[number(op[k],k) for k in ('vmin','vrated','vmax') if has(op.get(k))]
+    voltages=[v for v in voltages if v is not None]
+    if not voltages:errors.append('DC 전압을 하나 이상 입력하세요.')
+    for a,b in (('vmin','vrated'),('vrated','vmax'),('vmin','vmax')):
+        if has(op.get(a)) and has(op.get(b)) and isinstance(op[a],(int,float)) and isinstance(op[b],(int,float)) and op[a]>op[b]:errors.append('DC 전압 최소/정격/최대 순서를 확인하세요.')
+    current=number(max_line_peak_A,'선전류 첨두 한도')
+    if isinstance(iterations,bool) or not isinstance(iterations,int) or not 1<=iterations<=30:errors.append('탐색 예산은 1~30세대 정수입니다.')
+    targets={}
+    for field,label,default in (('eff','효율',None),('density','전류밀도',None),('imax','DC 전류',None),('ripple','토크 리플',20)):
+        value=op.get(field) if has(op.get(field)) else default
+        targets[field]=number(value,label) if value is not None else None
+    if targets['eff'] is not None and targets['eff']>100:errors.append('효율은 100% 이하입니다.')
+    flux=s.get('fluxDensityMaxT') if has(s.get('fluxDensityMaxT')) else 1.8
+    flux=number(flux,'최대 B')
+    fsw=10000
+    if has(s.get('switchingKHz')):
+        khz=number(s['switchingKHz'],'스위칭 주파수')
+        fsw=khz*1000 if khz else None
+    fsw=number(fsw,'스위칭 주파수')
+    cycles=120*fsw/(4*speed) if fsw and speed else None
+    if cycles is not None and cycles<20:errors.append('전기 1주기당 PWM 횟수가 20회 미만입니다.')
+    if current and targets['density']:
+        # Delta, one strand/path: Iline_peak = sqrt(6) * Jphase_rms * copper area.
+        current=min(current,math.sqrt(6)*targets['density']*math.pi*1.8**2/4)
+    pwm=number(s['pwmCurrentRipplePct'],'PWM 전류 리플') if has(s.get('pwmCurrentRipplePct')) else 15
+    shaft=torque*(1+margin/100) if torque is not None and margin is not None else None
+    deferred=['축토크: 3500rpm 국소 보정 영역에서는 손실을 반영해 전류를 계산하고, 영역 밖에서는 전자기 토크 필요 하한만 적용하며 축토크 미검증으로 표시; 실제 합격은 FEA에서 판정',
+              '전압·동손 효율 상한은 근사 선별에 사용, 단면 B는 오차로 인해 비교 표시만 하며 실제 효율·국부 최대 B·DC 전류는 FEA 후 판정',
+              'PWM 전류 리플: 아직 미검증; 전체 설계 합격으로 표시하지 않음']
+    if len(set(voltages))>1:deferred.append('복수 전압: 초기 FEA는 최소 버스 한 조건만 해석하며 나머지 전압은 미검증으로 보존')
+    return {'schema':'breadloaf-main-input-contract-v1','can_search':not errors,'errors':errors,
+            'target_basis':'shaft','requested_shaft_torque_Nm':shaft,
+            'target_electromagnetic_torque_Nm':shaft,'max_line_peak_A':current,'iterations':iterations,
+            'speed_rpm':speed,'voltages_V':sorted(set(voltages)),'temperature_C':20,
+            'requirements':{'efficiency_min_pct':targets['eff'],'dc_current_max_A':targets['imax'],
+                'current_density_max_A_mm2':targets['density'],'torque_ripple_max_pct':targets['ripple'],'flux_density_max_T':flux},
+            'pwm_current_ripple_max_pct':pwm,
+            'search_space':space,
+            'applied':['요구 축토크와 토크 마진: 국소 모델 유효 영역 안에서 손실 포함 전류 결정, 밖에서는 필요 전자기 토크 하한만 적용','RPM과 최소 DC 전압을 Native 입력에 저장',
+                       '선전류 첨두 한도 및 전류밀도에서 환산한 한도','리플 최소화 목적함수와 0.1 mm 치수 격자'],
+            'deferred':deferred,'pwm_cycles_per_electrical_period':cycles,
+            'full_requirement_optimization':False,'ui_input_snapshot':s}
+
+END_CONTENT
+END_SOURCE S104
+
+
+END_REVIEW_PART_018

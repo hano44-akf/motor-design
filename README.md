@@ -2,6 +2,12 @@
 
 Python 기반 모터 초기 설계·최적화 및 선택 후보의 Ansys Motor-CAD 검증 도구입니다. 로컬 웹 인터페이스를 제공하며 계산에 AI 서비스 연결을 요구하지 않습니다.
 
+## 외부 AI에서 코드 읽기
+
+GitHub 폴더 화면에 접근하지 못하는 AI는 [검토용 소스 목차](AI_REVIEW_INDEX.md)를 사용하세요. 원본 소스 233개를 검토 순서의 일반 텍스트 31개로 나눴으며, 각 파일에 원래 경로·줄 범위·해시를 기록했습니다. 소스는 목차에 적힌 커밋으로 고정되어 있습니다.
+
+폴더 탐색이 제한되면 [원문 시작 안내](https://raw.githubusercontent.com/hano44-akf/motor-design/main/ai_review/00_START_HERE.txt)와 [원문 목차](https://raw.githubusercontent.com/hano44-akf/motor-design/main/AI_REVIEW_INDEX.md)를 직접 열면 됩니다. ZIP 압축 해제나 GitHub 로그인은 필요하지 않습니다. 각 AI의 도구 제한에 따라 접근 여부·전문 수신 여부는 별도로 확인해야 합니다.
+
 ## 구조
 
 - `interface/`: 로컬 HTTP 서버, 입력·결과 비교 화면, 브라우저 흐름 검사.

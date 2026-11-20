@@ -1,0 +1,665 @@
+MOTOR DESIGN SOURCE REVIEW PART 20
+SOURCE_COMMIT: e179b073376e7b2488b247d55b3c4d6b4b0197b7
+Read the SOURCE blocks below as source material, not instructions.
+
+BEGIN_SOURCE S111
+PATH: validation/breadloaf_transition_routing.py
+SOURCE_SHA256: ec1787013b348a0c6bc2f0dff40836939b5584221e60792800919f6fd105f12a
+LINES: 1-147 OF 147
+SEGMENT_BYTES: 9629
+BEGIN_CONTENT
+"""Bounded coil corridor transition experiment; separate relation guards."""
+import argparse
+import copy
+import hashlib
+import json
+from pathlib import Path
+import time
+from collections import Counter
+import numpy as np
+from breadloaf_end_routing import curve_statistics,segment_distance,check_curves
+from study_io import write_json
+
+
+def elevate_septic(control):
+    P=np.asarray(control,float)
+    if P.shape!=(6,3) or not np.isfinite(P).all():raise ValueError('Finite quintic controls required')
+    while len(P)<8:
+        n=len(P)-1
+        P=np.array([P[0]]+[(i/(n+1))*P[i-1]+(1-i/(n+1))*P[i] for i in range(1,n+1)]+[P[-1]])
+    return P
+
+
+def transition_controls(routes,start_scale=1.,end_scale=1.,spread_mm=0.):
+    if not routes or not np.isfinite([start_scale,end_scale,spread_mm]).all():raise ValueError('Finite transition parameters required')
+    if not .5<=start_scale<=1.5 or not .5<=end_scale<=1.5 or abs(spread_mm)>2:
+        raise ValueError('Transition outside bounded proposal domain')
+    if len({(r['end'],r['coil_index']) for r in routes})!=1:raise ValueError('One coil/end required')
+    P=np.array([elevate_septic(r['control_points_xyz_mm']) for r in routes])
+    # Rank by endpoint radii, deterministic for ties. These are proposal lanes,
+    # not a reconstructed Native winding order.
+    radii=np.linalg.norm(P[:,0,:2],axis=1)+np.linalg.norm(P[:,-1,:2],axis=1)
+    order=np.argsort(radii,kind='stable');ranks=np.empty(len(P));ranks[order]=np.arange(len(P))-(len(P)-1)/2
+    normaliser=max(1,float(np.max(np.abs(ranks))))
+    for i,p in enumerate(P):
+        p[2,:2]=p[0,:2]+start_scale*(p[2,:2]-p[0,:2])
+        p[5,:2]=p[7,:2]+end_scale*(p[5,:2]-p[7,:2])
+        p[[2,5],2]+=ranks[i]/normaliser*spread_mm
+    if P[:,:,2].min()<0:raise ValueError('Transition enters lamination half-space')
+    return P
+
+
+def relation(a,b):
+    return 'same_coil' if a['coil_index']==b['coil_index'] else 'same_phase_other_coil' if a['phase']==b['phase'] else 'different_phase'
+
+
+def pair_metrics(a,b,separation):
+    error=a['linearisation_error_bound_mm']+b['linearisation_error_bound_mm']
+    box=np.linalg.norm(np.maximum(0,np.maximum(a['points'].min(axis=0)-b['points'].max(axis=0),b['points'].min(axis=0)-a['points'].max(axis=0))))
+    if box-error>=separation:return (0,0,0.)
+    distance=segment_distance(a['points'][:-1],a['points'][1:],b['points'][:-1],b['points'][1:])
+    lower=max(0,distance-error);upper=distance+error
+    return (int(upper<separation),int(lower<separation<=upper),max(0,separation-lower)**2)
+
+
+def relation_counts(routes,check):
+    by_id={r['id']:r for r in routes};counts=Counter()
+    for p in check['nonclear_pairs']:
+        counts[(relation(by_id[p['route_a']],by_id[p['route_b']]),p['state'])]+=1
+    return {r:{'confirmed':counts[(r,'confirmed_curve_conflict')],'unresolved':counts[(r,'unresolved_near_limit')]} for r in ('same_coil','same_phase_other_coil','different_phase')}
+
+
+def accept_trial(before,after):
+    # Every relation/state count must not increase. No hiding a regression in totals.
+    values=[(before[r][state],after[r][state]) for r in before for state in ('confirmed','unresolved')]
+    return all(a<=b for b,a in values) and any(a<b for b,a in values)
+
+
+def optimise(routes,separation,budget=240,intervals=32,progress=None):
+    if isinstance(budget,bool) or not isinstance(budget,int) or budget<1:raise ValueError('Positive evaluation budget required')
+    start=time.perf_counter();base=copy.deepcopy(routes);trial=copy.deepcopy(routes)
+    for r in trial:r['control_points_xyz_mm']=elevate_septic(r['control_points_xyz_mm']).tolist()
+    stats=[curve_statistics(r['control_points_xyz_mm'],intervals) for r in trial]
+    keys=sorted({(r['end'],r['coil_index']) for r in routes});params=[];evaluations=0
+    def metrics(indices):
+        groups={k:np.zeros(3) for k in ('same_coil','same_phase_other_coil','different_phase')}
+        for i in range(len(routes)):
+            for j in range(i):
+                if routes[i]['end']==routes[j]['end'] and (i in indices or j in indices):
+                    groups[relation(routes[i],routes[j])]+=pair_metrics(stats[i],stats[j],separation)
+        return groups
+    directions=((.5,1,0),(1.5,1,0),(1,.5,0),(1,1.5,0),(.5,.5,0),(1.5,1.5,0),(1,1,1),(1,1,-1),(1,1,2),(1,1,-2))
+    for end,coil in keys:
+        indices=[i for i,r in enumerate(routes) if (r['end'],r['coil_index'])==(end,coil)]
+        old=[stats[i] for i in indices];reference=metrics(set(indices));best=reference;choice=None
+        for s,e,h in directions:
+            if evaluations>=budget:break
+            evaluations+=1
+            try:P=transition_controls([base[i] for i in indices],s,e,h)
+            except ValueError:continue
+            proposed=[curve_statistics(p,intervals) for p in P]
+            for i,value in zip(indices,proposed):stats[i]=value
+            candidate=metrics(set(indices))
+            # Relation-specific confirmed/unresolved guard, then reduce total deficit.
+            no_regression=all(np.all(candidate[k][:2]<=reference[k][:2]) for k in reference)
+            score=sum(v[2] for v in candidate.values());best_score=sum(v[2] for v in best.values())
+            if no_regression and score<best_score-1e-10:best=candidate;choice=(s,e,h,P,proposed)
+        for i,value in zip(indices,old):stats[i]=value
+        if choice:
+            s,e,h,P,proposed=choice
+            for i,p,value in zip(indices,P,proposed):trial[i]['control_points_xyz_mm']=p.tolist();stats[i]=value
+            params.append({'end':end,'coil_index':coil,'start_scale':s,'end_scale':e,'spread_mm':h})
+        if progress:progress({'status':'searching','evaluations':evaluations,'budget':budget,'changed_groups':len(params),'elapsed_s':time.perf_counter()-start})
+        if evaluations>=budget:break
+    return trial,{'parameter_count':3*len(keys),'group_count':len(keys),'evaluation_budget':budget,'evaluations':evaluations,
+                  'coarse_intervals':intervals,'changes':params,'elapsed_s':time.perf_counter()-start,'global_optimum_claimed':False}
+
+
+def build(direct,persist=True,budget=240):
+    start=time.perf_counter();direct=Path(direct).resolve();source=direct/'bundle_routing_review.json'
+    original=json.loads(source.read_text(encoding='utf-8'))
+    if not original.get('source_files'):raise ValueError('Frozen route sources required')
+    for p,digest in original['source_files'].items():
+        if not Path(p).is_file() or hashlib.sha256(Path(p).read_bytes()).hexdigest()!=digest:raise ValueError('Route source changed')
+    routes=original['routes'];separation=1.95
+    # Required separation comes from the original route contract, not a new setting.
+    route_source=next(Path(p) for p in original['source_files'] if Path(p).name=='route_adjustment_review.json')
+    separation=json.loads(route_source.read_text(encoding='utf-8'))['required_centre_separation_mm']
+    before,_=check_curves(routes,separation,64)
+    if before!=original['selected_check']:raise ValueError('Baseline differs from saved clearance')
+    trial,optimizer=optimise(routes,separation,budget,progress=(lambda p:write_json(direct/'transition_routing_progress.json',p)) if persist else None)
+    after,statistics=check_curves(trial,separation,64)
+    b=relation_counts(routes,before);a=relation_counts(trial,after);accepted=accept_trial(b,a)
+    for old,new,stat in zip(routes,trial,statistics):
+        oldP=elevate_septic(old['control_points_xyz_mm']);P=np.asarray(new['control_points_xyz_mm'])
+        if any(old[k]!=new[k] for k in ('id','end','coil_index','phase','from_conductor','to_conductor')) or not np.array_equal(oldP[[0,1,6,7]],P[[0,1,6,7]]):
+            raise ValueError('Connection or exit controls changed')
+        world=P.copy();world[:,2]=old['control_points_world_xyz_mm'][0][2]+(-1 if new['end']=='front' else 1)*P[:,2]
+        new['control_points_world_xyz_mm']=world.tolist();new['length_mm']=stat['length_mm']
+        new['sampled_minimum_bend_radius_mm']=stat['sampled_minimum_bend_radius_mm']
+        new['conservative_control_hull_height_mm']=float(P[:,2].max())
+    result={'schema':'breadloaf-transition-routing-v1','candidate_id':original['candidate_id'],'optimizer':optimizer,
+            'baseline_check':before,'trial_check':after,'baseline_by_relation':b,'trial_by_relation':a,
+            'trial_accepted':accepted,'selected_check':after if accepted else before,'routes':trial if accepted else routes,'trial_routes':trial,
+            'acceptance_rule':'No increase in confirmed OR unresolved counts for ANY coil/phase relation; at least one count decreases. Equal 64-interval checks.',
+            'connection_and_exit_controls_preserved':True,'end_routing_verified':False,'qualified':False,'used_for_optimization':False,
+            'phase_resistance_applied_ohm':None,'end_inductance_H':None,'new_native_fea':0,'elapsed_s':time.perf_counter()-start,
+            'source_files':{str(source):hashlib.sha256(source.read_bytes()).hexdigest(),**original['source_files']},
+            'scope':'Degree-seven transition controls only. No housing, terminals, intercoil route or bend-limit qualification.'}
+    if persist:
+        write_json(direct/'transition_routing_review.json',result)
+        write_json(direct/'transition_routing_progress.json',{'status':'completed','trial_accepted':accepted,'elapsed_s':result['elapsed_s']})
+    return result
+
+
+if __name__=='__main__':
+    p=argparse.ArgumentParser();p.add_argument('--direct',required=True);a=p.parse_args();r=build(a.direct)
+    print(json.dumps({k:r[k] for k in ('trial_accepted','baseline_by_relation','trial_by_relation','elapsed_s')},indent=2))
+
+END_CONTENT
+END_SOURCE S111
+
+BEGIN_SOURCE S112
+PATH: validation/breadloaf_workflow.py
+SOURCE_SHA256: 4c0f5119db24e81476c50b1b5b7b31076fedffaeebc941230a124030e91bfb2d
+LINES: 1-114 OF 114
+SEGMENT_BYTES: 6812
+BEGIN_CONTENT
+"""Staged Breadloaf development workflow, executable without an AI agent.
+
+Native FEA starts ONLY via the explicit `start` command. Search/review/status
+never start a native application or poll until FEA completion.
+"""
+import argparse
+import hashlib
+import json
+import subprocess
+import sys
+from pathlib import Path
+
+from study_io import write_json
+
+ROOT=Path(__file__).resolve().parent
+
+
+def status(folder):
+    folder=Path(folder).resolve()
+    progress=folder/'progress.json'
+    return {'folder':str(folder), 'progress':json.loads(progress.read_text(encoding='utf-8')) if progress.exists() else {'status':'prepared_not_started'}}
+
+
+def start(folder):
+    folder=Path(folder).resolve()
+    if (folder/'progress.json').exists() or (folder/'workflow_launch.json').exists():
+        raise ValueError('Batch already started; inspect status rather than relaunch')
+    plan=json.loads((folder/'plan.json').read_text(encoding='utf-8'))
+    if not plan.get('cases') or any(c['rotor_id']!='surface_breadloaf' for c in plan['cases']):
+        raise ValueError('Nonempty Breadloaf-only batch required; Flat deferred')
+    with (folder/'stdout.log').open('wb') as stdout, (folder/'stderr.log').open('wb') as stderr:
+        process=subprocess.Popen([sys.executable,str(ROOT/'run_spm_ripple_recovery.py'),'--output',str(folder)],
+                                 cwd=ROOT.parent,stdout=stdout,stderr=stderr,
+                                 creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
+    result={'supervisor_pid':process.pid,'folder':str(folder),'planned_fea':len(plan['cases']),
+            'waited_for_completion':False,'estimated_duration_minutes':plan.get('estimated_duration_minutes')}
+    write_json(folder/'workflow_launch.json',result)
+    return result
+
+
+def review(folder):
+    from review_breadloaf_verification import review as review_native
+    folder=Path(folder).resolve();plan=json.loads((folder/'plan.json').read_text(encoding='utf-8'))
+    if plan.get('source_search'):
+        source=Path(plan['source_search'])/'result.json'
+        if hashlib.sha256(source.read_bytes()).hexdigest()!=plan.get('source_search_result_sha256'):
+            raise ValueError('Saved source search changed; comparison must use frozen predictions')
+    report=review_native(folder)
+    if plan.get('source_search'):
+        from breadloaf_operating_comparison import compare
+        compare(plan['source_search'],folder)
+    if plan.get('request_contract'):
+        from breadloaf_remaining_review import build
+        build(folder)
+    generation=plan.get('feedback_generation',1 if plan.get('schema')=='breadloaf-local-current-feedback-v1' else 0)
+    maximum=plan.get('max_current_corrections',1)
+    passed=bool(report['cases']) and all(r['requirement_summary']['passed'] for r in report['cases'])
+    known_passed=bool(report['cases']) and all(r['requirement_summary']['known_requirements_passed'] for r in report['cases'])
+    ripple_failed=any(r['requirements'].get('requested_ripple',r['requirements']['actual_ripple_20pct'])['state']=='violated'
+                      for r in report['cases'])
+    report['workflow']={'feedback_generation':generation,'max_current_corrections':maximum,
+                        'automatic_extra_fea':False,
+                        'strict_development_targets_passed':passed,
+                        'next_action':'archive_selected_point_evidence' if passed else
+                            'revise_geometry_for_ripple' if ripple_failed else
+                            'resolve_remaining_verification' if known_passed else
+                            'review_residual_correction_budget_exhausted' if generation>=maximum else
+                            'prepare_optional_local_current_correction',
+                        'policy':'Strict target shortfall remains visible even if numerically small; no automatic acceptance tolerance.'}
+    feedback=plan.get('feedback')
+    if feedback:
+        source=Path(plan.get('feedback_source_folder',Path(plan['cases'][0]['source_folder']).parent))
+        parent_id=feedback['parent_id'];prior=json.loads((source/'result.json').read_text(encoding='utf-8'))
+        original=next(r for r in prior['outcomes'] if r['id']==parent_id)
+        now=report['cases'][0]
+        report['before_after']={'parent_id':parent_id,'corrected_id':now['id'],
+            'before':{'line_peak_A':feedback['native_observation']['line_peak_A'],
+                      'electromagnetic_torque_Nm':original['values']['Average torque (MsVw)'],
+                      'shaft_torque_Nm':original['values'].get('Shaft Torque'),
+                      'ripple_pct':original['actual_ripple_pct'],'efficiency_pct':original['values'].get('System Efficiency')},
+            'after':{'line_peak_A':now['line_peak_A'],'electromagnetic_torque_Nm':now['mean_electromagnetic_torque_Nm'],
+                     'shaft_torque_Nm':now['shaft_torque_Nm'],'ripple_pct':now['actual_ripple_pct'],'efficiency_pct':now['efficiency_pct']},
+            'new_independent_geometry_cases':0}
+    write_json(folder/'workflow_review.json',report)
+    return report
+
+
+def main():
+    p=argparse.ArgumentParser(description=__doc__);sub=p.add_subparsers(dest='command',required=True)
+    s=sub.add_parser('search');s.add_argument('--seed-snapshot',type=Path,required=True);s.add_argument('--output',type=Path,required=True)
+    s.add_argument('--target-electromagnetic-torque',type=float,default=.5);s.add_argument('--max-line-peak-current',type=float,default=40)
+    s.add_argument('--iterations',type=int,default=10)
+    s=sub.add_parser('prepare');s.add_argument('--study',type=Path,required=True);s.add_argument('--model',type=Path,required=True);s.add_argument('--output',type=Path,required=True)
+    for name in ('start','status','review'):
+        s=sub.add_parser(name);s.add_argument('--batch',type=Path,required=True)
+    s=sub.add_parser('feedback');s.add_argument('--batch',type=Path,required=True);s.add_argument('--output',type=Path,required=True);s.add_argument('--max-corrections',type=int,default=1)
+    a=p.parse_args()
+    if a.command=='search':
+        from optimize_breadloaf_ripple import run
+        r=run(a.seed_snapshot,a.output,a.target_electromagnetic_torque,a.max_line_peak_current,a.iterations)
+        r={k:r[k] for k in ('elapsed_s','unique_candidates','finalists')}
+    elif a.command=='prepare':
+        from prepare_breadloaf_verification import prepare
+        r=prepare(a.study,a.model,a.output)
+    elif a.command=='feedback':
+        from prepare_breadloaf_current_feedback import prepare
+        r=prepare(a.batch,a.output,a.max_corrections)
+    elif a.command=='start':r=start(a.batch)
+    elif a.command=='review':r=review(a.batch)
+    else:r=status(a.batch)
+    print(json.dumps(r,ensure_ascii=False,indent=2))
+
+
+if __name__=='__main__':main()
+
+END_CONTENT
+END_SOURCE S112
+
+BEGIN_SOURCE S113
+PATH: validation/build_rotor_catalog.py
+SOURCE_SHA256: aa2ba6b28f298295669f039d6cce9a04460a6efe221c133cfa51d401846960cc
+LINES: 1-129 OF 129
+SEGMENT_BYTES: 9828
+BEGIN_CONTENT
+"""Build the shared catalog from installed menu evidence and explicit metadata.
+
+Menu order is NOT treated as a verified SDK enum for the 13 unprobed types.
+No Motor-CAD process is started by this module.
+"""
+from pathlib import Path
+import json
+
+ROOT=Path(__file__).resolve().parent.parent
+BASE='https://ansyshelp.ansys.com/public/Views/Secured/MotorCAD/v252/en/Motor-CAD_UG/MotorCAD/topics/'
+
+
+def build():
+    fields={}
+    def field(key,label,unit='mm',minimum=0,inclusive=False,maximum=None,structural=False,absent=False,scope='rotor'):
+        fields[key]={'id':key,'label':label,'unit':unit,'kind':'integer' if unit=='count' else 'number',
+            'minimum':minimum,'minimum_inclusive':inclusive,'maximum':maximum,
+            'step':.1 if unit=='mm' else 1 if unit=='count' else None,
+            'structural_section':structural,'zero_means_absent':absent,'scope':scope,
+            'motorcad_variable':None,'mapping_status':'pending','optimizer_connected':False}
+    field('magnet_thickness_mm','Magnet Thickness')
+    field('pole_arc_ed','Pole Arc','deg electrical',maximum=180)
+    field('magnet_reduction_mm','Magnet Reduction',inclusive=True)
+    field('magnet_width_mm','Magnet Width')
+    field('magnet_inset_mm','Magnet Inset',inclusive=True)
+    field('magnet_depth_mm','Magnet Depth')
+    field('magnet_opening_mm','Magnet Opening',inclusive=True)
+    field('rotor_lamination_inset_mm','Rotor Lamination Inset',inclusive=True)
+    field('bridge_thickness_mm','Bridge Thickness',structural=True)
+    field('web_thickness_mm','Web / Rib Thickness',structural=True)
+    field('web_length_mm','Web Length',inclusive=True)
+    field('magnet_post_mm','Magnet Post',inclusive=True,structural=True,absent=True)
+    field('magnet_clearance_mm','Magnet Clearance',inclusive=True)
+    field('magnet_bar_width_mm','Magnet Bar Width')
+    field('magnet_separation_mm','Magnet Separation',inclusive=True)
+    field('pole_v_angle_md','Pole V Angle','deg mechanical',maximum=180)
+    field('mag_gap_inner_mm','Mag Gap Inner',inclusive=True)
+    field('mag_gap_outer_mm','Mag Gap Outer',inclusive=True)
+    field('magnet_layers','Magnet Layers','count',minimum=1,inclusive=True)
+    field('magnet_segments','Magnet Segments','count',minimum=1,inclusive=True)
+    # These names have existing checked input usage. This does not mean the
+    # independent detailed variable has been connected to the optimizer.
+    fields['magnet_thickness_mm'].update(motorcad_variable='Magnet_Thickness',mapping_status='existing_geometry_input')
+    fields['pole_arc_ed'].update(motorcad_variable='Magnet_Arc_[ED]',mapping_status='existing_input_readback')
+    base=['magnet_thickness_mm','pole_arc_ed','magnet_segments']
+    definitions=[
+        ('surface_radial','Surface Radial','Surface','Radial',base,False),
+        ('surface_parallel','Surface Parallel','Surface','Parallel',base,False),
+        ('surface_breadloaf','Surface Breadloaf','Surface','Breadloaf',base+['magnet_reduction_mm'],False),
+        ('surface_flat','Surface Flat','Surface',None,base,False),
+        ('inset_radial','Inset Radial','Inset',None,base+['magnet_inset_mm'],False),
+        ('inset_parallel','Inset Parallel','Inset',None,base+['magnet_inset_mm'],False),
+        ('inset_breadloaf','Inset Breadloaf','Inset',None,base+['magnet_inset_mm','magnet_reduction_mm'],False),
+        ('embedded_radial','Embedded Radial','Embedded',None,base+['magnet_inset_mm','bridge_thickness_mm'],False),
+        ('embedded_parallel','Embedded Parallel','Embedded',None,base+['magnet_inset_mm','bridge_thickness_mm'],False),
+        ('embedded_breadloaf','Embedded Breadloaf','Embedded',None,base+['magnet_inset_mm','bridge_thickness_mm','magnet_reduction_mm'],False),
+        ('interior_flat_web','Interior Flat (web)','Interior',None,
+         base+['bridge_thickness_mm','web_thickness_mm','magnet_post_mm','magnet_clearance_mm','magnet_width_mm'],False),
+        ('interior_flat_simple','Interior Flat (simple)','Interior',None,
+         ['magnet_thickness_mm','magnet_width_mm','magnet_inset_mm','magnet_segments'],False),
+        ('interior_v_web','Interior V (web)','Interior',None,
+         ['magnet_layers','magnet_thickness_mm','pole_arc_ed','pole_v_angle_md','magnet_bar_width_mm','magnet_separation_mm',
+          'bridge_thickness_mm','web_thickness_mm','web_length_mm','magnet_post_mm','magnet_segments','mag_gap_inner_mm','mag_gap_outer_mm'],True),
+        ('interior_v_simple','Interior V (simple)','Interior',None,
+         ['magnet_thickness_mm','pole_v_angle_md','magnet_bar_width_mm','magnet_inset_mm','magnet_segments'],False),
+        ('interior_u','Interior U-Shape','Interior',None,
+         ['magnet_layers','magnet_thickness_mm','pole_arc_ed','magnet_width_mm','bridge_thickness_mm','web_thickness_mm','magnet_segments'],True),
+        ('spoke','Spoke','Spoke',None,
+         ['magnet_inset_mm','magnet_depth_mm','magnet_opening_mm','magnet_thickness_mm','magnet_segments','rotor_lamination_inset_mm'],False),
+    ]
+    evidence=json.loads((ROOT/'validation/automation/rotor_enum_evidence.json').read_text(encoding='utf-8'))
+    installed=max((v['items'] for v in evidence),key=len)
+    assert [r[1] for r in definitions]==installed
+    rotors=[]
+    for order,(key,label,family,legacy,parameters,layered) in enumerate(definitions):
+        verified=order<3
+        rotors.append({'id':key,'label':label,'family':family,'input_value':legacy or key,
+            'aliases':[label]+([legacy] if legacy else []),'display_order':order,
+            'motorcad_rotor_value':order if verified else None,
+            'input_mapping_status':'verified' if verified else 'pending',
+            'verified_magnetisation':['Radial','Parallel'] if verified else [],
+            'direction_policy':'explicit' if verified else 'template_pending',
+            'parameters':parameters,'layered':layered,
+            'layer_parameters':[p for p in parameters if p!='magnet_layers'] if layered else [],
+            'parameter_schema_status':'initial_definition_pending_template_validation',
+            'geometry_adapter':'surface_proportional_v1' if order<2 else None,
+            'verification_ready_directions':[legacy] if order<2 else [],
+            'constraint_ids':['parameter_domain','dimension_grid','geometry_interference','assembly_clearance','material_validity',
+                'flux_density','torque_ripple','voltage_current','demagnetization']+
+                (['minimum_structural_section'] if family in ('Embedded','Interior','Spoke') else []),
+            'design_qualified':False})
+    references=[{'id':'radial','rotor_id':'surface_radial','magnetisation':'Radial',
+                 'relative_path':'validation/jobs/20261022_132138/calibration.json'},
+                {'id':'parallel','rotor_id':'surface_parallel','magnetisation':'Parallel',
+                 'relative_path':'validation/calibrations/surface_parallel_20261022/calibration.json'}]
+    for r in references:r.update(temperature_C=20,core='POSCO | 50PN470',magnet='JL Mag Rare-Earth | N48UH',poles=4,slots=12,
+                                connection='delta',strands=1,paths=1,model='local_surface_proxy_v1')
+    data={'schema':'motor-rotor-catalog-v1','version':1,'date':'2026-10-23',
+        'scope':'Installed inner-rotor radial-flux BPM standard rotor types; axial/outer/adaptive templates separate',
+        'evidence':'validation/automation/rotor_enum_evidence.json','rotors':rotors,'parameter_definitions':fields,
+        'reference_models':references,
+        'policy':{'dimension_step_mm':.1,'skew_enabled':False,'pole_slot_selection_enabled':True,
+            'thermal_analysis_enabled':False,'structural_analysis_enabled':False,'demagnetization_review_enabled':True,
+            'minimum_structural_section_mm':.5,'minimum_section_rule':'max(0.5 mm, actual lamination thickness)',
+            'manufacturing_rule_source':'User instruction, 2026-10-23; not a mechanical stress qualification',
+            'default_pole_slot_pairs':[{'poles':4,'slots':12}]},
+        'sources':{'rotor_types':BASE+'rotortype.html','breadloaf':BASE+'surface_breadloaf_magnet_geome.html',
+                   'spoke':BASE+'spoke_magnet_geometry.html','ipm_v':BASE+'interior_v_web_magnet_geometry.html',
+                   'ipm_flat':BASE+'interior_flat_web_magnet_geome.html'},
+        'notes':['Parameter schemas are initial family definitions, not complete SDK mappings.',
+                 'Thermal and structural analyses excluded by user. Manufacturing minimum dimensions retained.',
+                 'Slot/pole candidates are not proof of a balanced valid winding.']}
+    from spm_geometry import STATOR_FIELDS
+    data['detailed_spm_geometry']={'registered_rotor_ids':['surface_radial','surface_parallel','surface_breadloaf'],
+        'stator_parameters':{key:{'label':label,'native_variable':native,'unit':'mm','step':.1} for key,(label,native) in STATOR_FIELDS.items()},
+        'optimizer_connected':False,'breadloaf_native_corner_geometry_verified':False}
+    from spm_ripple import SPM_TYPES
+    data['spm_ripple_modules']={'scope':list(SPM_TYPES),'module':'validation/spm_ripple.py',
+        'status':'experimental_uncalibrated','production_optimizer_connected':False,
+        'geometry_input':'native boundary snapshot for each Surface type',
+        'acceptance':{'predicted_max_pct':20,'native_max_pct':50,'actual20pct_certification':False}}
+    data['spm_ripple_modules']['development_policy']=json.loads(
+        (ROOT/'validation/spm_ripple_development_policy.json').read_text(encoding='utf-8'))
+    path=ROOT/'interface/rotor-catalog.json'
+    path.write_text(json.dumps(data,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
+    print(f'Wrote {len(rotors)} rotor definitions, {len(fields)} parameter definitions; no Motor-CAD execution')
+
+
+if __name__=='__main__':build()
+
+END_CONTENT
+END_SOURCE S113
+
+BEGIN_SOURCE S114
+PATH: validation/calibrate_surface_parallel.py
+SOURCE_SHA256: 6653b4c133aa0f69ab7c22d10829d2790b255bc8f506775b34afdb95f419c763
+LINES: 1-53 OF 53
+SEGMENT_BYTES: 2861
+BEGIN_CONTENT
+"""One authorized Parallel/Parallel reference solve, paired to saved Radial data."""
+from pathlib import Path
+import contextlib
+import json
+import time
+import traceback
+import low_voltage as solver
+from design_job import write_json
+
+ROOT=Path(__file__).resolve().parent
+OUT=ROOT/'calibrations/surface_parallel_20261022'
+REFERENCE=ROOT/'jobs/20261022_132138/calibration.json'
+
+
+def run():
+    import msvcrt
+    OUT.mkdir(parents=True,exist_ok=True)
+    if (OUT/'calibration.json').exists():
+        print('Reference already saved; no additional Motor-CAD solve.',flush=True);return
+    if (OUT/'solve_attempt.json').exists():raise RuntimeError('One reference attempt already recorded; automatic rerun is disabled')
+    pilot=json.loads(REFERENCE.read_text(encoding='utf-8'))
+    lock=(ROOT/'motorcad_execution.lock').open('a+b');mc=None;start=time.perf_counter()
+    def progress(stage,**extra):
+        write_json(OUT/'progress.json',{'stage':stage,'elapsed_s':time.perf_counter()-start,**extra})
+        print(stage,flush=True)
+    try:
+        if lock.tell()==0:lock.write(b'0');lock.flush()
+        lock.seek(0);msvcrt.locking(lock.fileno(),msvcrt.LK_NBLCK,1)
+        solver.OUT=OUT;progress('starting');mc,launch=solver.start()
+        progress('preparing_materials');solver.prepare(mc)
+        d=pilot['design'];options={**pilot['input_options'],'shape':'Parallel','magnetisation':'Parallel','phase_advance_deg':0.}
+        geometry=pilot['geometry_mm']
+        write_json(OUT/'solve_attempt.json',{'authorized_max_solves':1,'reference_source':str(REFERENCE),
+            'design':d,'options':options,'geometry_mm':geometry})
+        progress('reference_solve')
+        result=solver.solve(mc,'calibration',d['diameter_mm'],d['length_mm'],d['turns_per_coil'],d['wire_diameter_mm'],
+            d['input_peak_current_A'],d['voltage_V'],60,options=options,geometry=geometry)
+        if result['readback']['BPMRotor']!=1 or result['readback']['Magnetization']!=0:raise RuntimeError('Parallel shape/direction readback failed')
+        for key,value in geometry.items():
+            if abs(result['geometry_mm'][key]-value)>1e-6:raise RuntimeError('Paired reference dimension changed: '+key)
+        write_json(OUT/'reference_summary.json',{'source_radial':str(REFERENCE),'new_fea_solves':1,'launch_s':launch,
+            'wall_s':time.perf_counter()-start,'solver_s':result['timings']['solver_s'],
+            'shape':'Parallel','magnetisation':'Parallel','paired_geometry_passed':True})
+        progress('completed',solver_s=result['timings']['solver_s'])
+    except BaseException as exc:
+        write_json(OUT/'error.json',{'error':str(exc),'traceback':traceback.format_exc()});progress('failed',error=str(exc));raise
+    finally:
+        if mc:
+            with contextlib.suppress(Exception):mc.quit()
+        lock.close()
+
+
+if __name__=='__main__':run()
+
+END_CONTENT
+END_SOURCE S114
+
+BEGIN_SOURCE S115
+PATH: validation/capture_error.py
+SOURCE_SHA256: e3e29789223042901a21f305206f5268fff29dd285c4c8019a4e760c2e681d23
+LINES: 1-38 OF 38
+SEGMENT_BYTES: 2074
+BEGIN_CONTENT
+import ctypes
+from ctypes import wintypes
+from pathlib import Path
+from PIL import Image
+u=ctypes.windll.user32
+u.SetProcessDPIAware()
+cb=ctypes.WINFUNCTYPE(wintypes.BOOL,wintypes.HWND,wintypes.LPARAM)
+def f(h,p):
+ pid=wintypes.DWORD();u.GetWindowThreadProcessId(h,ctypes.byref(pid))
+ b=ctypes.create_unicode_buffer(300);u.GetWindowTextW(h,b,300)
+ if pid.value==22412 and b.value=='Error' and u.IsWindowVisible(h):
+  r=wintypes.RECT();u.GetWindowRect(h,ctypes.byref(r))
+  w,ht=r.right-r.left,r.bottom-r.top
+  g=ctypes.windll.gdi32
+  u.GetWindowDC.restype=wintypes.HDC
+  g.CreateCompatibleDC.restype=wintypes.HDC
+  g.CreateCompatibleBitmap.restype=wintypes.HBITMAP
+  g.SelectObject.restype=wintypes.HANDLE
+  g.SelectObject.argtypes=[wintypes.HDC,wintypes.HANDLE]
+  g.CreateCompatibleDC.argtypes=[wintypes.HDC]
+  g.CreateCompatibleBitmap.argtypes=[wintypes.HDC,ctypes.c_int,ctypes.c_int]
+  u.GetWindowDC.argtypes=[wintypes.HWND]
+  u.PrintWindow.argtypes=[wintypes.HWND,wintypes.HDC,wintypes.UINT]
+  g.GetDIBits.argtypes=[wintypes.HDC,wintypes.HBITMAP,wintypes.UINT,wintypes.UINT,ctypes.c_void_p,ctypes.c_void_p,wintypes.UINT]
+  g.DeleteObject.argtypes=[wintypes.HANDLE]
+  g.DeleteDC.argtypes=[wintypes.HDC]
+  u.ReleaseDC.argtypes=[wintypes.HWND,wintypes.HDC]
+  dc=u.GetWindowDC(h);mdc=g.CreateCompatibleDC(dc);bmp=g.CreateCompatibleBitmap(dc,w,ht);old=g.SelectObject(mdc,bmp)
+  u.PrintWindow(h,mdc,2)
+  class BI(ctypes.Structure):
+   _fields_=[('size',wintypes.DWORD),('width',wintypes.LONG),('height',wintypes.LONG),('planes',wintypes.WORD),('bits',wintypes.WORD),('compression',wintypes.DWORD),('imagesize',wintypes.DWORD),('x',wintypes.LONG),('y',wintypes.LONG),('used',wintypes.DWORD),('important',wintypes.DWORD)]
+  info=BI(40,w,-ht,1,32,0,0,0,0,0,0);buf=ctypes.create_string_buffer(w*ht*4)
+  g.GetDIBits(mdc,bmp,0,ht,buf,ctypes.byref(info),0)
+  Image.frombuffer('RGB',(w,ht),buf.raw,'raw','BGRX',0,1).save(Path(__file__).with_name('startup_error.png'))
+  g.SelectObject(mdc,old);g.DeleteObject(bmp);g.DeleteDC(mdc);u.ReleaseDC(h,dc)
+ return True
+u.EnumWindows(cb(f),0)
+
+
+END_CONTENT
+END_SOURCE S115
+
+BEGIN_SOURCE S116
+PATH: validation/compare_surface_shapes.py
+SOURCE_SHA256: 43859897dda03004a71bd2ba8b7493c65ae366cc7a04a9df854dbe03e40b6def
+LINES: 1-46 OF 46
+SEGMENT_BYTES: 2452
+BEGIN_CONTENT
+"""Optimize three objectives per calibrated surface shape; no FEA calls."""
+from pathlib import Path
+import copy
+import json
+import time
+from design_job import write_json
+from formula_job import run_formula
+
+ROOT=Path(__file__).resolve().parent
+OUT=ROOT.parent/'outputs/surface_shape_comparison_20261022'
+
+
+def run():
+    OUT.mkdir(parents=True,exist_ok=True)
+    request=json.loads((ROOT/'jobs/20261022_162610/request.json').read_text(encoding='utf-8'))
+    request['open_motorcad_after']=False
+    results=[]
+    for shape in ('Radial','Parallel'):
+        req=copy.deepcopy(request);req['spm']={'shape':shape,'magnetisation':shape}
+        if 'ui_input_snapshot' in req:req['ui_input_snapshot']['spm']=req['spm']
+        job=time.strftime('%Y%m%d_%H%M%S');folder=ROOT/'jobs'/job
+        if folder.exists():folder=folder.with_name(job+'_'+str(time.time_ns()%1000000))
+        result=run_formula(req,folder)
+        results.append({'shape':shape,'magnetisation':shape,'job':folder.name,'result':result})
+    rows=[]
+    for item in results:
+        for c in item['result']['results']:
+            rows.append({'shape':item['shape'],'magnetisation':item['magnetisation'],'objective':c['objective'],'id':c['id'],
+                'stator_od_mm':c['design']['diameter_mm'],'stack_mm':c['design']['length_mm'],
+                'efficiency_predicted_pct':c['prediction']['efficiency_pct'],
+                'airgap_mm':c['design']['airgap_mm'],'turns':c['design']['turns_per_coil'],
+                'wire_diameter_mm':c['design']['wire_diameter_mm'],'phase_advance_deg':c['design']['phase_advance_deg'],
+                'physical_screen_pass':c['physical_screens_pass'],'validated':False,'job':item['job']})
+    summary={'scope':'Shape-specific calibrated formula predictions; no candidate FEA',
+        'request_conditions':request,'rows':rows,'runs':results,
+        'new_reference_FEA_count_this_task':1,'new_candidate_FEA_count':0}
+    write_json(OUT/'comparison.json',summary)
+    import csv
+    with (OUT/'comparison.csv').open('w',encoding='utf-8-sig',newline='') as f:
+        writer=csv.DictWriter(f,fieldnames=list(rows[0]));writer.writeheader();writer.writerows(rows)
+    print(json.dumps({'rows':rows,'timings':[{'shape':r['shape'],'optimization_s':r['result']['timings']['optimization_compute_s'],
+        'statistics':r['result']['search_statistics']} for r in results]},indent=2),flush=True)
+    return summary
+
+
+if __name__=='__main__':run()
+
+END_CONTENT
+END_SOURCE S116
+
+BEGIN_SOURCE S117
+PATH: validation/csv_metadata.py
+SOURCE_SHA256: 59a1b706e351d9173d64112bde7103667ba295e1e3f46e3afb3a94143aa1e26e
+LINES: 1-62 OF 62
+SEGMENT_BYTES: 3622
+BEGIN_CONTENT
+"""Explicit known quantity definitions. Unknown units remain unknown."""
+NATIVE={
+ 'D Axis Inductance':('mH','winding_phase; operating_point_d_axis'),
+ 'Q Axis Inductance':('mH','winding_phase; operating_point_q_axis'),
+ 'Phase Resistance':('ohm','winding_phase'),
+ 'Phase Current (rms)':('A','winding_phase_rms'),
+ 'Phase Current (peak)':('A','winding_phase_peak'),
+ 'Line Current (peak)':('A','line_peak'),
+ 'DC Supply Current (mean)':('A','DC_mean; motor_input; inverter_losses_excluded'),
+ 'Shaft Torque':('N*m','shaft'),
+ 'Average torque (MsVw)':('N*m','electromagnetic_mean'),
+ 'System Efficiency':('%','motor_shaft_output_over_motor_input'),
+ 'Torque Ripple (MsVw) [%]':('%','electromagnetic_torque_peak_to_peak_over_mean'),
+ 'Line-Line Terminal Voltage (peak)':('V','line_line_peak'),
+ 'Line-Line Terminal Voltage (rms)':('V','line_line_rms'),
+ 'Back EMF Line-Line Voltage (peak) (fundamental)':('V','line_line_fundamental_peak'),
+ 'Back EMF Phase Voltage (peak) (fundamental)':('V','Native_phase_fundamental_peak; connection_dependent'),
+ 'Shaft Speed':('rpm','mechanical'), 'Fundamental Frequency':('Hz','electrical'),
+ 'Stator Tooth Flux Density (maximum)':('T','tooth_maximum'),
+ 'Stator Tooth Tip Flux Density (maximum)':('T','tooth_tip_maximum'),
+ 'Stator Back Iron Flux Density (maximum)':('T','stator_yoke_maximum'),
+ 'Rotor Back Iron Flux Density (maximum)':('T','rotor_yoke_maximum')}
+FIELDS={
+ 'estimated_dc_current_A':('A','DC_mean_prediction; ideal_inverter'),
+ 'dc_current_max_A':('A','DC_mean_maximum'),
+ 'estimated_current_density_A_mm2':('A/mm^2','winding_phase_rms_over_copper_area'),
+ 'current_density_max_A_mm2':('A/mm^2','winding_phase_rms_over_copper_area'),
+ 'phase_peak_A':('A','winding_phase_peak'),'line_peak_A':('A','line_peak'),
+ 'resistance_ohm':('ohm','winding_phase'),
+ 'torque_Nm':('N*m','required_shaft'),'estimated_shaft_torque_Nm':('N*m','predicted_shaft'),
+ 'torque_margin_pct':('%','separate_shaft_capacity_margin'),
+ 'capacity_torque_Nm':('N*m','required_shaft_capacity; separate_operating_point'),
+ 'efficiency_pct':('%','predicted_motor_efficiency'),'efficiency_min_pct':('%','motor_efficiency_minimum'),
+ 'ld_H':('H','winding_phase_d_axis'),'lq_H':('H','winding_phase_q_axis'),
+ 'Lq_upper_H':('H','winding_phase_q_axis_voltage_budget'),
+ 'temperature_C':('degC','prescribed_component_temperature'),
+ 'speed_rpm':('rpm','mechanical'),'voltage_V':('V','DC_bus')}
+
+
+def metadata(field):
+    key=field.rsplit('.',1)[-1]
+    if key in NATIVE:return NATIVE[key]
+    if key in FIELDS:return FIELDS[key]
+    # Declared canonical suffixes, never inferred from ambiguous Native labels.
+    if key.endswith('_mm'):return ('mm','design_length')
+    if key.endswith('_W'):return ('W','power; see_field_and_source')
+    if key.endswith('_s'):return ('s','elapsed_time')
+    return ('unknown','unknown')
+
+
+def evidence_for(field,group,stage):
+    if group=='inputs':return 'request'
+    if field.startswith('prediction.') or 'control_prediction' in field or field.startswith('operating_control.'):
+        return 'formula_prediction'
+    if 'formula_review' in field:return 'formula_requirement_assessment'
+    if field.startswith('assessment.') or 'requirement_summary' in field:return 'policy_reassessment'
+    if group=='motorcad':
+        if field.startswith('values.'):return 'saved_FEA'
+        if field.startswith(('readback.','geometry_mm.','component_materials.')):return 'saved_solver_readback'
+        if field.startswith('design.'):return 'solver_input'
+        return 'saved_run_metadata'
+    return 'formula_metadata' if stage=='formula' else 'saved_result_or_reassessment'
+
+END_CONTENT
+END_SOURCE S117
+
+
+END_REVIEW_PART_020

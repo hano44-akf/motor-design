@@ -1,0 +1,848 @@
+MOTOR DESIGN SOURCE REVIEW PART 26
+SOURCE_COMMIT: e179b073376e7b2488b247d55b3c4d6b4b0197b7
+Read the SOURCE blocks below as source material, not instructions.
+
+BEGIN_SOURCE S165
+PATH: validation/task_store.py
+SOURCE_SHA256: b2561cd61d32bf23ea46a7ad8abe995c55e32d627125376a94b1905e17b0f4ae
+LINES: 1-291 OF 291
+SEGMENT_BYTES: 19486
+BEGIN_CONTENT
+"""Durable local task DAG. No solver imports or application launch side effects."""
+import contextlib
+import hashlib
+import json
+import math
+from pathlib import Path
+import re
+import sqlite3
+import time
+import uuid
+
+ROOT=Path(__file__).resolve().parent.parent
+DEFAULT_DB=ROOT/'outputs/task_queue/tasks.sqlite'
+KINDS={'mock','formula','motorcad_verify','motorcad_diagnostic','motorcad_mesh','manual_check'}
+NATIVE={'motorcad_verify','motorcad_diagnostic','motorcad_mesh'}
+
+
+def encoded(value):return json.dumps(value,sort_keys=True,separators=(',',':'),ensure_ascii=False,allow_nan=False)
+def digest(value):return hashlib.sha256(encoded(value).encode('utf-8')).hexdigest()
+
+
+def implementation_digest():
+    h=hashlib.sha256()
+    for file in sorted((ROOT/'validation').glob('*.py')):
+        h.update(file.name.encode());h.update(file.read_bytes())
+    return h.hexdigest()
+
+
+def project_file(path):
+    path=Path(path);path=(ROOT/path if not path.is_absolute() else path).resolve()
+    if not path.is_relative_to(ROOT) or not path.is_file():raise ValueError('Existing project file required: '+str(path))
+    return path
+
+
+def file_digest(path):
+    h=hashlib.sha256()
+    with Path(path).open('rb') as stream:
+        for block in iter(lambda:stream.read(1024*1024),b''):h.update(block)
+    return h.hexdigest()
+
+
+class TaskStore:
+    def __init__(self,path=DEFAULT_DB):
+        self.path=Path(path).resolve();self.path.parent.mkdir(parents=True,exist_ok=True)
+        with self.connect() as db:
+            db.executescript('''
+            CREATE TABLE IF NOT EXISTS meta(key TEXT PRIMARY KEY,value TEXT NOT NULL);
+            INSERT OR IGNORE INTO meta VALUES('schema','motor-task-store-v1');
+            CREATE TABLE IF NOT EXISTS jobs(
+              id TEXT PRIMARY KEY, signature TEXT UNIQUE NOT NULL, title TEXT NOT NULL,
+              state TEXT NOT NULL, stop_requested INTEGER NOT NULL DEFAULT 0,
+              code_hash TEXT NOT NULL, manifest_json TEXT NOT NULL, created REAL NOT NULL, updated REAL NOT NULL);
+            CREATE TABLE IF NOT EXISTS tasks(
+              job_id TEXT NOT NULL,id TEXT NOT NULL,kind TEXT NOT NULL,payload_json TEXT NOT NULL,
+              input_hash TEXT NOT NULL,files_json TEXT NOT NULL,deps_json TEXT NOT NULL,
+              state TEXT NOT NULL,reason TEXT,attempts INTEGER NOT NULL DEFAULT 0,
+              estimate_s REAL,timeout_s REAL NOT NULL,output_json TEXT,error TEXT,
+              PRIMARY KEY(job_id,id),FOREIGN KEY(job_id) REFERENCES jobs(id));
+            CREATE TABLE IF NOT EXISTS attempts(
+              job_id TEXT NOT NULL,task_id TEXT NOT NULL,number INTEGER NOT NULL,state TEXT NOT NULL,
+              started REAL NOT NULL,ended REAL,pid INTEGER,output_dir TEXT NOT NULL,error TEXT,
+              PRIMARY KEY(job_id,task_id,number));
+            CREATE TABLE IF NOT EXISTS events(
+              number INTEGER PRIMARY KEY AUTOINCREMENT,job_id TEXT NOT NULL,task_id TEXT,event TEXT NOT NULL,
+              created REAL NOT NULL,details_json TEXT NOT NULL);
+            ''')
+            if db.execute("SELECT value FROM meta WHERE key='schema'").fetchone()[0]!='motor-task-store-v1':raise ValueError('Unsupported task store schema')
+
+    @contextlib.contextmanager
+    def connect(self):
+        db=sqlite3.connect(self.path,timeout=20);db.row_factory=sqlite3.Row
+        db.execute('PRAGMA foreign_keys=ON');db.execute('PRAGMA journal_mode=WAL')
+        try:
+            yield db;db.commit()
+        except BaseException:db.rollback();raise
+        finally:db.close()
+
+    def _event(self,db,job,task,event,details=None):
+        db.execute('INSERT INTO events(job_id,task_id,event,created,details_json) VALUES(?,?,?,?,?)',
+                   (job,task,event,time.time(),encoded(details or {})))
+
+    def create(self,title,tasks):
+        if not isinstance(title,str) or not title.strip():raise ValueError('Job title required')
+        if not isinstance(tasks,list) or not 1<=len(tasks)<=4096:raise ValueError('Use 1..4096 tasks')
+        normalized=[];seen=set()
+        for spec in tasks:
+            ident=spec.get('id');kind=spec.get('kind')
+            if not isinstance(ident,str) or not re.fullmatch(r'[A-Za-z0-9_][A-Za-z0-9_-]{0,95}',ident) or ident in seen:raise ValueError('Invalid/duplicate task ID')
+            seen.add(ident)
+            if kind not in KINDS:raise ValueError('Unknown task kind')
+            payload=spec.get('payload',{})
+            if not isinstance(payload,dict):raise ValueError('Task payload must be an object')
+            deps=spec.get('depends_on',[])
+            if not isinstance(deps,list) or len(deps)!=len(set(deps)) or not all(isinstance(v,str) for v in deps):raise ValueError('Distinct dependency IDs required')
+            estimates=spec.get('estimate_s');timeout=spec.get('timeout_s',3600)
+            for name,value in (('estimate_s',estimates),('timeout_s',timeout)):
+                if value is None and name=='estimate_s':continue
+                if isinstance(value,bool) or not isinstance(value,(int,float)) or not math.isfinite(value) or value<=0:raise ValueError('Positive duration required: '+name)
+            files={str(project_file(p).relative_to(ROOT)):file_digest(project_file(p)) for p in spec.get('input_files',[])}
+            entry={'id':ident,'kind':kind,'payload':payload,'depends_on':deps,'files':files,
+                   'estimate_s':estimates,'timeout_s':timeout}
+            entry['input_hash']=digest({k:entry[k] for k in ('kind','payload','depends_on','files')})
+            normalized.append(entry)
+        graph={t['id']:t['depends_on'] for t in normalized};resolved=set()
+        while len(resolved)<len(graph):
+            ready=[key for key,deps in graph.items() if key not in resolved and set(deps)<=resolved]
+            if not ready:raise ValueError('Unknown dependency or dependency cycle')
+            resolved.update(ready)
+        # Identical executable inputs within a graph must share an explicit
+        # task/dependency, rather than silently renaming requested model IDs.
+        hashes=[t['input_hash'] for t in normalized if t['kind']!='manual_check']
+        if len(hashes)!=len(set(hashes)):raise ValueError('Duplicate executable inputs: share one task via dependencies')
+        code=implementation_digest();manifest={'schema':'motor-task-plan-v1','tasks':normalized,'code_hash':code}
+        signature=digest(manifest);job='job_'+uuid.uuid4().hex
+        with self.connect() as db:
+            db.execute('BEGIN IMMEDIATE')
+            previous=db.execute('SELECT id FROM jobs WHERE signature=?',(signature,)).fetchone()
+            if previous:return previous['id']
+            now=time.time()
+            db.execute('INSERT INTO jobs(id,signature,title,state,code_hash,manifest_json,created,updated) VALUES(?,?,?,?,?,?,?,?)',
+                       (job,signature,title,'planned',code,encoded(manifest),now,now))
+            for t in normalized:
+                db.execute('INSERT INTO tasks(job_id,id,kind,payload_json,input_hash,files_json,deps_json,state,reason,estimate_s,timeout_s) VALUES(?,?,?,?,?,?,?,?,?,?,?)',
+                           (job,t['id'],t['kind'],encoded(t['payload']),t['input_hash'],encoded(t['files']),encoded(t['depends_on']),
+                            'blocked' if t['kind']=='manual_check' else 'planned',
+                            'execution_recipe_required' if t['kind']=='manual_check' else None,t['estimate_s'],t['timeout_s']))
+            self._event(db,job,None,'plan_created',{'tasks':len(tasks),'native_execution_started':False})
+        return job
+
+    def snapshot(self,job):
+        with self.connect() as db:
+            header=db.execute('SELECT * FROM jobs WHERE id=?',(job,)).fetchone()
+            if not header:raise ValueError('Unknown task job')
+            tasks=[dict(r) for r in db.execute('SELECT * FROM tasks WHERE job_id=? ORDER BY rowid',(job,))]
+            attempts=[dict(r) for r in db.execute('SELECT * FROM attempts WHERE job_id=? ORDER BY started',(job,))]
+        for task in tasks:
+            for key in ('payload','files','deps','output'):
+                task[key]=json.loads(task.pop(key+'_json')) if task.get(key+'_json') else None
+        states={}
+        for task in tasks:states[task['state']]=states.get(task['state'],0)+1
+        remaining=[t for t in tasks if t['state'] in ('planned','ready','running','blocked')]
+        unknown=sum(t['estimate_s'] is None for t in remaining)
+        estimate=sum(t['estimate_s'] or 0 for t in remaining)
+        return {'schema':'motor-task-status-v1','id':job,'title':header['title'],'state':header['state'],
+                'implementation_compatible':header['code_hash']==implementation_digest(),
+                'stop_requested':bool(header['stop_requested']),'created':header['created'],'updated':header['updated'],
+                'counts':states,'tasks':tasks,'attempts':attempts,
+                'completed_tasks':states.get('completed',0),'total_tasks':len(tasks),
+                'estimated_remaining_s':estimate if not unknown else None,
+                'known_estimate_sum_s':estimate,'unestimated_tasks':unknown,
+                'estimate_scope':'Sum of remaining task estimates, not a live per-solve ETA. Any unestimated/blocked recipe prevents a complete ETA.'}
+
+    def list_jobs(self):
+        with self.connect() as db:
+            return [dict(r) for r in db.execute("SELECT id,title,state,stop_requested,created,updated FROM jobs WHERE state!='superseded' ORDER BY created DESC")]
+
+    def supersede_outdated_checklists(self,replacement):
+        """Remove obsolete thermal/structure bundles from the active plan list.
+
+        Original tasks, file hashes, attempts and history are never rewritten.
+        """
+        superseded=[]
+        with self.connect() as db:
+            for job in db.execute("SELECT id FROM jobs WHERE id!=? AND state!='superseded'",(replacement,)).fetchall():
+                rows=db.execute('SELECT id,kind FROM tasks WHERE job_id=?',(job['id'],)).fetchall()
+                if rows and all(t['kind']=='manual_check' for t in rows) and any(t['id'].endswith('_safety') for t in rows):
+                    db.execute("UPDATE jobs SET state='superseded',updated=? WHERE id=?",(time.time(),job['id']))
+                    self._event(db,job['id'],None,'plan_superseded',{'replacement':replacement,'reason':'Thermal/structural scope removed by user'})
+                    superseded.append(job['id'])
+        return superseded
+
+    def artifact(self,job,task,attempt,name):
+        allowed={'result.json','request.json','inputs.csv','results.csv','motorcad.csv','receipt.json',
+                 'task_error.json','domain_request.json','model_support.json','worker.log'}
+        if name not in allowed or isinstance(attempt,bool) or not isinstance(attempt,int) or attempt<1:
+            raise ValueError('Unknown artifact')
+        with self.connect() as db:
+            row=db.execute('SELECT output_dir FROM attempts WHERE job_id=? AND task_id=? AND number=?',(job,task,attempt)).fetchone()
+        if not row:raise ValueError('Unknown task attempt')
+        root=Path(row['output_dir']).resolve();path=(root/name if name=='worker.log' else root/'output'/name).resolve()
+        if not path.is_relative_to(root) or not path.is_relative_to(self.path.parent/'artifacts') or not path.is_file():
+            raise ValueError('Artifact not available')
+        return path
+
+    def set_stop(self,job,value=True):
+        with self.connect() as db:
+            if not db.execute('UPDATE jobs SET stop_requested=?,updated=? WHERE id=?',(int(value),time.time(),job)).rowcount:raise ValueError('Unknown task job')
+            self._event(db,job,None,'stop_requested' if value else 'resume_requested')
+
+    def is_stopped(self,job):
+        with self.connect() as db:
+            row=db.execute('SELECT stop_requested FROM jobs WHERE id=?',(job,)).fetchone()
+            if not row:raise ValueError('Unknown task job')
+            return bool(row[0])
+
+    def begin_worker(self,job):
+        with self.connect() as db:
+            db.execute('BEGIN IMMEDIATE')
+            header=db.execute('SELECT * FROM jobs WHERE id=?',(job,)).fetchone()
+            if not header:raise ValueError('Unknown task job')
+            if header['code_hash']!=implementation_digest():raise ValueError('Implementation changed; create a new plan instead of mixing versions')
+            for row in db.execute("SELECT id,output_json FROM tasks WHERE job_id=? AND state='completed'",(job,)).fetchall():
+                receipt=json.loads(row['output_json']) if row['output_json'] else {}
+                file=Path(receipt.get('result_file',''))
+                if not file.is_file() or file_digest(file)!=receipt.get('result_sha256'):
+                    db.execute("UPDATE tasks SET state='failed',reason='completed_artifact_changed',error='Saved completed result is missing or changed' WHERE job_id=? AND id=?",(job,row['id']))
+                    self._event(db,job,row['id'],'completed_artifact_changed')
+            # A lost worker may have left an active solver child. Never reclaim
+            # such work automatically or repeat it under another worker.
+            lost=db.execute("SELECT id FROM tasks WHERE job_id=? AND state='running'",(job,)).fetchall()
+            for row in lost:
+                db.execute("UPDATE tasks SET state='failed',reason='interrupted_worker_review_required',error='Prior worker exited without committing task result' WHERE job_id=? AND id=?",(job,row['id']))
+                db.execute("UPDATE attempts SET state='interrupted',ended=?,error='Worker interrupted; inspect any child process before retry' WHERE job_id=? AND task_id=? AND ended IS NULL",(time.time(),job,row['id']))
+                self._event(db,job,row['id'],'interrupted_worker')
+            db.execute("UPDATE jobs SET state='running',updated=? WHERE id=?",(time.time(),job))
+            self._event(db,job,None,'worker_started')
+
+    def claim(self,job,allow_native=False):
+        with self.connect() as db:
+            db.execute('BEGIN IMMEDIATE')
+            if db.execute('SELECT stop_requested FROM jobs WHERE id=?',(job,)).fetchone()[0]:return None
+            rows=[dict(r) for r in db.execute('SELECT * FROM tasks WHERE job_id=? ORDER BY rowid',(job,))]
+            states={t['id']:t['state'] for t in rows}
+            native_failure=any(t['kind'] in NATIVE and t['state']=='failed' and t['reason'] in
+                               ('interrupted_worker_review_required','execution_failed') for t in rows)
+            for row in rows:
+                if row['state'] not in ('planned','ready','blocked') or row['kind']=='manual_check':continue
+                deps=json.loads(row['deps_json'])
+                reason=None
+                if any(states[d]!='completed' for d in deps):reason='dependency_not_completed'
+                elif row['kind'] in NATIVE and not allow_native:reason='native_execution_not_enabled'
+                elif row['kind'] in NATIVE and native_failure:reason='prior_native_failure_review_required'
+                if reason:
+                    db.execute("UPDATE tasks SET state='blocked',reason=? WHERE job_id=? AND id=?",(reason,job,row['id']));continue
+                files=json.loads(row['files_json'])
+                if any(not (ROOT/p).is_file() or file_digest(ROOT/p)!=h for p,h in files.items()):
+                    db.execute("UPDATE tasks SET state='failed',reason='input_changed',error='Input file missing or hash changed' WHERE job_id=? AND id=?",(job,row['id']))
+                    self._event(db,job,row['id'],'input_changed');continue
+                number=row['attempts']+1
+                out=self.path.parent/'artifacts'/job/row['id']/f'attempt_{number:03d}'
+                out.mkdir(parents=True,exist_ok=False)
+                db.execute("UPDATE tasks SET state='running',reason=NULL,error=NULL,attempts=? WHERE job_id=? AND id=?",(number,job,row['id']))
+                db.execute('INSERT INTO attempts(job_id,task_id,number,state,started,output_dir) VALUES(?,?,?,?,?,?)',(job,row['id'],number,'running',time.time(),str(out)))
+                self._event(db,job,row['id'],'task_started',{'attempt':number,'output_dir':str(out)})
+                return {**row,'payload':json.loads(row['payload_json']),'attempt':number,'output_dir':str(out)}
+        return None
+
+    def child_started(self,job,task,attempt,pid):
+        with self.connect() as db:db.execute('UPDATE attempts SET pid=? WHERE job_id=? AND task_id=? AND number=?',(pid,job,task,attempt))
+
+    def finish(self,job,task,attempt,output=None,error=None):
+        state='failed' if error else 'completed'
+        with self.connect() as db:
+            db.execute('BEGIN IMMEDIATE')
+            row=db.execute('SELECT state,attempts FROM tasks WHERE job_id=? AND id=?',(job,task)).fetchone()
+            if not row or row['state']!='running' or row['attempts']!=attempt:raise ValueError('Stale task completion')
+            db.execute('UPDATE tasks SET state=?,reason=?,error=?,output_json=? WHERE job_id=? AND id=?',
+                       (state,'execution_failed' if error else None,error,encoded(output) if output else None,job,task))
+            db.execute('UPDATE attempts SET state=?,ended=?,error=? WHERE job_id=? AND task_id=? AND number=?',(state,time.time(),error,job,task,attempt))
+            db.execute('UPDATE jobs SET updated=? WHERE id=?',(time.time(),job))
+            self._event(db,job,task,'task_'+state,{'attempt':attempt,'error':error})
+
+    def retry(self,job,task,reviewed=False):
+        # Called only while the global queue worker lock is held by the caller.
+        with self.connect() as db:
+            db.execute('BEGIN IMMEDIATE')
+            row=db.execute('SELECT * FROM tasks WHERE job_id=? AND id=?',(job,task)).fetchone()
+            if not row or row['state']!='failed':raise ValueError('Only failed tasks can be retried')
+            if (row['kind'] in NATIVE or row['reason'] in ('interrupted_worker_review_required','completed_artifact_changed')) and not reviewed:
+                raise ValueError('Inspect prior child process and partial results before native/interrupted retry')
+            if row['reason']=='input_changed':raise ValueError('Input changed: create a new plan')
+            db.execute("UPDATE tasks SET state='planned',reason=NULL,error=NULL WHERE job_id=? AND id=?",(job,task))
+            self._event(db,job,task,'retry_requested',{'reviewed':reviewed})
+
+    def finish_worker(self,job):
+        snapshot=self.snapshot(job);counts=snapshot['counts']
+        state=('completed' if snapshot['completed_tasks']==snapshot['total_tasks'] else
+               'stopped' if snapshot['stop_requested'] else 'failed' if counts.get('failed') else 'blocked')
+        with self.connect() as db:
+            db.execute('UPDATE jobs SET state=?,updated=? WHERE id=?',(state,time.time(),job))
+            self._event(db,job,None,'worker_finished',{'state':state})
+        return self.snapshot(job)
+
+
+def import_checklist(store,path):
+    path=project_file(path);data=json.loads(path.read_text(encoding='utf-8'))
+    if data.get('schema')!='deferred-motor-validation-v1':raise ValueError('Unsupported checklist schema')
+    from verification_scope import apply_scope
+    data=apply_scope(data)
+    tasks=[{'id':t['id'],'kind':'manual_check','payload':t,'depends_on':t.get('depends_on',[]),'input_files':[str(path)]} for t in data['tasks']]
+    return store.create('Imported verification preparation checklist',tasks)
+
+END_CONTENT
+END_SOURCE S165
+
+BEGIN_SOURCE S166
+PATH: validation/test_audit_spm_ripple.py
+SOURCE_SHA256: fb5bc53616c7f244a1031fd3cca906d87d59f982c7005e284cefd018b584b2b7
+LINES: 1-26 OF 26
+SEGMENT_BYTES: 1004
+BEGIN_CONTENT
+import unittest
+import numpy as np
+from audit_spm_ripple import compare, waveform_summary
+
+
+class AuditTests(unittest.TestCase):
+    def test_phase_cannot_hide_amplitude_error(self):
+        t = np.arange(480) * 2 * np.pi / 480
+        actual = .5 + .3 * np.sin(12 * t)
+        prediction = .5 + .05 * np.sin(12 * t + np.pi / 2)
+        r = compare(prediction, actual)
+        self.assertAlmostEqual(r['mean_error_pct'], 0)
+        self.assertAlmostEqual(r['peak_to_peak_underprediction_factor'], 6)
+        self.assertGreater(r['best_shift_ac_rmse_Nm'], .17)
+        self.assertFalse(r['phase_search_used_for_acceptance'])
+        self.assertEqual(r['native']['dominant_mechanical_orders'][0]['order'], 12)
+
+    def test_invalid_grids_and_nonfinite_samples_rejected(self):
+        with self.assertRaises(ValueError):
+            compare(np.ones(8), np.ones(9))
+        with self.assertRaises(ValueError):
+            waveform_summary([float('nan')] * 8)
+
+
+if __name__ == '__main__':
+    unittest.main()
+
+END_CONTENT
+END_SOURCE S166
+
+BEGIN_SOURCE S167
+PATH: validation/test_background_validation.py
+SOURCE_SHA256: 2785b8a6f1049bdb4baffc90bece3f7eaab0665e2a2f59b9806907f954c3fa8b
+LINES: 1-15 OF 15
+SEGMENT_BYTES: 517
+BEGIN_CONTENT
+import unittest
+from background_validation import controls_differ
+
+
+class BackgroundTests(unittest.TestCase):
+    def test_bus_alone_is_not_a_new_electromagnetic_control_point(self):
+        a={'phase_peak_A':20.,'phase_advance_deg':0.,'bus':9}
+        b={**a,'bus':16}
+        self.assertFalse(controls_differ(a,b))
+        b['phase_advance_deg']=5
+        self.assertTrue(controls_differ(a,b))
+        b={**a,'phase_peak_A':21}
+        self.assertTrue(controls_differ(a,b))
+
+if __name__=='__main__':unittest.main()
+
+END_CONTENT
+END_SOURCE S167
+
+BEGIN_SOURCE S168
+PATH: validation/test_breadloaf_boundary.py
+SOURCE_SHA256: d3dd0be8a07ee2ccb8b3b13c5f5524f509f086168e77e998b4118a3b52bfd4b1
+LINES: 1-37 OF 37
+SEGMENT_BYTES: 1817
+BEGIN_CONTENT
+import json
+import math
+import unittest
+from pathlib import Path
+from breadloaf_boundary import boundary
+from magnet_boundary_check import check_region
+
+
+class BreadloafBoundaryTests(unittest.TestCase):
+    def test_matches_all_valid_saved_native_boundaries_and_rejects_crossings(self):
+        root=Path(__file__).resolve().parent.parent/'outputs/spm_ripple_validation_v2_20261103_140824'
+        paths=list(root.glob('surface_breadloaf_*_snapshot.json'))
+        self.assertEqual(len(paths),16)
+        valid=0
+        for path in paths:
+            s=json.loads(path.read_text(encoding='utf-8'));n=s['expected_native']
+            args=(n['Stator_Bore'],n['Airgap'],n['Magnet_Thickness'],n['Magnet_Arc_[ED]'],n['MagnetReduction'])
+            if not check_region(s['magnet_region'])['passed']:
+                with self.assertRaises(ValueError):boundary(*args)
+                continue
+            actual,derived=boundary(*args);valid+=1
+            self.assertGreater(derived['edge_thickness_along_magnet_axis_mm'],0)
+            for a,b in zip(actual['entities'],s['magnet_region']['entities']):
+                self.assertEqual(a['type'],b['type'])
+                for field in ('start','end')+(('centre',) if a['type']=='arc' else ()):
+                    for xy in ('x','y'):self.assertAlmostEqual(a[field][xy],b[field][xy],places=9)
+                if a['type']=='arc':self.assertAlmostEqual(a['radius'],b['radius'],places=9)
+        self.assertEqual(valid,5)
+
+    def test_dimensions_and_rotated_axis(self):
+        with self.assertRaises(ValueError):boundary(52.3,.5,2.5,140,.8)
+        r,_=boundary(52.3,.5,2.5,70,.5,axis_rad=0)
+        self.assertAlmostEqual(r['centroid']['y'],0)
+        with self.assertRaises(ValueError):boundary(52.3,.5,2.5,float('nan'),.5)
+
+
+if __name__=='__main__':unittest.main()
+
+END_CONTENT
+END_SOURCE S168
+
+BEGIN_SOURCE S169
+PATH: validation/test_breadloaf_bundle_routing.py
+SOURCE_SHA256: 31e86c7cf8c06f37f1bff69293b388c9a4001095a7d92ecdfad94546564f6fad
+LINES: 1-49 OF 49
+SEGMENT_BYTES: 2332
+BEGIN_CONTENT
+import copy
+import unittest
+import numpy as np
+from breadloaf_end_routing import arch,bezier
+from breadloaf_route_adjustment import elevate
+from breadloaf_bundle_routing import corridor_controls,optimise
+
+
+def examples():
+    result=[]
+    for i,y in enumerate((0,2,4)):
+        p=elevate(arch([0,y],[20,y],8))
+        result.append({'id':str(i),'end':'rear','coil_index':0,'phase':'A',
+                       'from_conductor':str(i)+'a','to_conductor':str(i)+'b',
+                       'control_points_xyz_mm':p.tolist(),'control_points_world_xyz_mm':p.tolist()})
+    return result
+
+
+class BundleRoutingTests(unittest.TestCase):
+    def test_corridor_lanes_and_connections(self):
+        routes=examples();P=corridor_controls(routes,1.95,lateral=2,height_delta=4)
+        for r,q in zip(routes,P):
+            p=np.array(r['control_points_xyz_mm'])
+            for derivative in (0,1):np.testing.assert_allclose(bezier(p,[0,1],derivative),bezier(q,[0,1],derivative))
+        for control in (2,3):
+            np.testing.assert_allclose(np.linalg.norm(np.diff(P[:,control,:],axis=0),axis=1),1.95)
+        self.assertTrue((P[:,:,2]>=0).all())
+
+    def test_bounded_search_does_not_mutate_source(self):
+        routes=examples();original=copy.deepcopy(routes)
+        result,info=optimise(routes,1.95,budget=3)
+        self.assertEqual(routes,original);self.assertEqual(info['evaluations'],3)
+        self.assertEqual(info['parameter_count'],2)
+        for old,new in zip(routes,result):
+            self.assertEqual(old['id'],new['id'])
+            np.testing.assert_array_equal(np.array(old['control_points_xyz_mm'])[[0,1,4,5]],np.array(new['control_points_xyz_mm'])[[0,1,4,5]])
+            self.assertGreater(new['length_mm'],20)
+        self.assertFalse(info['global_optimum_claimed'])
+
+    def test_invalid_corridors_rejected(self):
+        with self.assertRaises(ValueError):corridor_controls([],1.95)
+        with self.assertRaises(ValueError):corridor_controls(examples(),float('nan'))
+        with self.assertRaises(ValueError):corridor_controls(examples(),1.95,height_delta=-100)
+        rows=examples();rows[0]['coil_index']=1
+        with self.assertRaises(ValueError):corridor_controls(rows,1.95)
+        with self.assertRaises(ValueError):optimise(examples(),1.95,budget=True)
+
+
+if __name__=='__main__':unittest.main()
+
+END_CONTENT
+END_SOURCE S169
+
+BEGIN_SOURCE S170
+PATH: validation/test_breadloaf_clearance_refinement.py
+SOURCE_SHA256: 2c689498a81a100ad2ebbcbfb3746436379f6f0bab6108cae7cd4c0a4a2e0e05
+LINES: 1-59 OF 59
+SEGMENT_BYTES: 3244
+BEGIN_CONTENT
+import json
+from pathlib import Path
+import tempfile
+import unittest
+from breadloaf_end_routing import arch,check_curves
+from breadloaf_clearance_refinement import refine,build
+
+
+def pair(gap):
+    return [{'id':str(i),'end':'rear','coil_index':i,'phase':'AB'[i],
+             'control_points_xyz_mm':arch([0,y],[20,y],5).tolist()} for i,y in enumerate((0,gap))]
+
+
+class ClearanceRefinementTests(unittest.TestCase):
+    def test_known_parallel_curves_resolve_both_sides(self):
+        for gap,state in ((1.949,'confirmed_curve_conflict'),(1.951,'clear_with_error_bound')):
+            routes=pair(gap);initial,_=check_curves(routes,1.95,16)
+            self.assertEqual(initial['unresolved_pairs'],1)
+            result=refine(routes,initial,1.95,error_target_mm=1e-6)
+            row=result['refined_pairs'][0]
+            self.assertEqual(row['state'],state)
+            self.assertLessEqual(row['distance_lower_bound_mm'],gap+1e-12)
+            self.assertGreaterEqual(row['distance_upper_bound_mm'],gap-1e-12)
+            self.assertGreaterEqual(row['distance_lower_bound_mm'],initial['nonclear_pairs'][0]['distance_lower_bound_mm'])
+            self.assertLessEqual(row['distance_upper_bound_mm'],initial['nonclear_pairs'][0]['distance_upper_bound_mm'])
+
+    def test_exact_limit_is_not_passed_by_error_target(self):
+        routes=pair(1.95);initial,_=check_curves(routes,1.95,16)
+        result=refine(routes,initial,1.95,error_target_mm=.001)
+        self.assertEqual(result['unresolved_pairs'],1)
+        self.assertFalse(result['all_modelled_routes_clear'])
+        self.assertEqual(result['refined_pairs'][0]['refinement_stop'],'error_target_reached_unresolved')
+
+    def test_budget_and_interval_limits_do_not_force_resolution(self):
+        routes=pair(1.95);initial,_=check_curves(routes,1.95,16)
+        result=refine(routes,initial,1.95,pair_budget=1,error_target_mm=1e-12)
+        self.assertEqual(result['pair_evaluations'],1)
+        self.assertEqual(result['refined_pairs'][0]['refinement_stop'],'pair_budget_exhausted')
+        limited=refine(routes,initial,1.95,max_intervals=16)
+        self.assertEqual(limited['pair_evaluations'],0);self.assertEqual(limited['unresolved_pairs'],1)
+        for kwargs in ({'pair_budget':True},{'max_intervals':8},{'error_target_mm':0}):
+            with self.assertRaises(ValueError):refine(routes,initial,1.95,**kwargs)
+
+    def test_existing_certificates_are_preserved_without_new_evaluations(self):
+        for gap in (1,3):
+            routes=pair(gap);initial,_=check_curves(routes,1.95,64)
+            result=refine(routes,initial,1.95)
+            self.assertEqual(result['pair_evaluations'],0)
+            self.assertEqual(result['confirmed_conflicts'],initial['confirmed_conflicts'])
+            self.assertEqual(result['all_modelled_routes_clear'],gap==3)
+
+    def test_modified_upstream_is_rejected(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder);up=root/'up.json';up.write_text('{}')
+            (root/'transition_routing_review.json').write_text(json.dumps({'source_files':{str(up):'wrong'}}))
+            with self.assertRaisesRegex(ValueError,'source changed'):build(root,persist=False)
+
+
+if __name__=='__main__':unittest.main()
+
+END_CONTENT
+END_SOURCE S170
+
+BEGIN_SOURCE S171
+PATH: validation/test_breadloaf_coil_assignment.py
+SOURCE_SHA256: 5313101819cde7aee5e3372b443a71de972d964ca895c69205288d263a0e492a
+LINES: 1-75 OF 75
+SEGMENT_BYTES: 4508
+BEGIN_CONTENT
+import copy
+import json
+import math
+from pathlib import Path
+import unittest
+from unittest.mock import patch
+import numpy as np
+from breadloaf_coil_assignment import assign,envelope,path_check,build
+
+ROOT=Path(__file__).resolve().parent.parent
+DIRECT=ROOT/'outputs/breadloaf_phase_mapping_full_20261105'
+
+
+class CoilAssignmentTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        plan=json.loads((DIRECT/'plan.json').read_text(encoding='utf-8'))
+        cls.snapshot=json.loads(Path(plan['source_snapshot']).read_text(encoding='utf-8'))
+        cls.points=json.loads((DIRECT/'selected_continuous_packing.json').read_text(encoding='utf-8'))['points_radial_tangential_mm']
+
+    def test_slot_phase_sign_and_turn_graphs_preserve_source_winding(self):
+        r=assign(self.snapshot,self.points,1.9,1.8)
+        self.assertEqual(r['conductor_count'],144);self.assertEqual(r['slot_counts'],[12]*12)
+        self.assertEqual(r['phase_counts'],[48]*3)
+        self.assertEqual(len({(c['slot_zero_based'],c['point_index']) for c in r['conductors']}),144)
+        expected=np.zeros((12,3),int)
+        for c in self.snapshot['coils']:
+            expected[c['start'],c['phase']]+=c['turns'];expected[c['end'],c['phase']]-=c['turns']
+        np.testing.assert_array_equal(r['signed_slot_phase_counts'],expected)
+        np.testing.assert_allclose(r['slot_lumped_fundamental_winding_factors'],[math.sqrt(3)/2]*3,atol=1e-12)
+        for c in r['coils']:
+            self.assertTrue(c['logical_path_check']['single_series_path']);self.assertEqual(c['logical_path_check']['visited_nodes'],24)
+            self.assertEqual(c['active_conductor_segments'],12);self.assertEqual(len(c['end_connections']),11)
+            self.assertEqual(sum(e['end']=='rear' for e in c['end_connections']),6)
+            self.assertEqual(sum(e['end']=='front' for e in c['end_connections']),5)
+
+    def test_coordinate_list_order_does_not_change_phasor_or_coverage(self):
+        a=assign(self.snapshot,self.points,1.9,1.8);b=assign(self.snapshot,self.points[::-1],1.9,1.8)
+        self.assertEqual(a['signed_slot_phase_counts'],b['signed_slot_phase_counts'])
+        np.testing.assert_allclose([x['sum_end_chord_lower_bound_mm'] for x in a['coils']],
+                                   [x['sum_end_chord_lower_bound_mm'] for x in b['coils']],atol=1e-10)
+
+    def test_broken_branched_or_disconnected_coil_is_not_a_series_path(self):
+        self.assertFalse(path_check(['a','b','c'],[('a','b'),('a','c')])['single_series_path'])
+        self.assertFalse(path_check(['a','b','c','d'],[('a','b'),('c','d'),('d','c')])['single_series_path'])
+        with self.assertRaises(ValueError):path_check(['a','b'],[('a','z')])
+
+    def test_bundle_envelope_matches_circle_and_capsule_closed_forms(self):
+        single=envelope([[0,0]],2)
+        self.assertAlmostEqual(single['convex_wire_envelope_area_mm2'],math.pi)
+        self.assertAlmostEqual(single['axis_aligned_envelope_area_mm2'],4)
+        line=envelope([[0,0],[3,0]],2)
+        self.assertAlmostEqual(line['convex_wire_envelope_area_mm2'],6+math.pi)
+        with self.assertRaises(ValueError):envelope([[float('nan'),0]],2)
+
+    def test_invalid_packing_or_coil_table_rejected(self):
+        with self.assertRaises(ValueError):assign(self.snapshot,self.points[:-1],1.9,1.8)
+        p=copy.deepcopy(self.points);p[0]=p[1]
+        with self.assertRaises(ValueError):assign(self.snapshot,p,1.9,1.8)
+        s=copy.deepcopy(self.snapshot);s['coils'][0]['phase']=9
+        with self.assertRaises(ValueError):assign(s,self.points,1.9,1.8)
+        with self.assertRaises(ValueError):assign(self.snapshot,self.points,1.8,1.9)
+
+    def test_build_verifies_logic_without_promoting_physical_routing(self):
+        with patch('subprocess.Popen',side_effect=AssertionError('No Native')):r=build(DIRECT,persist=False)
+        self.assertTrue(r['logical_assignment_verified']);self.assertTrue(r['geometric_packing_verified'])
+        self.assertFalse(r['physical_layer_mapping_confirmed']);self.assertFalse(r['end_routing_verified'])
+        self.assertFalse(r['native_winding_updated']);self.assertFalse(r['qualified']);self.assertEqual(r['new_native_fea'],0)
+        self.assertIsNone(r['conductor_derived_end_area_mm2'])
+        for coil in r['coils']:
+            for section in coil['bundle_geometry']:
+                self.assertGreaterEqual(section['convex_wire_envelope_area_mm2'],coil['insulated_wire_area_per_coil_side_mm2']-1e-8)
+
+
+if __name__=='__main__':unittest.main()
+
+END_CONTENT
+END_SOURCE S171
+
+BEGIN_SOURCE S172
+PATH: validation/test_breadloaf_conductor_audit.py
+SOURCE_SHA256: 87a5e846f6189fb7b4bdff9ae5331f7b4103fd7a97578d9fbb532673cd00717d
+LINES: 1-66 OF 66
+SEGMENT_BYTES: 3509
+BEGIN_CONTENT
+import copy
+import json
+from pathlib import Path
+import unittest
+from unittest.mock import patch
+import numpy as np
+from breadloaf_conductor_audit import boundary_margin,extract_saved,lattice_packing,build
+from breadloaf_slot_detail import fields,dimensions
+
+ROOT=Path(__file__).resolve().parent.parent
+DIRECT=ROOT/'outputs/breadloaf_phase_mapping_full_20261105'
+
+
+class ConductorAuditTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        plan=json.loads((DIRECT/'plan.json').read_text(encoding='utf-8'))
+        cls.f=fields(plan['source_model']);cls.d=dimensions(cls.f)
+
+    def test_finite_wire_disk_not_just_centre_must_fit(self):
+        x=self.d['body_front_x']+.2
+        self.assertLess(boundary_margin(self.d,[[x,0]],1.9)[0],0)
+        with self.assertRaises(ValueError):boundary_margin(self.d,[[float('nan'),0]],1.9)
+        with self.assertRaises(ValueError):boundary_margin(self.d,[[x,0]],0)
+
+    def test_stale_cells_padding_and_placement_count_are_distinct(self):
+        r=extract_saved(self.f,self.d)
+        self.assertEqual(r['nonzero_saved_point_count'],79)
+        self.assertEqual(r['boundary_compatible_raw_count'],10)
+        self.assertEqual(r['declared_placement_count'],10)
+        self.assertFalse(r['active_mask_confirmed']);self.assertFalse(r['phase_and_layer_mapping_confirmed'])
+        f=dict(self.f);f['ConductorCentre_L_x[99][99]']='0';f['ConductorCentre_L_y[99][99]']='0'
+        padded=extract_saved(f,self.d)
+        self.assertEqual(padded['boundary_compatible_raw_count'],10)
+        self.assertEqual(padded['zero_padding_count'],r['zero_padding_count']+1)
+
+    def test_new_lattice_respects_whole_wire_and_pair_distances(self):
+        r=lattice_packing(self.d,1.9,12,.05,.025)
+        points=np.asarray(r['points_radial_tangential_mm'])
+        self.assertTrue(np.all(boundary_margin(self.d,points,1.9)>=.025-1e-9))
+        delta=np.linalg.norm(points[:,None,:]-points[None,:,:],axis=2);np.fill_diagonal(delta,np.inf)
+        self.assertGreaterEqual(delta.min(),1.95-1e-9)
+        self.assertFalse(r['failure_is_impossibility_proof']);self.assertFalse(r['native_winding_updated'])
+        self.assertFalse(r['electrical_assignment_confirmed'])
+        easy=lattice_packing(self.d,1.9,4,.05,.025,offset_steps=2)
+        self.assertTrue(easy['geometric_target_found']);self.assertEqual(easy['selected_wire_count'],4)
+
+    def test_invalid_packing_requests_rejected(self):
+        for target in (0,-1,True,1.2):
+            with self.assertRaises(ValueError):lattice_packing(self.d,1.9,target,.05,.025)
+        with self.assertRaises(ValueError):lattice_packing(self.d,1.9,12,-.05,.025)
+
+    def test_audit_does_not_assign_end_area_from_incomplete_coordinates(self):
+        with patch('subprocess.Popen',side_effect=AssertionError('No Native launch')):r=build(DIRECT,persist=False)
+        self.assertEqual(r['required_wires_per_slot'],12)
+        self.assertFalse(r['saved_coordinates_match_required_count'])
+        self.assertIsNone(r['conductor_derived_end_area_mm2'])
+        self.assertFalse(r['physical_layer_mapping_confirmed']);self.assertFalse(r['qualified'])
+        self.assertFalse(r['used_for_guidance']);self.assertEqual(r['new_native_fea'],0)
+        end=r['end_input_audit']
+        self.assertAlmostEqual(end['formula_coil_area_mm2'],13.291868793248401)
+        self.assertLess(abs(end['relative_difference_pct']),.01)
+        self.assertFalse(end['independent_new_geometry_prediction'])
+
+
+if __name__=='__main__':unittest.main()
+
+END_CONTENT
+END_SOURCE S172
+
+BEGIN_SOURCE S173
+PATH: validation/test_breadloaf_continuous_packing.py
+SOURCE_SHA256: 7e1e1434a5f3d17afb9b47971529940ad3a37a4f2bd29afbfa9b3953b6461c5d
+LINES: 1-62 OF 62
+SEGMENT_BYTES: 3695
+BEGIN_CONTENT
+import json
+from pathlib import Path
+import unittest
+from unittest.mock import patch
+import numpy as np
+from scipy.optimize._numdiff import approx_derivative
+from breadloaf_slot_detail import fields,dimensions
+from breadloaf_continuous_packing import constraints,solve,verify_native_boundary,repair_grid,build
+
+ROOT=Path(__file__).resolve().parent.parent
+DIRECT=ROOT/'outputs/breadloaf_phase_mapping_full_20261105'
+
+
+class ContinuousPackingTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        plan=json.loads((DIRECT/'plan.json').read_text(encoding='utf-8'))
+        mot=Path(plan['source_model']);cls.d=dimensions(fields(mot))
+        cls.region=json.loads((mot.parent/'native_geometry.json').read_text(encoding='utf-8'))['regions']['Impreg_1']
+
+    def test_analytic_jacobian_matches_independent_finite_difference(self):
+        p=np.array([[30.,-.7],[32.,1.]])
+        c,J=constraints(p,self.d,1.9,.05,.025)
+        numerical=approx_derivative(lambda v:constraints(v.reshape(2,2),self.d,1.9,.05,.025)[0],p.ravel())
+        np.testing.assert_allclose(J,numerical,atol=1e-7,rtol=1e-7)
+
+    def test_independent_native_check_does_not_reuse_solver_constraints(self):
+        p=[[30.,-1.],[33.,1.]]
+        with patch('breadloaf_continuous_packing.constraints',side_effect=AssertionError('Shared constraints')):
+            r=verify_native_boundary(p,self.region,self.d['beta'],1.9,.05,.025)
+        self.assertTrue(r['geometrically_verified']);self.assertFalse(r['manufacturing_qualified'])
+        r=verify_native_boundary([[30.,0.],[30.1,0.]],self.region,self.d['beta'],1.9,.05,.025)
+        self.assertFalse(r['geometrically_verified']);self.assertLess(r['pair_constraint_slack_mm'],0)
+        r=verify_native_boundary([[28.5,0.],[33.,1.]],self.region,self.d['beta'],1.9,.05,.025)
+        self.assertFalse(r['geometrically_verified']);self.assertLess(r['boundary_constraint_slack_mm'],0)
+
+    def test_milp_selects_valid_grid_points_without_changing_wire_size(self):
+        r=repair_grid([[30.02,-1.02],[32.98,1.03]],self.d,1.9,.05,.025)
+        self.assertTrue(r['found'])
+        p=np.asarray(r['points_radial_tangential_mm']);np.testing.assert_allclose(p*10,np.round(p*10),atol=1e-12)
+        checked=verify_native_boundary(p,self.region,self.d['beta'],1.9,.05,.025)
+        self.assertTrue(checked['geometrically_verified']);self.assertFalse(r['native_winding_updated'])
+
+    def test_budget_and_invalid_inputs(self):
+        for target in (1,0,True,2.2):
+            with self.assertRaises(ValueError):solve(self.d,target,1.9,.05,.025)
+        with self.assertRaises(ValueError):solve(self.d,12,1.9,-.05,.025)
+        with self.assertRaises(ValueError):repair_grid([[30.,0.],[33.,1.]],self.d,1.9,.05,.025,radius_ticks=0)
+
+    def test_twelve_wire_report_separates_continuous_grid_and_electrical_status(self):
+        with patch('subprocess.Popen',side_effect=AssertionError('No Native launch')):r=build(DIRECT,persist=False)
+        self.assertEqual(r['target_wires'],12);self.assertEqual(r['free_coordinate_variables'],24)
+        self.assertLessEqual(r['completed_starts'],r['restart_budget'])
+        self.assertTrue(r['independent_native_boundary_check']['geometrically_verified'])
+        self.assertFalse(r['grid_0p1mm_check']['geometrically_verified'])
+        self.assertFalse(r['qualified']);self.assertFalse(r['physical_layer_mapping_confirmed'])
+        self.assertFalse(r['native_winding_updated']);self.assertEqual(r['new_native_fea'],0)
+        self.assertGreaterEqual(r['elapsed_s'],r['continuous_solve_elapsed_s'])
+        for grid in r['grid_repairs']:self.assertFalse(grid['global_impossibility_proof'])
+
+
+if __name__=='__main__':unittest.main()
+
+END_CONTENT
+END_SOURCE S173
+
+BEGIN_SOURCE S174
+PATH: validation/test_breadloaf_end_routing.py
+SOURCE_SHA256: 5d5e2944bcf9ea0eff1f3ac95d3ca9330274dc8e7778fbb972a6039cf4e4d7e6
+LINES: 1-62 OF 62
+SEGMENT_BYTES: 3688
+BEGIN_CONTENT
+import json
+from pathlib import Path
+import unittest
+from unittest.mock import patch
+import numpy as np
+from breadloaf_end_routing import segment_distance,bezier,arch,curve_statistics,check_curves,build
+
+ROOT=Path(__file__).resolve().parent.parent
+DIRECT=ROOT/'outputs/breadloaf_phase_mapping_full_20261105'
+
+
+class EndRoutingTests(unittest.TestCase):
+    def test_segment_minimum_handles_crossing_parallel_and_degenerate_cases(self):
+        self.assertAlmostEqual(segment_distance([[-1,0,0]],[[1,0,0]],[[0,-1,0]],[[0,1,0]]),0)
+        self.assertAlmostEqual(segment_distance([[-1,0,0]],[[1,0,0]],[[0,-1,2]],[[0,1,2]]),2)
+        self.assertAlmostEqual(segment_distance([[0,0,0]],[[1,0,0]],[[2,1,0]],[[3,1,0]]),np.sqrt(2))
+        self.assertAlmostEqual(segment_distance([[0,0,0]],[[0,0,0]],[[1,-1,0]],[[1,1,0]]),1)
+
+    def test_bezier_endpoints_peak_length_and_linearisation_bound(self):
+        control=arch([0,0],[20,0],5)
+        np.testing.assert_allclose(bezier(control,[0,1]),[[0,0,0],[20,0,0]])
+        self.assertAlmostEqual(bezier(control,[.5])[0,2],5)
+        stats=curve_statistics(control,32)
+        self.assertGreater(stats['length_mm'],20)
+        for i in range(32):
+            t=(i+np.linspace(0,1,21))/32
+            linear=stats['points'][i]+np.linspace(0,1,21)[:,None]*(stats['points'][i+1]-stats['points'][i])
+            self.assertLessEqual(np.linalg.norm(bezier(control,t)-linear,axis=1).max(),stats['linearisation_error_bound_mm']+1e-12)
+        refined=curve_statistics(control,64)
+        self.assertAlmostEqual(refined['linearisation_error_bound_mm'],stats['linearisation_error_bound_mm']/4)
+        self.assertAlmostEqual(refined['length_mm'],stats['length_mm'])
+
+    def test_curve_conflict_and_clearance_are_distinguished_with_error_bounds(self):
+        routes=[{'id':'a','end':'rear','control_points_xyz_mm':arch([0,0],[20,0],5).tolist()},
+                {'id':'b','end':'rear','control_points_xyz_mm':arch([0,1],[20,1],5).tolist()}]
+        result,_=check_curves(routes,1.95,32)
+        self.assertEqual(result['confirmed_conflicts'],1);self.assertFalse(result['all_modelled_routes_clear'])
+        routes[1]['control_points_xyz_mm']=arch([0,3],[20,3],5).tolist()
+        result,_=check_curves(routes,1.95,32)
+        self.assertTrue(result['all_modelled_routes_clear'])
+
+    def test_invalid_curves_and_units_rejected(self):
+        with self.assertRaises(ValueError):arch([0,0],[1,0],0)
+        with self.assertRaises(ValueError):curve_statistics(arch([0,0],[1,0],1),True)
+        with self.assertRaises(ValueError):bezier([[0,0,0]], [.5])
+
+    def test_full_proposal_reports_conflicts_and_does_not_apply_resistance(self):
+        with patch('subprocess.Popen',side_effect=AssertionError('No Native launch')):
+            r=build(DIRECT,persist=False,intervals=16)
+        self.assertEqual(r['route_count'],132);self.assertEqual([x['connection_count'] for x in r['ends']],[60,72])
+        self.assertGreater(r['curve_clearance_check']['confirmed_conflicts'],0)
+        self.assertFalse(r['end_routing_verified']);self.assertFalse(r['qualified']);self.assertEqual(r['new_native_fea'],0)
+        self.assertIsNone(r['end_inductance_H']);self.assertIsNone(r['conductor_derived_end_area_mm2'])
+        for phase in r['phase_length_diagnostics']:
+            self.assertTrue(phase['omits_intercoil_links_and_terminals']);self.assertIsNone(phase['applied_phase_resistance_ohm'])
+            self.assertAlmostEqual(phase['active_length_mm'],960)
+        for route in r['routes']:
+            z=route['control_points_world_xyz_mm'][0][2]
+            self.assertAlmostEqual(z,-10 if route['end']=='front' else 10)
+
+
+if __name__=='__main__':unittest.main()
+
+END_CONTENT
+END_SOURCE S174
+
+
+END_REVIEW_PART_026

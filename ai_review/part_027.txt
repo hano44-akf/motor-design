@@ -1,0 +1,985 @@
+MOTOR DESIGN SOURCE REVIEW PART 27
+SOURCE_COMMIT: e179b073376e7b2488b247d55b3c4d6b4b0197b7
+Read the SOURCE blocks below as source material, not instructions.
+
+BEGIN_SOURCE S175
+PATH: validation/test_breadloaf_flux_probe.py
+SOURCE_SHA256: 951e964732f194126a999aeee88171b8f152653461193bd2de88114e07a720f0
+LINES: 1-86 OF 86
+SEGMENT_BYTES: 5132
+BEGIN_CONTENT
+import json
+from pathlib import Path
+import tempfile
+import unittest
+from unittest.mock import patch
+import numpy as np
+from breadloaf_flux_probe import wave_text,prepare,launch,review,resume_validated,pair_self_minimum
+
+ROOT=Path(__file__).resolve().parent.parent
+
+
+class FluxProbeTests(unittest.TestCase):
+    def test_full_cycle_data_has_positive_self_derivatives_and_end_anchor(self):
+        result=review(ROOT/'outputs/breadloaf_phase_mapping_full_20261105')
+        self.assertEqual(result['status'],'central_jacobian_assembled')
+        self.assertGreater(result['self_derivative_minimum_raw'],0)
+        self.assertTrue(result['response_rows_excitation_columns_explicit'])
+        anchor=result['unit_and_end_anchor']
+        self.assertLess(anchor['max_H_interpretation_anchor_difference'],anchor['native_csv_rounding_H'])
+        self.assertFalse(result['matrix_qualified']);self.assertFalse(result['pwm_ripple_certified'])
+
+    def test_cycle_reconstruction_is_detected_before_more_pairs(self):
+        root=ROOT/'outputs/breadloaf_phase_mapping_v3_20261105'
+        load=lambda name:json.loads((root/name/'result.json').read_text(encoding='utf-8'))
+        self.assertLess(pair_self_minimum(load('phase1_plus'),load('phase1_minus'),1),0)
+
+    def test_angle_origin_correction_is_supported_by_solved_pilot_currents(self):
+        root=ROOT/'outputs/breadloaf_phase_mapping_v2_20261105'
+        plan=json.loads((root/'plan.json').read_text(encoding='utf-8'))
+        result=json.loads((root/'phase1_plus/result.json').read_text(encoding='utf-8'))
+        angle=np.array(plan['cases'][0]['expected_angle_ed']);file_values=np.array(plan['cases'][0]['expected_phase_current_A'])
+        for phase in range(3):
+            graph=result['graphs'][f'PhaseCurrent{phase+1}']
+            expected=np.interp((np.array(graph['x'])-90)%360,angle,file_values[:,phase])
+            np.testing.assert_allclose(graph['y'],expected,atol=1e-9)
+
+    def test_stopped_input_check_cannot_produce_a_qualified_matrix(self):
+        with tempfile.TemporaryDirectory() as tmp,patch('breadloaf_flux_probe.subprocess.Popen') as popen:
+            folder=Path(tmp);(folder/'plan.json').write_text('{}')
+            (folder/'result.json').write_text(json.dumps({'status':'stopped_after_input_check','completed_fea':1,'unattempted_cases':5}))
+            result=review(folder)
+            self.assertEqual(result['status'],'input_validation_incomplete')
+            self.assertFalse(result['matrix_qualified']);self.assertEqual(result['new_native_fea'],0)
+            popen.assert_not_called()
+
+    def test_header_and_full_cycle_are_preserved(self):
+        text=wave_text([0,180,360],[[1,2,3],[4,5,6],[1,2,3]])
+        self.assertTrue(text.startswith('ElectricalAngle Phase1 Phase2 Phase3\n'))
+        rows=np.loadtxt(text.splitlines(),skiprows=1)
+        self.assertEqual(rows.shape,(3,4));self.assertEqual(rows[0,0],0);self.assertEqual(rows[-1,0],360)
+        with self.assertRaises(ValueError):wave_text([0,359],[[1,2,3],[1,2,3]])
+
+    def test_six_frozen_cases_perturb_only_the_selected_phase(self):
+        with tempfile.TemporaryDirectory() as tmp,patch('breadloaf_flux_probe.subprocess.Popen') as popen:
+            result=prepare(ROOT/'outputs/breadloaf_small_signal_20261105',Path(tmp)/'study')
+            self.assertEqual(result['planned_fea'],6)
+            self.assertEqual(result['settings']['DriveType_BPM'],0)
+            self.assertEqual(result['settings']['BPMDriveMode'],2)
+            self.assertEqual(result['settings']['FEASolutionCycle'],1)
+            for phase in range(3):
+                plus=np.array(result['cases'][phase*2]['expected_phase_current_A'])
+                minus=np.array(result['cases'][phase*2+1]['expected_phase_current_A'])
+                delta=np.zeros_like(plus);delta[:,phase]=.2
+                np.testing.assert_allclose(plus-minus,delta,atol=1e-12)
+                case=result['cases'][phase*2]
+                expected_peak=np.max(abs(plus[:,0]-plus[:,1]))
+                self.assertEqual(case['peak_line_current_setting_A'],expected_peak)
+            popen.assert_not_called()
+
+    def test_reuse_validated_cases_and_correct_only_phase3_normalisation(self):
+        with tempfile.TemporaryDirectory() as tmp,patch('breadloaf_flux_probe.subprocess.Popen') as popen:
+            r=resume_validated(ROOT/'outputs/breadloaf_phase_mapping_v3_20261105',Path(tmp)/'next')
+            self.assertEqual(r['planned_fea'],2);self.assertEqual(len(r['reused_outcomes']),4)
+            self.assertEqual({c['id'] for c in r['cases']},{'phase3_plus','phase3_minus'})
+            for c in r['cases']:
+                self.assertAlmostEqual(c['peak_line_current_setting_A'],39.9981243112972,places=8)
+            popen.assert_not_called()
+
+    def test_existing_batch_not_relaunched(self):
+        with tempfile.TemporaryDirectory() as tmp,patch('breadloaf_flux_probe.subprocess.Popen') as popen:
+            folder=Path(tmp);(folder/'progress.json').write_text('{}')
+            with self.assertRaises(ValueError):launch(folder)
+            popen.assert_not_called()
+
+
+if __name__=='__main__':unittest.main()
+
+END_CONTENT
+END_SOURCE S175
+
+BEGIN_SOURCE S176
+PATH: validation/test_breadloaf_grid_packing.py
+SOURCE_SHA256: 083ef0b833d1550f450748529526c96b48e590ef56b52ffd9e430b98d4d6a152
+LINES: 1-58 OF 58
+SEGMENT_BYTES: 3185
+BEGIN_CONTENT
+import json
+from pathlib import Path
+from types import SimpleNamespace
+import unittest
+from unittest.mock import patch
+import numpy as np
+from breadloaf_grid_packing import candidate_grid,solve_grid
+from breadloaf_slot_detail import fields,dimensions
+from breadloaf_conductor_audit import boundary_margin
+
+ROOT=Path(__file__).resolve().parent.parent
+DIRECT=ROOT/'outputs/breadloaf_phase_mapping_full_20261105'
+
+
+class WholeGridTests(unittest.TestCase):
+    def test_whole_supported_cavity_has_no_local_assignment_windows(self):
+        plan=json.loads((DIRECT/'plan.json').read_text(encoding='utf-8'));d=dimensions(fields(plan['source_model']))
+        ticks=candidate_grid(d,1.9,.025)
+        self.assertEqual(len(ticks),2527)
+        self.assertTrue(np.all(ticks==np.round(ticks)))
+        self.assertTrue(np.all(boundary_margin(d,ticks/10,1.9)>=.025-1e-10))
+        # Independent conservative rectangular enumeration reproduces the set;
+        # no old wire centre or candidate label participates.
+        box=np.array([[x,y] for x in range(280,351) for y in range(-100,101)])
+        expected=box[boundary_margin(d,box/10,1.9)>=.025-1e-10]
+        self.assertEqual(set(map(tuple,ticks)),set(map(tuple,expected)))
+
+    def test_toy_grid_packing_has_exact_pair_separation(self):
+        ticks=np.array([[0,0],[0,10],[30,0],[30,10]])
+        with patch('subprocess.Popen',side_effect=AssertionError('Native forbidden')):
+            r=solve_grid(ticks,2,1.95,time_budget_s=2)
+        self.assertTrue(r['found_grid_packing'])
+        p=np.array(r['points_radial_tangential_mm'])
+        self.assertGreaterEqual(np.linalg.norm(p[0]-p[1]),1.95)
+        self.assertFalse(r['manufacturing_qualified']);self.assertFalse(r['continuous_impossibility_proof'])
+
+    def test_valid_clique_rejects_target_only_in_that_grid_model(self):
+        r=solve_grid(np.array([[0,0],[0,10],[10,0]]),2,1.95,time_budget_s=2)
+        self.assertFalse(r['found_grid_packing']);self.assertEqual(r['model_status'],'grid_relaxation_infeasible')
+        self.assertTrue(r['cliques_validated_with_integer_distances'])
+        self.assertLessEqual(r['maximum_clique_diameter_squared_ticks'],r['conflicting_distance_squared_ticks_max'])
+        self.assertFalse(r['continuous_impossibility_proof'])
+
+    def test_timeout_or_solver_error_never_becomes_impossibility(self):
+        for status in (1,4):
+            with patch('breadloaf_grid_packing.milp',return_value=SimpleNamespace(status=status,x=None,message='diagnostic')):
+                r=solve_grid(np.array([[0,0],[30,0]]),2,1.95,time_budget_s=2)
+            self.assertEqual(r['model_status'],'budget_or_solver_unresolved')
+            self.assertFalse(r['continuous_impossibility_proof']);self.assertFalse(r['found_grid_packing'])
+
+    def test_invalid_grid_and_budgets_rejected(self):
+        for points in ([[0,.1],[20,0]],[[0,0],[0,0]],[[float('nan'),0],[20,0]]):
+            with self.assertRaises(ValueError):solve_grid(points,2,1.95)
+        with self.assertRaises(ValueError):solve_grid([[0,0],[20,0]],True,1.95)
+        with self.assertRaises(ValueError):solve_grid([[0,0],[20,0]],2,1.95,time_budget_s=0)
+
+
+if __name__=='__main__':unittest.main()
+
+END_CONTENT
+END_SOURCE S176
+
+BEGIN_SOURCE S177
+PATH: validation/test_breadloaf_gui.py
+SOURCE_SHA256: 49777991a7559c66b6b3461edb02d2fcedf8584a2591e906b82ba9ad9fec3958
+LINES: 1-57 OF 57
+SEGMENT_BYTES: 3160
+BEGIN_CONTENT
+import tempfile
+import json
+from pathlib import Path
+import unittest
+from unittest.mock import patch
+import breadloaf_gui as gui
+
+
+class GuiTests(unittest.TestCase):
+    def test_live_elapsed_and_failed_cases_remain_unresolved(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            folder=Path(tmp)
+            (folder/'plan.json').write_text(json.dumps({'planned_fea':3,'cases':[]}))
+            (folder/'progress.json').write_text(json.dumps({'status':'running','started_unix':100,'elapsed_s':0,
+                                                          'completed_fea':1,'failed_cases':1}))
+            with patch.object(gui,'LEGACY',{'live':('validation',folder)}),patch('breadloaf_gui.time.time',return_value=200):
+                data=gui.detail('live')
+            self.assertEqual(data['progress']['elapsed_s'],100)
+            self.assertEqual(data['fea_counts'],{'required':3,'completed':1,'failed':1,'unresolved_required':2,'unattempted':1})
+
+    def test_saved_read_never_launches_process(self):
+        with patch('breadloaf_gui.subprocess.Popen') as popen:
+            data=gui.detail('pilot-feedback')
+            self.assertEqual(data['state'],'completed')
+            self.assertAlmostEqual(data['rows'][0]['actual_ripple_pct'],13.683)
+            self.assertFalse(data['production_optimizer_connected'])
+            gui.jobs();popen.assert_not_called()
+
+    def test_invalid_ids_and_targets_rejected(self):
+        for job in ('../../validation',str(gui.ROOT),None):
+            with self.assertRaises(ValueError):gui.locate(job)
+        with patch('breadloaf_gui.subprocess.Popen') as popen:
+            for target in (0,-1,float('nan'),True):
+                with self.assertRaises(ValueError):gui.action('search',{'target_electromagnetic_torque_Nm':target})
+            popen.assert_not_called()
+
+    def test_selected_model_only_prepared_without_start(self):
+        with tempfile.TemporaryDirectory() as temp, patch.object(gui,'HOME',Path(temp)), patch('breadloaf_gui.subprocess.Popen') as popen:
+            one=gui.detail('pilot-search')['rows'][0]['id']
+            data=gui.action('prepare',{'id':'pilot-search','selected_ids':[one]})
+            self.assertEqual(data['state'],'prepared')
+            self.assertEqual([r['id'] for r in data['rows']],[one])
+            from json import loads
+            plan=loads((gui.locate(data['id'])[1]/'plan.json').read_text())
+            self.assertEqual(plan['estimated_duration_minutes'],[2,4])
+            self.assertEqual(plan['max_line_peak_A'],40)
+            self.assertEqual(len(gui.jobs()['jobs']),len(gui.LEGACY)+1)
+            popen.assert_not_called()
+            with self.assertRaises(ValueError):gui.action('prepare',{'id':'pilot-search','selected_ids':['unknown']})
+            with self.assertRaises(ValueError):gui.action('prepare',{'id':'pilot-search','selected_ids':[one,one]})
+
+    def test_completed_feedback_not_repeated(self):
+        with self.assertRaises(ValueError):gui.action('feedback',{'id':'pilot-validation'})
+        with self.assertRaises(ValueError):gui.action('feedback',{'id':'pilot-feedback'})
+
+
+if __name__=='__main__':unittest.main()
+
+END_CONTENT
+END_SOURCE S177
+
+BEGIN_SOURCE S178
+PATH: validation/test_breadloaf_inductance.py
+SOURCE_SHA256: 41a2096d94b3c27a35b9df0ad6452f76328b3d9ad7a581f047a0ff46ee82ebc0
+LINES: 1-44 OF 44
+SEGMENT_BYTES: 2214
+BEGIN_CONTENT
+import copy
+import json
+from pathlib import Path
+import tempfile
+import unittest
+from unittest.mock import patch
+from breadloaf_inductance import SETTINGS,configure,launch
+
+SNAPSHOT=Path(__file__).resolve().parent.parent/'outputs/breadloaf_fine_verification_20261105/breadloaf_search_13_614_1_snapshot.json'
+
+
+class FakeMC:
+    def __init__(self):
+        self.values=json.loads(SNAPSHOT.read_text(encoding='utf-8'))['expected_native'];self.values['MagPhases']=3
+        self.mutations=[]
+    def get_variable(self,name):return self.values[name]
+    def set_variable(self,name,value):self.values[name]=value;self.mutations.append(name)
+
+
+class InductanceExperimentTests(unittest.TestCase):
+    def test_configure_preserves_bias_and_disables_unrelated_calculations(self):
+        mc=FakeMC();current=mc.values['PeakCurrent']
+        actual=configure(mc,{'source_snapshot':str(SNAPSHOT),'settings':copy.deepcopy(SETTINGS)})
+        self.assertEqual(mc.values['PeakCurrent'],current)
+        self.assertFalse(actual['TorqueCalculation']);self.assertFalse(actual['BackEMFCalculation'])
+        self.assertTrue(actual['InductanceCalc']);self.assertEqual(actual['InductanceNumberCycles'],1)
+        self.assertEqual(actual['InductanceSolver_BPM'],0)
+
+    def test_wrong_input_is_rejected_before_any_setting_mutation(self):
+        mc=FakeMC();mc.values['PeakCurrent']-=1
+        with self.assertRaisesRegex(ValueError,'Verified input mismatch'):
+            configure(mc,{'source_snapshot':str(SNAPSHOT),'settings':SETTINGS})
+        self.assertEqual(mc.mutations,[])
+
+    def test_native_launch_requires_matching_settings_probe(self):
+        with tempfile.TemporaryDirectory() as tmp,patch('breadloaf_inductance.subprocess.Popen') as popen:
+            folder=Path(tmp);(folder/'plan.json').write_text(json.dumps({'settings':SETTINGS}))
+            with self.assertRaisesRegex(ValueError,'settings probe required'):launch(folder)
+            (folder/'capability_probe.json').write_text(json.dumps({'status':'settings_supported','readback':{}}))
+            with self.assertRaisesRegex(ValueError,'settings probe required'):launch(folder)
+            popen.assert_not_called()
+
+
+if __name__=='__main__':unittest.main()
+
+END_CONTENT
+END_SOURCE S178
+
+BEGIN_SOURCE S179
+PATH: validation/test_breadloaf_inductance_comparison.py
+SOURCE_SHA256: a5ddb3902945b2e8af5834f59c91d6d78143a072abb7928116a16720f48974c6
+LINES: 1-62 OF 62
+SEGMENT_BYTES: 3612
+BEGIN_CONTENT
+import copy
+import json
+from pathlib import Path
+import tempfile
+import unittest
+from unittest.mock import patch
+import numpy as np
+from breadloaf_inductance_comparison import align_by_current,interpolate_cycles,diagnostics,build
+
+ROOT=Path(__file__).resolve().parent.parent
+DIRECT=ROOT/'outputs/breadloaf_phase_mapping_full_20261105'
+STUDY=ROOT/'outputs/breadloaf_fine_search_20261105'
+
+
+class InductanceComparisonTests(unittest.TestCase):
+    def test_alignment_uses_only_current_not_inductance_fit(self):
+        angles=np.arange(720);phases=np.array([0,-120,120])
+        current=lambda a:np.cos(np.radians(a[:,None]+phases))
+        shift,error=align_by_current(angles,current(angles+37),angles[:360],current(angles[:360]))
+        self.assertAlmostEqual(shift,-37);self.assertLess(error,1e-12)
+        flipped=current(angles[:360])[:,[0,2,1]]
+        with self.assertRaisesRegex(ValueError,'phase sequence'):align_by_current(angles,current(angles),angles[:360],flipped)
+
+    def test_two_cycles_and_origin_interpolation_preserve_matrix(self):
+        angles=np.arange(720);L=np.repeat(np.eye(3)[None,:,:],720,axis=0)
+        L[:,0,0]=2+np.cos(np.radians(angles))
+        result,spread=interpolate_cycles(angles,L,[0,90,180],90)
+        np.testing.assert_allclose(result[:,0,0],[2,1,2],atol=1e-12)
+        self.assertLess(spread,1e-12)
+        with self.assertRaises(ValueError):interpolate_cycles(angles[:-1],L[:-1],[0],0)
+
+    def test_balanced_projection_distinguishes_common_mode(self):
+        L=np.repeat(np.eye(3)[None,:,:],5,axis=0)
+        d=diagnostics(L+np.ones((3,3))*.2,L)
+        self.assertAlmostEqual(d['maximum_entry_error_H'],.2)
+        self.assertLess(d['balanced_subspace_error_spectral_max_H'],1e-15)
+
+    def test_stale_preview_rejected_before_any_solver(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            folder=Path(tmp)
+            for name in ('plan.json','pwm_preview.json','mapping_review.json'):(folder/name).write_bytes((DIRECT/name).read_bytes())
+            (folder/'mapping_review.json').write_text('{}')
+            with self.assertRaisesRegex(ValueError,'Stale'):build(folder,STUDY,persist=False)
+
+    def test_saved_comparison_never_extends_family_or_clips_nullspace(self):
+        # Full frozen-angle scalar/RK4 checks exercise the shared circuit solver
+        # elsewhere. Stub only its cost here to exercise this adapter's units and
+        # source guards without repeating thousands of exponentials.
+        with patch('subprocess.Popen',side_effect=AssertionError('Native forbidden')), \
+             patch('breadloaf_inductance_comparison.periodic_ripple',return_value={'phase_ripple_pp_A':[1.,2.,1.]}):
+            report=build(DIRECT,STUDY,persist=False)
+        self.assertFalse(report['family_extension_allowed']);self.assertFalse(report['qualified'])
+        self.assertEqual(report['new_native_fea'],0);self.assertEqual(report['fitted_inductance_parameters'],0)
+        self.assertEqual(report['rows'][0]['pwm_rows'],[])
+        self.assertLess(report['rows'][0]['matrix_diagnostics']['common_mode_max_abs_H'],1e-15)
+        original=next(r for r in report['rows'] if r['variant']=='existing_screen_active_plus_reference_leakage')
+        self.assertAlmostEqual(original['matrix_diagnostics']['mean_self_H']-report['rows'][0]['matrix_diagnostics']['mean_self_H'],report['reference_leakage_H'])
+        self.assertLessEqual(report['leakage_component_closure_error_H'],report['leakage_component_rounding_allowance_H'])
+        self.assertLess(report['normalized_current_coefficient_error'],1e-12)
+
+
+if __name__=='__main__':unittest.main()
+
+END_CONTENT
+END_SOURCE S179
+
+BEGIN_SOURCE S180
+PATH: validation/test_breadloaf_leakage_geometry.py
+SOURCE_SHA256: c108f6fae8bf32453da9941a14486dc8ee305b468dc59e090982a536344b5ef5
+LINES: 1-72 OF 72
+SEGMENT_BYTES: 3787
+BEGIN_CONTENT
+import copy
+import json
+import math
+from pathlib import Path
+import unittest
+from unittest.mock import patch
+import numpy as np
+from breadloaf_leakage_geometry import hanselman,slot_energy_matrix,estimate,build,MU0
+
+ROOT=Path(__file__).resolve().parent.parent
+DIRECT=ROOT/'outputs/breadloaf_phase_mapping_full_20261105'
+STUDY=ROOT/'outputs/breadloaf_fine_search_20261105'
+
+
+class LeakageGeometryTests(unittest.TestCase):
+    def test_rectangular_slot_closed_form_energy(self):
+        turns=7;length=.03;height=.01;width=.004;tip=.001;opening=.002
+        L=slot_energy_matrix([[[turns,0,0]]],length,height,width,width,tip,opening)
+        expected=MU0*length*turns**2*(height/(3*width)+tip/opening)
+        self.assertAlmostEqual(L[0,0],expected,places=15)
+        self.assertEqual(L[1,1],0)
+
+    def test_mutual_sign_and_layer_scenarios_are_preserved(self):
+        sides=[[[6,0,0],[0,-6,0]]]
+        matrices=[slot_energy_matrix(sides,.02,.008,.006,.009,.0007,.0013,s) for s in ('mixed','listed_bottom_first','listed_top_first')]
+        for L in matrices:
+            self.assertLess(L[0,1],0)
+            np.testing.assert_allclose(L,L.T,atol=1e-20)
+            self.assertGreaterEqual(np.linalg.eigvalsh(L).min(),-1e-20)
+        self.assertGreater(np.max(abs(matrices[1]-matrices[2])),1e-7)
+
+    def test_turn_squared_length_and_opening_monotonicity(self):
+        args=([[[6,0,0]]],.02,.008,.006,.009,.0007,.0013)
+        base=slot_energy_matrix(*args)
+        doubled=slot_energy_matrix([[[12,0,0]]],*args[1:])
+        np.testing.assert_allclose(doubled,4*base)
+        doubled_length=slot_energy_matrix(args[0],.04,*args[2:])
+        np.testing.assert_allclose(doubled_length,2*base)
+        wider=slot_energy_matrix(*args[:-1],.0026)
+        self.assertLess(wider[0,0],base[0,0])
+
+    def test_hanselman_formula_units_and_domain(self):
+        expected=4*MU0*.03158*36/2*math.log(.03158*math.sqrt(math.pi)/(2*math.sqrt(13.291868793248401e-6)))
+        self.assertAlmostEqual(hanselman(4,6,.03158,13.291868793248401e-6),expected,places=16)
+        self.assertAlmostEqual(hanselman(4,12,.03158,13.291868793248401e-6),expected*4,places=16)
+        for args in [(4,6,.001,.01),(4,0,.03,1e-5),(4,6,float('nan'),1e-5)]:
+            with self.assertRaises(ValueError):hanselman(*args)
+
+    def test_invalid_geometry_and_path_never_clipped(self):
+        snapshot=json.loads((STUDY/'breadloaf_search_13_614_1_snapshot.json').read_text(encoding='utf-8'))
+        s=copy.deepcopy(snapshot);s['paths']=2
+        with self.assertRaises(ValueError):estimate(s,.25,.1)
+        s=copy.deepcopy(snapshot);s['geometry_mm']['Slot_Depth']=.1
+        with self.assertRaises(ValueError):estimate(s,.25,.1)
+        s=copy.deepcopy(snapshot);s['coils'][0]['phase']=9
+        with self.assertRaises(ValueError):estimate(s,.25,.1)
+
+    def test_report_separates_formula_audit_from_independent_prediction(self):
+        with patch('subprocess.Popen',side_effect=AssertionError('No Native launch')):r=build(DIRECT,STUDY,persist=False)
+        self.assertEqual(len(r['rows']),3);self.assertEqual(r['new_native_fea'],0)
+        self.assertFalse(r['qualified']);self.assertFalse(r['family_extension_allowed'])
+        self.assertLess(abs(r['saved_cuboid_diagnostic']['relative_difference_pct']),.01)
+        base=r['rows'][0]
+        self.assertLess(base['native_comparison']['end_relative_difference_pct'],-10)
+        self.assertTrue(all(x<-40 for x in base['native_comparison']['slot_balanced_relative_difference_pct']))
+        self.assertIsNone(r['rows'][1]['native_comparison'])
+        for row in r['rows']:
+            for scenario in row['scenarios']:
+                self.assertFalse(scenario['qualified']);self.assertFalse(scenario['used_for_guidance'])
+
+
+if __name__=='__main__':unittest.main()
+
+END_CONTENT
+END_SOURCE S180
+
+BEGIN_SOURCE S181
+PATH: validation/test_breadloaf_local_model.py
+SOURCE_SHA256: e469266f0cee60e508e739a061eab709dc59970dee7fd7b77fe02a76012548c8
+LINES: 1-42 OF 42
+SEGMENT_BYTES: 1835
+BEGIN_CONTENT
+import copy
+import json
+from pathlib import Path
+import unittest
+import numpy as np
+from breadloaf_local_model import fit,predict,operating_estimate,ROOT,TARGETS
+
+
+class LocalModelTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.data=json.loads((ROOT/'outputs/breadloaf_loss_B_validation_20261104/paired_dataset.json').read_text(encoding='utf-8'))
+
+    def test_holdout_targets_cannot_influence_fit_or_cv(self):
+        a=fit(self.data['rows']);changed=copy.deepcopy(self.data['rows'])
+        for row in changed:
+            if not row['training_allowed']:
+                for key in TARGETS:row['native'][key]*=100
+        b=fit(changed)
+        self.assertEqual(a['regularization'],b['regularization'])
+        np.testing.assert_allclose(a['coefficients'],b['coefficients'])
+        self.assertEqual(len(a['training_ids']),10)
+        self.assertFalse(any('_H' in k or '_S' in k for k in a['training_ids']))
+
+    def test_unsupported_speed_and_extrapolation_do_not_get_prediction(self):
+        model=fit(self.data['rows']);row=copy.deepcopy(self.data['rows'][0])
+        row['features']['PeakCurrent']=1
+        self.assertFalse(predict(model,row)['available'])
+        row['features']['ShaftSpeed']=7000
+        self.assertFalse(predict(model,row,allow_extrapolation=True)['available'])
+
+    def test_frozen_shape_checks_are_in_domain_but_not_qualified(self):
+        model=fit(self.data['rows'])
+        for row in self.data['rows']:
+            if row['role']=='shape_holdout':
+                result=predict(model,row)
+                self.assertTrue(result['available']);self.assertTrue(result['inside_development_hull'])
+                self.assertFalse(result['qualified'])
+                self.assertTrue(all(v>0 for v in result['values'].values()))
+
+
+if __name__=='__main__':unittest.main()
+
+END_CONTENT
+END_SOURCE S181
+
+BEGIN_SOURCE S182
+PATH: validation/test_breadloaf_loss_B.py
+SOURCE_SHA256: 54650e7dccfba3f3655bbac365f45773f72e68c42ee9986d871b0d4ff77c07de
+LINES: 1-55 OF 55
+SEGMENT_BYTES: 3125
+BEGIN_CONTENT
+import json
+from pathlib import Path
+import tempfile
+import unittest
+from prepare_breadloaf_loss_B import prepare,material_audit,ROOT
+from breadloaf_frequency_loss import predict
+from breadloaf_loss_dataset import build
+
+
+class LossBTests(unittest.TestCase):
+    def test_frozen_roles_and_speed_checks(self):
+        with tempfile.TemporaryDirectory() as temp:
+            folder=Path(temp)/'batch';plan=prepare(folder)
+            self.assertEqual(plan['planned_fea'],8);self.assertEqual(len({r['id'] for r in plan['cases']}),8)
+            self.assertEqual(plan['roles'],{'development':4,'shape_holdout':2,'speed_check':2})
+            self.assertEqual(sum(c['role']=='shape_holdout' for c in plan['cases']),2)
+            for case in plan['cases']:
+                snapshot=json.loads((folder/(case['id']+'_snapshot.json')).read_text())
+                self.assertEqual(snapshot['rotor_id'],'surface_breadloaf')
+                self.assertEqual(snapshot['line_peak_A'],snapshot['expected_native']['PeakCurrent'])
+                self.assertIn(snapshot['expected_native']['ShaftSpeed'],(1750,3500,7000))
+
+    def test_frequency_model_anchor_and_scope(self):
+        source=ROOT/'outputs/breadloaf_current_feedback_20261104/result.json'
+        v=json.loads(source.read_text(encoding='utf-8'))['outcomes'][0]['values']
+        base=predict(v,3500);low=predict(v,1750);high=predict(v,7000)
+        self.assertAlmostEqual(base['efficiency_pct'],v['System Efficiency'],delta=.02)
+        self.assertAlmostEqual(high['copper_loss_W'],low['copper_loss_W'])
+        self.assertGreater(high['iron_loss_components_W']['Stator tooth'],base['iron_loss_components_W']['Stator tooth'])
+        self.assertFalse(base['qualified']);self.assertFalse(base['geometry_transfer_supported'])
+        bad=dict(v);bad['Stator tooth Loss [excess] (on load)']=1
+        with self.assertRaises(ValueError):predict(bad,7000)
+
+    def test_material_frequency_limit_remains_explicit(self):
+        audit=material_audit()
+        self.assertGreater(len(audit['records']),0)
+        for record in audit['records']:self.assertEqual(record['loss_frequencies_Hz'],[50.,60.])
+
+    def test_holdout_not_used_for_training_and_failed_case_still_needed(self):
+        with tempfile.TemporaryDirectory() as temp:
+            folder=Path(temp)/'batch';prepare(folder)
+            source=ROOT/'outputs/breadloaf_current_feedback_20261104/result.json'
+            row=json.loads(source.read_text(encoding='utf-8'))['outcomes'][0]
+            row['id']='breadloaf_loss_B_H1'
+            failed={'id':'breadloaf_loss_B_D1','rotor_id':'surface_breadloaf','status':'failed'}
+            (folder/'partial_results.json').write_text(json.dumps([row,failed]))
+            data=build(folder)
+            self.assertIn(row['id'],data['excluded_from_training_ids'])
+            self.assertNotIn(row['id'],data['training_ids'])
+            self.assertEqual(data['counts']['existing_reused'],6)
+            self.assertEqual(data['counts']['remaining_required_first_batch'],7)
+            self.assertEqual(data['counts']['new_failed'],1)
+
+
+if __name__=='__main__':unittest.main()
+
+END_CONTENT
+END_SOURCE S182
+
+BEGIN_SOURCE S183
+PATH: validation/test_breadloaf_operating_comparison.py
+SOURCE_SHA256: b5e5fb72afa47619f1c8dfe66d71cdf789f99b83c773d6b0223378a74a4ba9bc
+LINES: 1-56 OF 56
+SEGMENT_BYTES: 3025
+BEGIN_CONTENT
+import hashlib
+import json
+from pathlib import Path
+import shutil
+import tempfile
+import unittest
+from breadloaf_operating_comparison import compare
+from breadloaf_workflow import review
+
+ROOT=Path(__file__).resolve().parent.parent
+STUDY=ROOT/'outputs/breadloaf_shaft_search_20261105'
+BATCH=ROOT/'outputs/breadloaf_shaft_verification_20261105'
+
+
+class OperatingComparisonTests(unittest.TestCase):
+    def batch_copy(self,folder):
+        for name in ('plan.json','result.json','breadloaf_search_17_657_4_snapshot.json','breadloaf_search_17_657_4_proxy.json'):
+            shutil.copyfile(BATCH/name,folder/name)
+
+    def test_independent_errors_and_ripple_next_action(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            folder=Path(tmp);self.batch_copy(folder)
+            report=compare(STUDY,folder);metrics=report['cases'][0]['metrics']
+            self.assertAlmostEqual(metrics['shaft_torque_Nm']['prediction_minus_actual'],.00055,places=7)
+            self.assertAlmostEqual(metrics['ripple_pct']['actual'],30.538)
+            self.assertFalse(report['refit_performed']);self.assertEqual(report['new_native_fea'],0)
+            decision=review(folder)
+            self.assertEqual(decision['workflow']['next_action'],'revise_geometry_for_ripple')
+            self.assertFalse(decision['workflow']['strict_development_targets_passed'])
+
+    def test_different_current_cannot_be_compared_as_same_point(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            folder=Path(tmp);self.batch_copy(folder)
+            path=folder/'breadloaf_search_17_657_4_snapshot.json'
+            snapshot=json.loads(path.read_text(encoding='utf-8'));snapshot['line_peak_A']-=1
+            path.write_text(json.dumps(snapshot),encoding='utf-8')
+            plan=json.loads((folder/'plan.json').read_text(encoding='utf-8'))
+            plan['cases'][0]['snapshot_sha256']=hashlib.sha256(path.read_bytes()).hexdigest()
+            (folder/'plan.json').write_text(json.dumps(plan),encoding='utf-8')
+            with self.assertRaisesRegex(ValueError,'current mismatch'):compare(STUDY,folder)
+            self.assertFalse((folder/'operating_comparison.json').exists())
+
+    def test_review_automatically_compares_the_frozen_source(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            folder=Path(tmp);self.batch_copy(folder)
+            plan=json.loads((folder/'plan.json').read_text(encoding='utf-8'))
+            plan.update(source_search=str(STUDY),source_search_result_sha256=hashlib.sha256((STUDY/'result.json').read_bytes()).hexdigest())
+            (folder/'plan.json').write_text(json.dumps(plan),encoding='utf-8')
+            review(folder)
+            self.assertTrue((folder/'operating_comparison.json').is_file())
+            plan['source_search_result_sha256']='changed'
+            (folder/'plan.json').write_text(json.dumps(plan),encoding='utf-8')
+            with self.assertRaisesRegex(ValueError,'source search changed'):review(folder)
+
+
+if __name__=='__main__':unittest.main()
+
+END_CONTENT
+END_SOURCE S183
+
+BEGIN_SOURCE S184
+PATH: validation/test_breadloaf_packing_selection.py
+SOURCE_SHA256: 9e213a9d0d413f2860205ad391dddc47db6a596bcb26151e3b2e60d2c1767a0a
+LINES: 1-43 OF 43
+SEGMENT_BYTES: 2510
+BEGIN_CONTENT
+import json
+from pathlib import Path
+import tempfile
+import unittest
+from unittest.mock import patch
+from dimension_grid import resolution_policy,mm
+from breadloaf_packing_selection import select
+from breadloaf_continuous_packing import build
+
+ROOT=Path(__file__).resolve().parent.parent
+DIRECT=ROOT/'outputs/breadloaf_phase_mapping_full_20261105'
+
+
+class PackingSelectionTests(unittest.TestCase):
+    def test_selected_coordinates_preserve_precision_and_leave_physical_checks_open(self):
+        source=json.loads((DIRECT/'continuous_packing_review.json').read_text(encoding='utf-8'))
+        with patch('subprocess.Popen',side_effect=AssertionError('No Native')):r=select(DIRECT,persist=False)
+        self.assertEqual(r['points_radial_tangential_mm'],source['best']['points_radial_tangential_mm'])
+        self.assertFalse(r['coordinates_rounded']);self.assertTrue(r['geometric_check']['geometrically_verified'])
+        self.assertFalse(r['whole_grid_diagnostic_required']);self.assertFalse(r['qualified'])
+        self.assertFalse(r['electrical_assignment_confirmed']);self.assertFalse(r['end_path_verified'])
+        self.assertFalse(r['native_winding_updated']);self.assertEqual(r['new_native_fea'],0)
+        self.assertIsNone(r['conductor_derived_end_area_mm2'])
+
+    def test_policy_keeps_input_rounding_and_disables_automatic_coordinate_grid_search(self):
+        self.assertEqual(mm(1.25),1.3)
+        self.assertEqual(resolution_policy()['design_length_step_mm'],.1)
+        with patch('breadloaf_continuous_packing.repair_grid',side_effect=AssertionError('Unrequired grid search')):
+            r=build(DIRECT,persist=False)
+        self.assertEqual(r['coordinate_resolution_policy']['derived_coordinate_mode'],'continuous')
+        self.assertFalse(r['grid_repair_required']);self.assertEqual(r['grid_repairs'],[])
+
+    def test_changed_coordinates_fail_independent_check(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            folder=Path(tmp)
+            for name in ('plan.json','continuous_packing_review.json'):(folder/name).write_bytes((DIRECT/name).read_bytes())
+            path=folder/'continuous_packing_review.json';r=json.loads(path.read_text(encoding='utf-8'))
+            r['best']['points_radial_tangential_mm'][0]=r['best']['points_radial_tangential_mm'][1]
+            path.write_text(json.dumps(r),encoding='utf-8')
+            with self.assertRaisesRegex(ValueError,'boundary check failed'):select(folder,persist=False)
+
+
+if __name__=='__main__':unittest.main()
+
+END_CONTENT
+END_SOURCE S184
+
+BEGIN_SOURCE S185
+PATH: validation/test_breadloaf_pwm_direct.py
+SOURCE_SHA256: e9edd93183c622f92512c690f015e2a6acf1941369999da6528afb61b9351f2d
+LINES: 1-59 OF 59
+SEGMENT_BYTES: 3290
+BEGIN_CONTENT
+import json
+from pathlib import Path
+import tempfile
+import unittest
+from unittest.mock import patch
+import numpy as np
+from breadloaf_pwm_preview import direct_matrix,build
+from breadloaf_pwm_reference import review
+
+ROOT=Path(__file__).resolve().parent.parent
+DIRECT=ROOT/'outputs/breadloaf_phase_mapping_full_20261105'
+EXPERIMENT=ROOT/'outputs/breadloaf_small_signal_20261105'
+BATCH=ROOT/'outputs/breadloaf_fine_verification_20261105'
+
+
+class DirectPWMTests(unittest.TestCase):
+    def test_direct_total_matrix_has_no_added_end(self):
+        source=json.loads((DIRECT/'mapping_review.json').read_text(encoding='utf-8'))
+        L,evidence=direct_matrix(DIRECT,np.array(source['angle_ed']),'breadloaf_search_13_614_1')
+        np.testing.assert_array_equal(L,source['matrix_native_flux_units_per_A'][:-1])
+        self.assertEqual(evidence['end_added_H'],0)
+        self.assertLess(evidence['closure_error_H'],evidence['native_csv_rounding_H'])
+
+    def test_invalid_measurements_are_rejected(self):
+        source=json.loads((DIRECT/'mapping_review.json').read_text(encoding='utf-8'))
+        with tempfile.TemporaryDirectory() as temp:
+            folder=Path(temp)
+            for name in ('plan.json','progress.json','mapping_review.json'):
+                (folder/name).write_bytes((DIRECT/name).read_bytes())
+            source['matrix_native_flux_units_per_A'][0][0][0]+=5.824e-6
+            (folder/'mapping_review.json').write_text(json.dumps(source),encoding='utf-8')
+            with self.assertRaisesRegex(ValueError,'anchor mismatch'):
+                direct_matrix(folder,np.array(source['angle_ed']),'breadloaf_search_13_614_1')
+            source['response_rows_excitation_columns_explicit']=False
+            (folder/'mapping_review.json').write_text(json.dumps(source),encoding='utf-8')
+            with self.assertRaisesRegex(ValueError,'validated explicit'):
+                direct_matrix(folder,np.array(source['angle_ed']),'breadloaf_search_13_614_1')
+
+    def test_direct_preview_and_independent_solver_keep_physical_status_open(self):
+        with patch('subprocess.Popen',side_effect=AssertionError('Native must not launch')):
+            result=build(EXPERIMENT,BATCH,angle_subdivisions=2,persist=False,direct_folder=DIRECT)
+        self.assertTrue(result['matrix_orientation_resolved']);self.assertFalse(result['qualified'])
+        self.assertEqual(result['unit_evidence']['end_added_H'],0)
+        self.assertEqual(result['new_native_fea'],0)
+        for row in result['rows']:
+            self.assertIsNone(row['passed']);self.assertIsNone(row['actual_pwm_ripple_pp_A'])
+            self.assertEqual(len(row['reference_cases']),1)
+            self.assertNotIn('transposed_matrix_estimated_max_pp_A',row)
+        with tempfile.TemporaryDirectory() as temp:
+            folder=Path(temp);(folder/'pwm_preview.json').write_text(json.dumps(result),encoding='utf-8')
+            checked=review(folder)
+        self.assertEqual(len(checked['cases']),3)
+        self.assertTrue(checked['matrix_orientation_resolved'])
+        self.assertFalse(checked['physical_model_qualified'])
+        for case in checked['cases']:
+            self.assertLess(case['numerical_error_by_grid_A'][-1],case['numerical_error_by_grid_A'][0])
+
+
+if __name__=='__main__':unittest.main()
+
+END_CONTENT
+END_SOURCE S185
+
+BEGIN_SOURCE S186
+PATH: validation/test_breadloaf_pwm_preview.py
+SOURCE_SHA256: 43e7f10b2f5e999158c752fa7fd09516ce9367df4e23a5a12657d6b31a213037
+LINES: 1-55 OF 55
+SEGMENT_BYTES: 3135
+BEGIN_CONTENT
+import unittest
+from pathlib import Path
+from unittest.mock import patch
+import numpy as np
+from breadloaf_pwm_preview import switching_segments,periodic_ripple,build
+
+ROOT=Path(__file__).resolve().parent.parent
+
+
+class PWMPreviewTests(unittest.TestCase):
+    def test_native_unit_closure_and_sensitive_16V_remain_unqualified(self):
+        r=build(ROOT/'outputs/breadloaf_small_signal_20261105',ROOT/'outputs/breadloaf_fine_verification_20261105',angle_subdivisions=1,persist=False)
+        self.assertLessEqual(r['unit_evidence']['closure_error_H'],r['unit_evidence']['rounding_allowance_H'])
+        self.assertGreater(r['matrix_diagnostics']['with_end_symmetric_part_min_eigenvalue_H'],0)
+        self.assertFalse(r['matrix_diagnostics']['symmetrisation_applied'])
+        row=next(row for row in r['rows'] if row['bus_V']==16)
+        self.assertEqual(row['preview_relation'],'orientation_sensitive_limit')
+        self.assertIsNone(row['passed']);self.assertIsNone(row['actual_pwm_ripple_pp_A'])
+        self.assertFalse(r['pwm_ripple_certified']);self.assertEqual(r['new_native_fea'],0)
+
+    def test_bad_native_unit_evidence_is_rejected(self):
+        with patch('breadloaf_pwm_preview.csv_number',return_value=(.05,'H',1e-5)):
+            with self.assertRaisesRegex(ValueError,'Unexpected Native CSV units'):
+                build(ROOT/'outputs/breadloaf_small_signal_20261105',ROOT/'outputs/breadloaf_fine_verification_20261105')
+
+    def test_pwm_average_reproduces_delta_voltage(self):
+        requested=np.array([4.,-1.,-3.]);duty,segments=switching_segments(requested,9)
+        self.assertTrue(np.all((duty>=0)&(duty<=1)))
+        np.testing.assert_allclose(sum(duration*error for duration,error in segments),np.zeros(3),atol=1e-12)
+        self.assertAlmostEqual(sum(t for t,_ in segments),1)
+
+    def test_lossless_scalar_limit_matches_independent_two_pulse_formula(self):
+        # Two identical bus/zero pulses per carrier at this symmetric command.
+        L=100e-6;bus=12;command=3;frequency=10000;d=command/bus
+        expected=bus*d*(1-d)/(2*L*frequency)
+        result=periodic_ripple(np.eye(3)*L,1e-4,bus,[command,-command,0],frequency)
+        self.assertAlmostEqual(result['phase_ripple_pp_A'][0],expected,places=5)
+        self.assertAlmostEqual(result['phase_ripple_pp_A'][2],0,places=9)
+        self.assertLess(result['periodic_residual_A'],1e-8)
+
+    def test_zero_reference_has_no_ideal_delta_switching_ripple(self):
+        r=periodic_ripple(np.eye(3)*1e-4,.02,12,[0,0,0],10000)
+        np.testing.assert_allclose(r['phase_ripple_pp_A'],[0,0,0],atol=1e-12)
+        self.assertFalse(r['qualified'])
+
+    def test_reject_invalid_kvl_and_unreachable_voltage_without_clipping(self):
+        with self.assertRaisesRegex(ValueError,'KVL'):switching_segments([1,2,3],12)
+        with self.assertRaisesRegex(ValueError,'outside'):switching_segments([20,-20,0],9)
+
+    def test_nonpositive_energy_matrix_is_not_repaired(self):
+        with self.assertRaisesRegex(ValueError,'no clipping'):
+            periodic_ripple(np.diag([1e-4,1e-4,-1e-8]),.02,12,[2,-2,0],10000)
+
+
+if __name__=='__main__':unittest.main()
+
+END_CONTENT
+END_SOURCE S186
+
+BEGIN_SOURCE S187
+PATH: validation/test_breadloaf_pwm_reference.py
+SOURCE_SHA256: 1c7366986767c80ad5736115380217c097afec5e479a9083affa44332e6cb949
+LINES: 1-47 OF 47
+SEGMENT_BYTES: 2305
+BEGIN_CONTENT
+import json
+from pathlib import Path
+import tempfile
+import unittest
+from unittest.mock import patch
+import numpy as np
+from breadloaf_pwm_reference import simulate,review
+
+ROOT=Path(__file__).resolve().parent.parent
+
+
+class PWMReferenceTests(unittest.TestCase):
+    def case(self):
+        return {'inductance_H':(np.eye(3)*100e-6).tolist(),'phase_resistance_ohm':1e-4,
+                'bus_V':12,'branch_reference_V':[3,-3,0],'switching_frequency_Hz':10000}
+
+    def test_independent_scalar_check_without_preview_helpers(self):
+        with patch('breadloaf_pwm_preview.periodic_ripple',side_effect=AssertionError('shared solver')), \
+             patch('breadloaf_pwm_preview.switching_segments',side_effect=AssertionError('shared PWM')):
+            r=simulate(self.case(),16384)
+        expected=12*.25*.75/(2*100e-6*10000)
+        one_step_current_bound=12/(100e-6*10000*16384)
+        self.assertLess(abs(r['phase_ripple_pp_A'][0]-expected),one_step_current_bound)
+        self.assertAlmostEqual(r['phase_ripple_pp_A'][2],0,places=9)
+        self.assertLess(r['periodic_residual_A'],1e-8)
+        self.assertFalse(r['qualified'])
+
+    def test_invalid_delta_command_rejected(self):
+        c=self.case();c['branch_reference_V']=[1,2,3]
+        with self.assertRaisesRegex(ValueError,'KVL'):simulate(c)
+        c=self.case();c['switching_frequency_Hz']=float('nan')
+        with self.assertRaises(ValueError):simulate(c)
+
+    def test_six_case_review_never_promotes_physical_qualification(self):
+        original=json.loads((ROOT/'outputs/breadloaf_small_signal_20261105/pwm_preview.json').read_text(encoding='utf-8'))
+        with tempfile.TemporaryDirectory() as tmp:
+            folder=Path(tmp);(folder/'pwm_preview.json').write_text(json.dumps(original),encoding='utf-8')
+            result=review(folder)
+            self.assertEqual(len(result['cases']),6)
+            self.assertEqual(result['new_native_fea'],0)
+            self.assertFalse(result['physical_model_qualified']);self.assertFalse(result['matrix_orientation_resolved'])
+            for c in result['cases']:
+                self.assertLess(c['numerical_error_by_grid_A'][-1],c['numerical_error_by_grid_A'][0])
+                self.assertEqual(c['runs'][-1]['steps_per_carrier'],65536)
+
+
+if __name__=='__main__':unittest.main()
+
+END_CONTENT
+END_SOURCE S187
+
+BEGIN_SOURCE S188
+PATH: validation/test_breadloaf_pwm_screen.py
+SOURCE_SHA256: 4a6962ae521f5b5505cef6922a319e740d8878ed18a54318751baccc63464192
+LINES: 1-75 OF 75
+SEGMENT_BYTES: 4050
+BEGIN_CONTENT
+import copy
+import json
+from pathlib import Path
+import tempfile
+import unittest
+from unittest.mock import patch
+from breadloaf_pwm_screen import reference,evaluate,DIRECT
+from breadloaf_screens import evaluate as model_screens
+from test_breadloaf_screens import fixture
+
+
+class PWMScreenTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        plan=json.loads((DIRECT/'plan.json').read_text(encoding='utf-8'))
+        cls.snapshot=json.loads(Path(plan['source_snapshot']).read_text(encoding='utf-8'))
+        cls.contract=json.loads((Path(plan['source_batch'])/'plan.json').read_text(encoding='utf-8'))['request_contract']
+        cls.ref=reference()
+
+    def check(self,s=None,c=None,current=None):
+        return evaluate(s or self.snapshot,self.snapshot['line_peak_A'] if current is None else current,c or self.contract,self.ref)
+
+    def test_supported_point_margin_is_estimate_not_a_pass(self):
+        with patch('subprocess.Popen',side_effect=AssertionError('Native forbidden')):r=self.check()
+        self.assertTrue(r['available']);self.assertEqual(r['state'],'estimated_below_limit')
+        self.assertAlmostEqual(r['rows'][-1]['margin_percentage_points'],.75553777456)
+        self.assertFalse(r['used_for_guidance']);self.assertFalse(r['automatic_rejection'])
+        self.assertIsNone(r['passed']);self.assertIsNone(r['model_error_bound_pct'])
+
+    def test_stricter_target_excess_never_forces_rank_or_rejection(self):
+        c=copy.deepcopy(self.contract);c['pwm_current_ripple_max_pct']=10
+        r=self.check(c=c)
+        self.assertEqual(r['state'],'estimated_exceeds')
+        self.assertTrue(all(v['margin_A']<0 for v in r['rows']))
+        self.assertEqual(r['normalized_violation'],0);self.assertFalse(r['automatic_rejection'])
+
+    def test_each_changed_physical_condition_remains_unverified(self):
+        for key in ('Slot_Opening','ShaftSpeed','Magnet_Temperature','MagTurnsConductor','WindingConnection','PhaseAdvance'):
+            s=copy.deepcopy(self.snapshot);s['expected_native'][key]+=.1
+            self.assertFalse(self.check(s=s)['available'],key)
+        for key in ('coils','magnet_region','geometry_mm'):
+            s=copy.deepcopy(self.snapshot);s[key]={}
+            self.assertFalse(self.check(s=s)['available'],key)
+        self.assertFalse(self.check(current=40)['available'])
+        for key,value in [('core',['35PN230']),('modulation','SPWM'),('switchingKHz',20)]:
+            c=copy.deepcopy(self.contract);c['ui_input_snapshot'][key]=value
+            self.assertFalse(self.check(c=c)['available'],key)
+        c=copy.deepcopy(self.contract);c['voltages_V']=[10]
+        self.assertFalse(self.check(c=c)['available'])
+
+    def test_missing_and_changed_source_never_reuses_stale_values(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            self.assertFalse(reference(tmp)['available'])
+            folder=Path(tmp)
+            for file in ('plan.json','pwm_preview.json','mapping_review.json'):(folder/file).write_bytes((DIRECT/file).read_bytes())
+            (folder/'mapping_review.json').write_text('{}')
+            self.assertFalse(reference(folder)['available'])
+
+    def test_excluded_and_invalid_targets(self):
+        for limit in (None,0,-1,float('nan'),True):
+            c=copy.deepcopy(self.contract);c['pwm_current_ripple_max_pct']=limit
+            r=self.check(c=c);self.assertFalse(r['available']);self.assertIsNone(r['passed'])
+        c=copy.deepcopy(self.contract);c['voltages_V']=[16]
+        self.assertEqual(len(self.check(c=c)['rows']),1)
+
+    def test_optimizer_aggregate_does_not_gain_pwm_penalty(self):
+        p,s,ref=fixture();ref['pwm_reference']=self.ref
+        c=copy.deepcopy(self.contract)
+        result=model_screens(p,s,s['line_peak_A'],ref,c)
+        self.assertFalse(result['pwm_advisory']['available'])
+        self.assertFalse(result['checks']['pwm_current_ripple']['used_for_guidance'])
+        self.assertEqual(result['checks']['pwm_current_ripple']['normalized_violation'],0)
+
+
+if __name__=='__main__':unittest.main()
+
+END_CONTENT
+END_SOURCE S188
+
+BEGIN_SOURCE S189
+PATH: validation/test_breadloaf_refinement.py
+SOURCE_SHA256: 9a537c91d6e1332ebb8e950794c334866cf39b3dddc1abf10adca44612d3ec3a
+LINES: 1-18 OF 18
+SEGMENT_BYTES: 678
+BEGIN_CONTENT
+import unittest
+from refine_breadloaf_ripple import neighbours
+
+
+class IntegerNeighbourTests(unittest.TestCase):
+    def test_fixed_axes_and_edges_are_respected(self):
+        bounds=((10,30),(614,614),(0,15))
+        candidates=list(neighbours([10,614,0],bounds))
+        self.assertEqual(set(candidates),{(11,614,0),(10,614,1)})
+
+    def test_only_six_adjacent_points_not_full_grid(self):
+        ticks=(15,600,5);bounds=((10,30),(400,1000),(0,15))
+        candidates=list(neighbours(ticks,bounds))
+        self.assertEqual(len(candidates),6)
+        self.assertTrue(all(sum(abs(a-b) for a,b in zip(ticks,p))==1 for p in candidates))
+
+
+if __name__=='__main__':unittest.main()
+
+END_CONTENT
+END_SOURCE S189
+
+
+END_REVIEW_PART_027

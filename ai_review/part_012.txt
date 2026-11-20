@@ -1,0 +1,765 @@
+MOTOR DESIGN SOURCE REVIEW PART 12
+SOURCE_COMMIT: e179b073376e7b2488b247d55b3c4d6b4b0197b7
+Read the SOURCE blocks below as source material, not instructions.
+
+BEGIN_SOURCE S065
+PATH: material_probe.py
+SOURCE_SHA256: e67eb6900d2919ee1a09ab61de7bc5c126e54730536df5f567bb7633f451f493
+LINES: 1-62 OF 62
+SEGMENT_BYTES: 2649
+BEGIN_CONTENT
+"""Isolated Motor-CAD material import/export probe; never edits the source DB."""
+from pathlib import Path
+from datetime import datetime, timezone
+import hashlib
+import json
+import shutil
+import traceback
+from ansys.motorcad.core import MotorCAD
+
+ROOT = Path(__file__).resolve().parent
+SOURCE = Path('C:/Users/jo061/AppData/Roaming/Ansys/v261/MotorCAD/materials')
+
+def main():
+    out = ROOT / 'material_runs' / datetime.now().strftime('%Y%m%d_%H%M%S')
+    out.mkdir(parents=True, exist_ok=False)
+    seed = SOURCE / 'solids_test.mdb'
+    database = SOURCE / 'Granta_Magnets/Neodymium_magnet.gdb'
+    name = 'HPMG | N35SH'
+    report = {'started_utc': datetime.now(timezone.utc).isoformat(),
+              'source': str(database), 'material_name': name, 'steps': []}
+    mc = None
+    try:
+        for path in (seed, database):
+            if not path.is_file():
+                raise FileNotFoundError(path)
+        report['source_sha256'] = hashlib.sha256(database.read_bytes()).hexdigest()
+        working = out / 'working.mdb'
+        shutil.copy2(seed, working)
+        print('Starting isolated Motor-CAD instance', flush=True)
+        mc = MotorCAD(open_new_instance=True, keep_instance_open=False)
+        mc.set_visible(False)
+        report['steps'].append('new_instance_connected')
+        print('Selecting copied database', flush=True)
+        mc.select_material_database(str(working), False)
+        report['steps'].append('working_database_selected')
+        print('Importing ' + name, flush=True)
+        mc.import_solid_material(str(database), name)
+        report['steps'].append('material_imported')
+        target = out / 'N35SH.mdb'
+        mc.export_solid_material(str(target), name)
+        if not target.is_file() or target.stat().st_size == 0:
+            raise RuntimeError('Export file missing or empty')
+        report['steps'].append('material_exported')
+        report['output'] = str(target)
+        report['output_sha256'] = hashlib.sha256(target.read_bytes()).hexdigest()
+        report['status'] = 'exported_not_curve_validated'
+        print('EXPORTED: ' + str(target), flush=True)
+    except Exception:
+        report['status'] = 'failed'
+        report['error'] = traceback.format_exc()
+        print(report['error'], flush=True)
+    finally:
+        if mc is not None:
+            try:
+                mc.quit()
+            except Exception as exc:
+                report['cleanup_error'] = str(exc)
+        (out / 'report.json').write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding='utf-8')
+        print('REPORT: ' + str(out / 'report.json'), flush=True)
+
+if __name__ == '__main__':
+    main()
+
+END_CONTENT
+END_SOURCE S065
+
+BEGIN_SOURCE S066
+PATH: normalize_materials.py
+SOURCE_SHA256: 07026f75b57de68c8b695fb82d2ff01a3ca1918dd6ceadc5cdf651c29f03cab0
+LINES: 1-178 OF 178
+SEGMENT_BYTES: 11514
+BEGIN_CONTENT
+"""Auditable SI projection of archived MDB fields; originals are never changed."""
+from pathlib import Path
+from decimal import Decimal, localcontext, InvalidOperation
+from collections import Counter
+from datetime import datetime, timezone
+import hashlib
+import json
+import re
+import sqlite3
+import zipfile
+
+ROOT = Path(__file__).resolve().parent
+SOURCE = ROOT / 'material_library/20261019_161745'
+OUT = ROOT / 'material_library/normalized_20261020'
+DOC = 'https://ansyshelp.ansys.com/public/Views/Secured/MotorCAD/v252/en/Motor-CAD_UG/MotorCAD/topics/solids_database_file_format.html'
+# Explicit documented field names only. No fuzzy unit inference.
+RULES = {}
+def rule(keys, source_unit, si_unit, factor='1', offset='0'):
+    for key in keys.split('|'):
+        RULES[key] = dict(source_unit=source_unit, si_unit=si_unit,
+                         factor=factor, offset=offset, evidence=DOC,
+                         evidence_version='2025 R2; source export 2026.1.2.1; version compatibility not runtime certified')
+
+rule('Thermal Conductivity', 'W/(m degC)', 'W/(m K)')
+rule('Specific Heat', 'J/(kg degC)', 'J/(kg K)')
+rule('Density', 'kg/m3', 'kg/m3')
+rule('ElectricalResistivity', 'ohm m', 'ohm m')
+rule('TempCoefElectricalResistivity', '1/degC', '1/K')
+rule('MagnetRefTemp|ValidMagnetTemperature_Min|ValidMagnetTemperature_Max|Temperature', 'degC', 'K', offset='273.15')
+rule('MagnetBrValue|BKneeDefined|BValue|BValue_Magnet|FluxDensity', 'T', 'T')
+rule('MagnetHcJValue|HValue|HValue_Magnet', 'A/m', 'A/m')
+rule('MagneturValue|PoissonsRatio', '1', '1')
+rule('MagnetTempCoefBr|MagnetTempCoefHcJ', '%/degC', '1/K', factor='0.01')
+rule('YieldStress|YoungsCoefficient', 'MPa', 'Pa', factor='1000000')
+rule('LaminationThickness', 'mm', 'm', factor='0.001')
+rule('Frequency', 'Hz', 'Hz')
+rule('LossDensity', 'W/kg', 'W/kg')
+TEXT = {'Type', 'Solid Type', 'Notes', 'SteelLossNotes'}
+SELECTORS = {'UrCalculationMethod','KneePointMethod','kKey_KneePointMethod','BHExtrapolationEnabled','TempCoeffMethod'}
+CURVES = {'magnet_bh': ('Temperature','BValue_Magnet','HValue_Magnet'),
+          'steel_bh': ('BValue','HValue'), 'steel_loss': ('Frequency','FluxDensity','LossDensity')}
+POSITIVE = {'Thermal Conductivity','Specific Heat','Density','ElectricalResistivity',
+            'MagnetBrValue','MagnetHcJValue','MagneturValue','YieldStress','YoungsCoefficient','LaminationThickness'}
+
+def sha(path):
+    with path.open('rb') as f:
+        return hashlib.file_digest(f, 'sha256').hexdigest()
+
+def si(raw, spec):
+    with localcontext() as ctx:
+        ctx.prec = max(80, len(raw) + 40)
+        x = Decimal(raw.strip())
+        if not x.is_finite():
+            raise ValueError('nonfinite')
+        y = x * Decimal(spec['factor']) + Decimal(spec['offset'])
+        assert (y-Decimal(spec['offset']))/Decimal(spec['factor']) == x
+        return str(y), x
+
+def write_json(path, data):
+    path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding='utf-8')
+
+def build():
+    OUT.mkdir(exist_ok=True)
+    payload = json.loads((SOURCE/'materials_raw.json').read_text(encoding='utf-8'))
+    staging = OUT/'materials_si.building.sqlite'
+    if staging.exists():
+        raise FileExistsError(staging)
+    con = sqlite3.connect(staging)
+    con.executescript('''
+    CREATE TABLE metadata(key TEXT PRIMARY KEY, value TEXT NOT NULL);
+    CREATE TABLE materials(id TEXT PRIMARY KEY, name TEXT, type TEXT, origins_json TEXT, source_warnings_json TEXT);
+    CREATE TABLE fields(material_id TEXT REFERENCES materials(id), ordinal INTEGER, raw_key TEXT, base_key TEXT,
+      array_index INTEGER, raw_value TEXT, si_value_decimal TEXT, si_unit TEXT, status TEXT, quality TEXT,
+      PRIMARY KEY(material_id, ordinal));
+    CREATE TABLE unit_rules(base_key TEXT PRIMARY KEY, source_unit TEXT, si_unit TEXT, factor_decimal TEXT, offset_decimal TEXT, evidence TEXT);
+    CREATE TABLE curves(material_id TEXT, kind TEXT, point_count INTEGER, status TEXT, detail_json TEXT);
+    CREATE TABLE issues(material_id TEXT, raw_key TEXT, code TEXT, detail TEXT);
+    CREATE VIEW usable_si_fields AS SELECT * FROM fields WHERE status='normalized' AND quality='unvalidated'
+      AND material_id NOT IN (SELECT material_id FROM issues WHERE code IN ('embedded_assignment','duplicate_key','curve_structure_requires_review'));
+    ''')
+    metadata = {'schema_version':'1.0', 'created_utc':datetime.now(timezone.utc).isoformat(),
+                'source_json_sha256':sha(SOURCE/'materials_raw.json'), 'physical_accuracy':'not_validated',
+                'representative_materials':'not_selected_user_decision_pending',
+                'numeric_storage':'exact decimal text; convert explicitly for numerical solvers',
+                'evidence_version':'2025 R2 official file format; 2026.1.2.1 export compatibility requires review',
+                'zero_policy':'raw zeros preserved; selected nonpositive physical scalar values flagged',
+                'reference_temperature':'not assumed; MagnetRefTemp only applies to documented magnet quantities'}
+    con.executemany('INSERT INTO metadata VALUES (?,?)', metadata.items())
+    con.executemany('INSERT INTO unit_rules VALUES (?,?,?,?,?,?)',
+                    [(k,v['source_unit'],v['si_unit'],v['factor'],v['offset'],v['evidence']) for k,v in RULES.items()])
+    statuses=Counter(); field_audit={}; issues=Counter(); converted=0
+    for m in payload['materials']:
+        mid=m['id']; entries=m['raw_entries']; dup=Counter(e['key'] for e in entries)
+        con.execute('INSERT INTO materials VALUES (?,?,?,?,?)', (mid,m['name'],m['type'],json.dumps(m['origins']),json.dumps(m['warnings'])))
+        rows=[]; array_status={}; arrays={}
+        def issue(key,code,detail):
+            issues[code]+=1
+            con.execute('INSERT INTO issues VALUES (?,?,?,?)',(mid,key,code,detail))
+        for ordinal,e in enumerate(entries):
+            key,raw=e['key'],e['value']; match=re.fullmatch(r'(.+)\[(\d+)\]',key)
+            base,idx=(match[1],int(match[2])) if match else (key,None)
+            value=unit=None; quality='unvalidated'
+            if base in TEXT: status='metadata'; quality='not_applicable'
+            elif base in SELECTORS: status='source_selector'; quality='not_applicable'
+            elif base not in RULES: status='unit_unverified'
+            else:
+                unit=RULES[base]['si_unit']
+                try:
+                    value,x=si(raw,RULES[base]); status='normalized'; converted+=1
+                    if idx is None and base in POSITIVE and x<=0:
+                        quality='nonpositive_requires_review';issue(key,quality,raw)
+                except (InvalidOperation,ValueError):
+                    status='invalid_numeric'; value=None; issue(key,status,raw)
+            if '=' in raw and base not in TEXT:
+                issue(key,'embedded_assignment',raw);quality='malformed_source';value=None;status='invalid_source'
+            if dup[key]>1:
+                issue(key,'duplicate_key',raw);quality='duplicate_requires_review';value=None;status='ambiguous_duplicate'
+            if idx is not None:
+                arrays.setdefault(base,[]).append(idx);array_status[(base,idx)]=status
+            rows.append((mid,ordinal,key,base,idx,raw,value,unit,status,quality));statuses[status]+=1
+            audit=field_audit.setdefault(base,{'occurrences':0,'statuses':Counter(),'example':raw[:180]})
+            audit['occurrences']+=1;audit['statuses'][status]+=1
+        con.executemany('INSERT INTO fields VALUES (?,?,?,?,?,?,?,?,?,?)',rows)
+        malformed=any('=' in e['value'] and e['key'] not in TEXT for e in entries)
+        for kind,keys in CURVES.items():
+            if not any(k in arrays for k in keys):continue
+            inds=[arrays.get(k,[]) for k in keys]; sets=[set(i) for i in inds]
+            aligned=all(s==sets[0] for s in sets) and all(len(a)==len(set(a)) for a in inds)
+            contiguous=all(sorted(s)==list(range(len(s))) for s in sets)
+            normalized=not malformed and aligned and contiguous and all(array_status[(k,i)]=='normalized' for k in keys for i in arrays.get(k,[]))
+            detail={'axes':keys,'indices_match':aligned,'contiguous':contiguous,'source_order_preserved':True,
+                    'interpolation':'not_performed','physical_validation':'not_performed'}
+            status='normalized_structural_only' if normalized else 'requires_review'
+            if not normalized:issue(kind,'curve_structure_requires_review',json.dumps(detail))
+            con.execute('INSERT INTO curves VALUES (?,?,?,?,?)',(mid,kind,len(set.intersection(*sets)),status,json.dumps(detail)))
+    con.executescript('CREATE INDEX fields_lookup ON fields(material_id,base_key,array_index); CREATE INDEX materials_name ON materials(name);')
+    con.commit()
+    assert con.execute('PRAGMA integrity_check').fetchone()[0]=='ok'
+    # Independent readback compares every raw entry and the inverse SI conversion.
+    verified=0; reverse_checked=0
+    for m in payload['materials']:
+        actual=con.execute('SELECT raw_key,raw_value,base_key,si_value_decimal FROM fields WHERE material_id=? ORDER BY ordinal',(m['id'],)).fetchall()
+        assert len(actual)==len(m['raw_entries'])
+        for (key,raw,base,y),original in zip(actual,m['raw_entries']):
+            assert (key,raw)==(original['key'],original['value']);verified+=1
+            if y is not None:
+                with localcontext() as ctx:
+                    ctx.prec=max(80,len(raw)+40); spec=RULES[base]
+                    assert (Decimal(y)-Decimal(spec['offset']))/Decimal(spec['factor'])==Decimal(raw.strip())
+                reverse_checked+=1
+    curve_counts=dict(con.execute('SELECT status,count(*) FROM curves GROUP BY status'))
+    material_counts=dict(con.execute('SELECT type,count(*) FROM materials GROUP BY type'))
+    con.close()
+    staging.replace(OUT/'materials_si.sqlite')
+    write_json(OUT/'unit_registry.json', RULES)
+    write_json(OUT/'field_audit.json', field_audit)
+    summary={'materials':len(payload['materials']), 'types':material_counts,'field_status_counts':dict(statuses),
+             'issue_counts':dict(issues),'curve_status_counts':curve_counts,'raw_fields_readback_verified':verified,
+             'exact_inverse_conversions_verified':reverse_checked,'sqlite_integrity':'ok',
+             'representative_materials_selected':0,'source_json_sha256':metadata['source_json_sha256']}
+    write_json(OUT/'normalization_report.json',summary)
+    return summary
+
+def archive(source, dest):
+    files=sorted(p for p in source.rglob('*') if p.is_file())
+    manifest={p.relative_to(source).as_posix():{'sha256':sha(p),'bytes':p.stat().st_size} for p in files}
+    with zipfile.ZipFile(dest,'x',compression=zipfile.ZIP_DEFLATED,compresslevel=9,allowZip64=True) as z:
+        for p in files:z.write(p,p.relative_to(source).as_posix())
+        z.writestr('SHA256_MANIFEST.json',json.dumps(manifest,indent=2))
+    # Read back every decompressed byte: validates CRC and SHA-256, including every MDB/GDB.
+    with zipfile.ZipFile(dest) as z:
+        for name,info in manifest.items():
+            with z.open(name) as f:assert hashlib.file_digest(f,'sha256').hexdigest()==info['sha256'],name
+    return {'file':str(dest),'files_verified':len(files),'uncompressed_bytes':sum(i['bytes'] for i in manifest.values()),
+            'compressed_bytes':dest.stat().st_size,'sha256':sha(dest),'decompressed_sha256_check':'passed'}
+
+if __name__=='__main__':
+    print(json.dumps(build(),ensure_ascii=False),flush=True)
+
+END_CONTENT
+END_SOURCE S066
+
+BEGIN_SOURCE S067
+PATH: package_materials.py
+SOURCE_SHA256: adc44685158df18cbc4f3e8bd9eb557c28df00706786b90074b2ed43e2742698
+LINES: 1-17 OF 17
+SEGMENT_BYTES: 877
+BEGIN_CONTENT
+from normalize_materials import ROOT, SOURCE, OUT, archive, write_json
+from pathlib import Path
+import shutil
+import json
+
+if __name__=='__main__':
+    report=json.loads((OUT/'normalization_report.json').read_text(encoding='utf-8'))
+    assert report['sqlite_integrity']=='ok'
+    for name in ('normalize_materials.py','test_normalization.py','package_materials.py'):
+        shutil.copyfile(ROOT/name,OUT/name)
+    dest=ROOT/'material_packages';dest.mkdir(exist_ok=True)
+    results=[]
+    for source,name in [(SOURCE,'motorcad_original_20261020.zip'),(OUT,'motorcad_normalized_20261020.zip')]:
+        print('Compressing and verifying '+name,flush=True)
+        result=archive(source,dest/name);results.append(result)
+        print(json.dumps(result),flush=True)
+    write_json(dest/'compression_report.json',{'status':'passed','archives':results,'originals_deleted':False})
+
+END_CONTENT
+END_SOURCE S067
+
+BEGIN_SOURCE S068
+PATH: prepare_granta_batch.py
+SOURCE_SHA256: aea13fe23c18fe66e76a0e3c777fdeece804227f9793391504ff5261e3186e6f
+LINES: 1-40 OF 40
+SEGMENT_BYTES: 1993
+BEGIN_CONTENT
+from pathlib import Path
+from collections import Counter, defaultdict
+import json
+import re
+from datetime import datetime
+
+ROOT = Path(__file__).resolve().parent
+ATTACHMENT = Path('C:/Users/jo061/.codex/attachments/5616848f-abc9-4e83-adba-1ee0b7d883b4/pasted-text.txt')
+
+def prepare():
+    raw = ATTACHMENT.read_bytes()
+    rows = [line.split('\t') for line in raw.decode('utf-8-sig').splitlines() if line.strip()]
+    groups = defaultdict(list)
+    for row in rows:
+        if len(row) != 54 or row[2] not in ('Magnet', 'Steel'):
+            raise ValueError('Unexpected row format')
+        matches = re.findall(r'from "([^"]+\.gdb)"', row[-1])
+        if len(matches) != 1:
+            raise ValueError('Missing or ambiguous source: ' + row[1])
+        source = Path(matches[0]).resolve()
+        allowed = Path('C:/Users/jo061/AppData/Roaming/Ansys/v261/MotorCAD/materials').resolve()
+        if not source.is_relative_to(allowed) or not source.is_file():
+            raise ValueError('Source is outside materials or missing: ' + str(source))
+        groups[str(source)].append(row)
+    batch = ROOT / 'granta_batches' / datetime.now().strftime('%Y%m%d_%H%M%S')
+    batch.mkdir(parents=True)
+    (batch / 'supplied_table.tsv').write_bytes(raw)
+    plan = []
+    for index, (source, items) in enumerate(groups.items()):
+        if len(set(r[1] for r in items)) != len(items):
+            raise ValueError('Duplicate names in source')
+        table = batch / f'{index:02d}.tsv'
+        table.write_text('\n'.join('\t'.join(r) for r in items), encoding='utf-8')
+        plan.append({'source': source, 'table': str(table), 'count': len(items),
+                     'output': str(ROOT / 'granta_runs' / (batch.name + '_' + str(index)))})
+    (batch / 'plan.json').write_text(json.dumps(plan, ensure_ascii=False, indent=2), encoding='utf-8')
+    print(json.dumps({'batch': str(batch), 'total': len(rows), 'groups': plan}, ensure_ascii=False, indent=2))
+
+if __name__ == '__main__':
+    prepare()
+
+END_CONTENT
+END_SOURCE S068
+
+BEGIN_SOURCE S069
+PATH: review_representative_materials.py
+SOURCE_SHA256: 70af2e9e8676825d0691043700a5d9e617a856b091a6f7e4c5ff52eea8679835
+LINES: 1-64 OF 64
+SEGMENT_BYTES: 4215
+BEGIN_CONTENT
+from pathlib import Path
+from collections import defaultdict
+from statistics import median
+import json,re
+
+ROOT=Path(__file__).resolve().parent
+p=json.loads((ROOT/'material_library/20261019_161745/materials_raw.json').read_text(encoding='utf-8'))
+recent={g['export_sha256'] for g in p['granta_provenance'] if '20261019_131932' in g['report_path']}
+byname=defaultdict(list)
+for m in p['materials']:byname[m['name']].append(m)
+def chosen(ms):return sorted(ms,key=lambda m:(any(o['database_sha256'] in recent for o in m['origins']),m['id']),reverse=True)[0]
+materials=[chosen(ms) for ms in byname.values()]
+def fields(m):return {e['key']:e['value'] for e in m['raw_entries']}
+def num(m,k):
+ try:return float(fields(m)[k])
+ except (ValueError,KeyError):return None
+def interp(pairs,x):
+ pts=sorted(set(pairs))
+ for a,b in pts:
+  if a==x:return b
+ for (a,b),(aa,bb) in zip(pts,pts[1:]):
+  if a<x<aa:return b+(bb-b)*(x-a)/(aa-a)
+ return None
+def xy(m,xkey,ykey):
+ a=m['indexed_arrays'];xd={v['index']:float(v['raw_value']) for v in a.get(xkey,[])};yd={v['index']:float(v['raw_value']) for v in a.get(ykey,[])}
+ return [(xd[i],yd[i]) for i in sorted(xd.keys()&yd.keys())]
+def magnet_b(m,t,h):
+ a=m['indexed_arrays'];ts={v['index']:float(v['raw_value']) for v in a.get('Temperature',[])}
+ hs={v['index']:float(v['raw_value']) for v in a.get('HValue_Magnet',[])};bs={v['index']:float(v['raw_value']) for v in a.get('BValue_Magnet',[])}
+ return interp([(hs[i],bs[i]) for i in ts.keys()&hs.keys()&bs.keys() if ts[i]==t],h)
+def loss(m,f,b):
+ a=m['indexed_arrays'];fs={v['index']:float(v['raw_value']) for v in a.get('Frequency',[])};bs={v['index']:float(v['raw_value']) for v in a.get('FluxDensity',[])};ls={v['index']:float(v['raw_value']) for v in a.get('LossDensity',[])}
+ return interp([(bs[i],ls[i]) for i in fs.keys()&bs.keys()&ls.keys() if fs[i]==f],b)
+def range_(xs):
+ xs=[x for x in xs if x is not None];return [min(xs),median(xs),max(xs)] if xs else None
+rows=[]
+for m in materials:
+ match=re.fullmatch(r'JL Mag Rare-Earth \| N(\d+)(SH|UH)',m['name'])
+ if not match or not 30<=int(match[1])<=52:continue
+ product=m['name'].split('|')[-1].strip()
+ peers=[x for x in materials if '|' in x['name'] and not x['name'].startswith('JL Mag') and x['name'].split('|')[-1].strip()==product and num(x,'MagnetRefTemp')==20]
+ b100=magnet_b(m,100,-400000);temps=sorted({float(x['raw_value']) for x in m['indexed_arrays'].get('Temperature',[])})
+ rows.append({'name':m['name'],'id':m['id'],'Br20_T':num(m,'MagnetBrValue'),'Hcj20_kAm':num(m,'MagnetHcJValue')/1000,
+ 'curve_temperatures_C':temps,'peer_names':[x['name'] for x in peers],
+ 'peer_Br20_min_median_max_T':range_([num(x,'MagnetBrValue') for x in peers]),
+ 'B_100C_Hminus400kAm_T':b100,
+ 'peer_B_100C_Hminus400kAm_min_median_max_T':range_([magnet_b(x,100,-400000) for x in peers]),
+ 'curve_point_count':len(m['indexed_arrays'].get('Temperature',[]))})
+rows.sort(key=lambda r:(int(re.search(r'N(\d+)',r['name'])[1]),r['name']))
+steel=[]
+for m in materials:
+ if not m['name'].startswith('POSCO |'):continue
+ steel.append({'name':m['name'],'id':m['id'],'thickness_mm':num(m,'LaminationThickness'),
+ 'loss_50Hz_1p5T_Wkg':loss(m,50,1.5),'loss_60Hz_1p5T_Wkg':loss(m,60,1.5),
+ 'B_at_5000Am_T':interp(xy(m,'HValue','BValue'),5000),'notes':fields(m).get('Notes','')})
+comparison={}
+for t in [0.35,0.5]:
+ peers=[m for m in materials if m['type']=='Steel' and '|' in m['name'] and not m['name'].startswith('POSCO |') and num(m,'LaminationThickness')==t]
+ comparison[str(t)]={'peer_count':len(peers),'loss50_1p5_range':range_([loss(m,50,1.5) for m in peers]),'B5000_range':range_([interp(xy(m,'HValue','BValue'),5000) for m in peers])}
+out=ROOT/'outputs/representative_review_20261020';out.mkdir(exist_ok=True)
+result={'method':'Exact named grade peers with explicit manufacturer, one record per name preferring latest API export. Linear interpolation only within available H/B range, no temperature/frequency extrapolation. Comparison is a consistency screen, not certification.',
+ 'JL':rows,'POSCO':steel,'steel_peers':comparison}
+(out/'comparison.json').write_text(json.dumps(result,ensure_ascii=False,indent=2),encoding='utf-8')
+print(json.dumps(result,ensure_ascii=True,indent=2))
+
+END_CONTENT
+END_SOURCE S069
+
+BEGIN_SOURCE S070
+PATH: run_granta_batch.py
+SOURCE_SHA256: a6dbd394b063a8f3e8a6ced19f1a49965713805cb2501b11340264a9395c1afc
+LINES: 1-75 OF 75
+SEGMENT_BYTES: 4277
+BEGIN_CONTENT
+"""Sequential official API exports followed by validation and library rebuild."""
+from pathlib import Path
+import json
+import subprocess
+import sys
+from datetime import datetime, timezone
+from collections import Counter
+from collect_materials import collect
+from verify_library import verify
+
+ROOT = Path(__file__).resolve().parent
+
+def run(batch):
+    plan = json.loads((batch / 'plan.json').read_text(encoding='utf-8'))
+    status = {'status': 'running', 'requested_count': sum(g['count'] for g in plan),
+              'started_utc': datetime.now(timezone.utc).isoformat(), 'groups': []}
+    def save():
+        temp = batch / 'status.tmp'
+        temp.write_text(json.dumps(status, ensure_ascii=False, indent=2), encoding='utf-8')
+        temp.replace(batch / 'status.json')
+    save()
+    try:
+        for index, group in enumerate(plan):
+            current = {'source': group['source'], 'requested_count': group['count'],
+                       'output': group['output'], 'status': 'running'}
+            status['groups'].append(current)
+            save()
+            print(f'GROUP {index+1}/{len(plan)}: {Path(group["source"]).name} ({group["count"]})', flush=True)
+            with (batch / f'{index:02d}_export.log').open('a', encoding='utf-8') as log:
+                result = subprocess.run([sys.executable, '-u', str(ROOT / 'export_granta.py'),
+                    group['output'], group['table'], group['source']], cwd=ROOT,
+                    stdout=log, stderr=subprocess.STDOUT)
+            report_path = Path(group['output']) / 'report.json'
+            report = json.loads(report_path.read_text(encoding='utf-8')) if report_path.exists() else {}
+            current['exported_count'] = sum(r['status'] == 'exported' for r in report.get('results', []))
+            current['status'] = report.get('status', 'missing_report')
+            save()
+            if result.returncode or current['status'] != 'all_requested_exported':
+                raise RuntimeError('Export stopped; inspect ' + str(batch / f'{index:02d}_export.log'))
+        library = collect()
+        verify(library)
+        counts = Counter()
+        missing = []
+        for group in plan:
+            report = json.loads((Path(group['output']) / 'report.json').read_text(encoding='utf-8'))
+            if set(report['requested_names']) != {r['name'] for r in report['results'] if r['status'] == 'exported'}:
+                raise ValueError('Requested/exported name mismatch')
+            for item in report['results']:
+                for curve in item.get('curves', []):
+                    counts[curve['kind']] += curve['point_count']
+                if not item.get('curves'):
+                    missing.append(item['name'])
+        status.update(status='complete', library_directory=str(library), curve_point_counts=dict(counts),
+                      materials_without_recognized_curves=missing,
+                      completed_utc=datetime.now(timezone.utc).isoformat())
+        (library / 'README_KO.md').write_text(
+            '# Motor-CAD 재질 원시 데이터 통합\n\n'
+            f'이번 첨부 {status["requested_count"]}개 재질을 공식 API로 추출하고 기존 데이터와 통합했습니다.\n'
+            f'이번 곡선 점 수: {dict(counts)}\n\n'
+            '`materials_raw.json`: 통합 원시 필드·배열·출처·해시.\n'
+            '`catalog.csv`: 재질 목록. `raw_fields.csv`: 모든 원시 필드.\n'
+            '`indexed_values.csv`: 모든 배열 값. `raw/`: 원본 파일.\n'
+            '`verification.json`: 해시·원문 필드·배열 보존 검사 결과.\n\n'
+            '범위는 사용자가 제공한 목록입니다. 전체 Granta 라이브러리의 완전성을 뜻하지 않습니다.\n'
+            '동일 이름의 다른 데이터는 별도 버전으로 보존했습니다. 원시 단위·추정값 주석을 유지했습니다.\n'
+            '단위 정규화·보간·물리 정확도 검증은 별도 단계입니다.\n', encoding='utf-8')
+        save()
+        print(json.dumps(status, ensure_ascii=False, indent=2), flush=True)
+    except Exception as exc:
+        status.update(status='failed', error=str(exc))
+        save()
+        raise
+
+if __name__ == '__main__':
+    run(Path(sys.argv[1]).resolve())
+
+END_CONTENT
+END_SOURCE S070
+
+BEGIN_SOURCE S071
+PATH: test_collection.py
+SOURCE_SHA256: 07924de58db6263222bb97ba95801cc5dca52f99b45af9b4b65b24a6cec83047
+LINES: 1-28 OF 28
+SEGMENT_BYTES: 1388
+BEGIN_CONTENT
+import unittest
+from collect_materials import parse_mdb, summarize
+
+class ParserTests(unittest.TestCase):
+    def test_trailing_space_headers_and_equals_in_value(self):
+        _, sections, _ = parse_mdb(b'[Header]\nDate=x\n[Steel A] \nType=Fixed_Solid\nNotes=a=b\n[Steel B]\t\nDensity=7\n')
+        self.assertEqual([s['name'] for s in sections], ['Header', 'Steel A', 'Steel B'])
+        self.assertEqual(sections[1]['entries'][1]['value'], 'a=b')
+
+    def test_duplicate_values_are_preserved_and_flagged(self):
+        _, sections, _ = parse_mdb(b'[A]\nBValue[0]=1\nBValue[0]=2\nHValue[0]=3\n')
+        _, arrays, _, warnings = summarize(sections[0])
+        self.assertEqual(len(arrays['BValue']), 2)
+        self.assertIn('duplicate_key:BValue[0]', warnings)
+
+    def test_missing_curve_axis_is_flagged(self):
+        _, sections, _ = parse_mdb(b'[A]\nTemperature[0]=20\nBValue_Magnet[0]=1\n')
+        _, _, curves, warnings = summarize(sections[0])
+        self.assertFalse(curves[0]['indices_match'])
+        self.assertIn('mismatched_curve_indices:magnet_bh', warnings)
+
+    def test_comments_and_blank_values_retained(self):
+        _, sections, _ = parse_mdb(b'[A]\nNotes=\n; comment\n')
+        self.assertEqual(sections[0]['entries'][0]['value'], '')
+        self.assertEqual(sections[0]['other_lines'][0]['text'], '; comment')
+
+if __name__ == '__main__':
+    unittest.main()
+
+END_CONTENT
+END_SOURCE S071
+
+BEGIN_SOURCE S072
+PATH: test_normalization.py
+SOURCE_SHA256: 4ca0731e97d1d0da1b38a0f937e72b32849c358ec2ef1ebccc85fd10d99cae50
+LINES: 1-25 OF 25
+SEGMENT_BYTES: 1383
+BEGIN_CONTENT
+import unittest
+from decimal import Decimal, InvalidOperation
+from normalize_materials import RULES, si
+
+class ConversionTests(unittest.TestCase):
+    def test_temperature_offset_not_multiplier(self):
+        self.assertEqual(Decimal(si('-40',RULES['Temperature'])[0]),Decimal('233.15'))
+    def test_percent_coefficient(self):
+        self.assertEqual(Decimal(si('-0.12',RULES['MagnetTempCoefBr'])[0]),Decimal('-0.0012'))
+    def test_fractional_coefficient_not_percent(self):
+        self.assertEqual(Decimal(si('0.00393',RULES['TempCoefElectricalResistivity'])[0]),Decimal('0.00393'))
+    def test_dimensions(self):
+        self.assertEqual(Decimal(si('0.35',RULES['LaminationThickness'])[0]),Decimal('0.00035'))
+        self.assertEqual(Decimal(si('160000',RULES['YoungsCoefficient'])[0]),Decimal('160000000000'))
+    def test_loss_is_mass_specific(self):
+        self.assertEqual(RULES['LossDensity']['si_unit'],'W/kg')
+        self.assertEqual(Decimal(si('2.3',RULES['LossDensity'])[0]),Decimal('2.3'))
+    def test_reject_malformed_and_nonfinite(self):
+        for raw in ['212BValue[0]=0.0177','NaN','Infinity']:
+            with self.assertRaises((InvalidOperation,ValueError)):
+                si(raw,RULES['YieldStress'])
+    def test_no_guessed_polynomial_units(self):
+        self.assertNotIn('MagnetTempCoefBr_Maxwell_2',RULES)
+
+if __name__=='__main__':unittest.main()
+
+END_CONTENT
+END_SOURCE S072
+
+BEGIN_SOURCE S073
+PATH: validation/acceptance.py
+SOURCE_SHA256: 08a148e96275336d3ca2e6f4ac11c5b3e83069a71716e1b7e1e7c83d8d12f86f
+LINES: 1-34 OF 34
+SEGMENT_BYTES: 2193
+BEGIN_CONTENT
+"""AI-independent fail-closed checks for this prescribed sinusoidal-current study.
+
+Peak terminal voltage <= DC bus is a necessary waveform feasibility screen,
+not a substitute for inverter/circuit simulation or a sufficient feasibility proof.
+No torque-ripple threshold was requested; expose it as a review item.
+"""
+import math
+
+def assess(result, efficiency_target=88.0):
+    values=result.get('values',{})
+    design=result.get('design',{})
+    readback=result.get('readback',{})
+    checks={}
+    def number(source,key):
+        value=source.get(key)
+        return value if isinstance(value,(int,float)) and not isinstance(value,bool) and math.isfinite(value) else None
+    def minimum(key,limit):
+        value=number(values,key)
+        checks[key]=value is not None and value>=limit
+    minimum('Shaft Torque',.5)
+    minimum('System Efficiency',efficiency_target)
+    efficiency=number(values,'System Efficiency')
+    checks['efficiency_physical_range']=efficiency is not None and efficiency<=100
+    bus=number(design,'voltage_V'); peak=number(values,'Line-Line Terminal Voltage (peak)')
+    checks['peak_voltage_within_bus']=bus is not None and bus>0 and peak is not None and 0<=peak<=bus
+    speed=number(values,'Shaft Speed')
+    checks['speed_3500_rpm']=speed is not None and abs(speed-3500)<1e-6
+    checks['solver_voltage_flag_clear']=result.get('voltage_limit_exceeded') is False
+    for key,target in [('NumberStrandsHand',1),('ParallelPaths',1),('WindingConnection',1)]:
+        checks[key]=number(readback,key)==target
+    requested_wire=number(design,'wire_diameter_mm'); actual_wire=number(readback,'Copper_Diameter')
+    checks['wire_applied']=requested_wire is not None and actual_wire is not None and abs(requested_wire-actual_wire)<1e-6
+    checks['bus_applied']=bus is not None and number(readback,'DCBusVoltage')==bus and number(values,'DC Bus Voltage')==bus
+    return dict(passed=all(checks.values()),checks=checks,failures=[k for k,ok in checks.items() if not ok],torque_ripple_pct=values.get('Torque Ripple (MsVw) [%]'),scope='Numerical result screens only; material provenance, thermal/manufacturing limits and inverter waveform validation remain separate.')
+
+END_CONTENT
+END_SOURCE S073
+
+BEGIN_SOURCE S074
+PATH: validation/analyze_detailed_spm.py
+SOURCE_SHA256: 1def49386c0ea1e55f5226dd23e78fbfe24e438b2089974bca62e31569d2b726
+LINES: 1-136 OF 136
+SEGMENT_BYTES: 12273
+BEGIN_CONTENT
+"""Offline local DOE audit. No native SDK, FEA, or production model activation."""
+import argparse
+import hashlib
+import json
+from pathlib import Path
+import numpy as np
+from study_io import write_json
+
+METRICS={
+ 'torque_Nm':'Shaft Torque',
+ 'efficiency_pct':'System Efficiency',
+ 'phase_resistance_ohm':'Phase Resistance',
+ 'back_emf_ll_peak_fundamental_V':'Back EMF Line-Line Voltage (peak) (fundamental)',
+ 'tooth_B_T':'Stator Tooth Flux Density (maximum)',
+ 'yoke_B_T':'Stator Back Iron Flux Density (maximum)',
+ 'total_loss_W':'Total Losses (on load)'}
+OBSERVED={**METRICS,'torque_ripple_pct':'Torque Ripple (MsVw) [%]'}
+
+
+def matrix(x,quadratic=False):
+    x=np.asarray(x,dtype=float)
+    return np.column_stack([np.ones(len(x)),x,x*x] if quadratic else [np.ones(len(x)),x])
+
+
+def fit_audit(x,y,hold_x,hold_y,quadratic=False):
+    a=matrix(x,quadratic);b=matrix(hold_x,quadratic)
+    if np.linalg.matrix_rank(a)!=a.shape[1]:raise ValueError('Rank deficient training design')
+    coefficients=np.linalg.lstsq(a,np.asarray(y),rcond=None)[0]
+    predicted=b@coefficients;actual=np.asarray(hold_y,dtype=float);error=predicted-actual
+    return {'coefficients':coefficients.tolist(),'training_count':len(x),'coefficient_count':a.shape[1],
+        'training_residual_degrees_of_freedom':len(x)-a.shape[1],
+        'holdout_actual':actual.tolist(),'holdout_prediction':predicted.tolist(),
+        'holdout_signed_error':error.tolist(),'holdout_max_abs_error':float(np.max(np.abs(error))),
+        'holdout_rmse':float(np.sqrt(np.mean(error**2))),
+        'holdout_max_abs_relative_error_pct':float(np.max(np.abs(error)/np.maximum(np.abs(actual),1e-12))*100),
+        'qualified_for_production':False}
+
+
+def analyze(folder):
+    folder=Path(folder);plan=json.loads((folder/'plan.json').read_text(encoding='utf-8'))
+    result=json.loads((folder/'result.json').read_text(encoding='utf-8'))
+    if result['status'] not in ('completed','completed_with_blocked_cases'):raise ValueError('Completed batch required')
+    runs={row['id']:row for row in result['runs']}
+    if len(runs)!=len(result['runs']):raise ValueError('Duplicate result IDs')
+    groups=[];hashes={}
+    for group in plan['groups']:
+        cases=group['cases'];available=[c for c in cases if c['id'] in runs]
+        if not available:continue
+        if len(available)!=len(cases):raise ValueError('Partial topology DOE must not be fitted')
+        factors=group['factors'];x=[];values=[];roles=[]
+        for case in cases:
+            path=folder/(case['id']+'.json');raw=path.read_bytes();hashes[path.name]=hashlib.sha256(raw).hexdigest()
+            row=json.loads(raw)
+            if row['doe_role']!=case['role'] or row['doe_point']!=case['point']:raise ValueError('DOE identity mismatch')
+            if row['native_recipe']!=case['recipe']:raise ValueError('Applied recipe provenance mismatch')
+            expected_geometry=case['recipe']['native_variables']
+            for key,value in row['geometry_mm'].items():
+                if abs(value-expected_geometry[key])>1e-6:raise ValueError('Geometry readback mismatch')
+            if row['values']!=runs[case['id']]['values']:raise ValueError('Summary differs from individual result')
+            data={key:row['values'][field] for key,field in OBSERVED.items()}
+            if not all(np.isfinite(v) for v in data.values()):raise ValueError('Non-finite metric')
+            x.append([(case['point'][key]-center)/delta for key,center,delta in factors])
+            values.append(data);roles.append(case['role'])
+        x=np.asarray(x);train=np.array([role!='independent_holdout' for role in roles]);hold=~train
+        audits={key:{name:fit_audit(x[train],[v[key] for v,t in zip(values,train) if t],
+                    x[hold],[v[key] for v,t in zip(values,hold) if t],quadratic)
+                    for name,quadratic in [('linear',False),('additive_quadratic',True)]} for key in METRICS}
+        center=next(i for i,role in enumerate(roles) if role=='training_center')
+        effects=[]
+        for j,(key,c,delta) in enumerate(factors):
+            lo=next(i for i,v in enumerate(x) if np.allclose(v,-np.eye(len(factors))[j]))
+            hi=next(i for i,v in enumerate(x) if np.allclose(v,np.eye(len(factors))[j]))
+            effects.append({'factor':key,'low':c-delta,'center':c,'high':c+delta,
+                'responses':{metric:{'low':values[lo][metric],'center':values[center][metric],
+                    'high':values[hi][metric],'high_minus_low':values[hi][metric]-values[lo][metric],
+                    'central_slope_per_input_unit':(values[hi][metric]-values[lo][metric])/(2*delta)} for metric in OBSERVED}})
+        groups.append({'shape':group['shape'],'factor_order':[v[0] for v in factors],
+            'sample_count':len(cases),'training_count':int(train.sum()),'holdout_count':int(hold.sum()),
+            'holdout_ids':[c['id'] for c,h in zip(cases,hold) if h],
+            'holdout_normalized_coordinates':x[hold].tolist(),
+            'holdouts_outside_axial_training_convex_hull':(np.abs(x[hold]).sum(axis=1)>1+1e-9).tolist(),
+            'observed_ranges':{key:{'min':min(v[key] for v in values),'max':max(v[key] for v in values)} for key in OBSERVED},
+            'local_axis_effects':effects,'model_audits':audits,
+            'ripple_model_fitted':False,'production_model_activated':False})
+    return {'schema':'detailed-spm-offline-audit-v1','source_folder':str(folder.resolve()),
+        'source_sha256':hashes,'groups':groups,'new_motorcad_solves':0,
+        'policy':'Diagnostic fits only. No automatic qualification, optimizer integration or input-bound changes.',
+        'limitations':['Only three holdouts per shape; no statistical reliability certification.',
+            'Additive quadratic training is saturated (nine samples, nine coefficients).',
+            'Pairwise interactions are absent from the fitted basis and not identifiable from axial training.',
+            'Holdouts lie inside factor bounds but outside the axial training convex hull.',
+            'Fixed geometry envelope, winding, current, speed and temperature; no scaling to other conditions.',
+            'Ripple is observed only; no ripple predictor is fitted. Inductance is not used.']}
+
+
+def write_report(data,path):
+    lines=['# 상세 SPM DOE 분석','',
+        '새 Motor-CAD 해석 없이 기존 결과를 분석했다. 생산용 성능 모델 활성화와 프로그램 입력 범위 변경은 하지 않았다.',
+        '', '## 핵심 판단', '',
+        '고정된 국소 조건에서는 토크·효율·저항·역기전력·B의 확인점 오차가 작았다. 다만 선형식과 가산2차식의 차이가 작고, 2차식이 일관되게 우수하지 않았다. 지금 자료만으로 복잡한 모델이 더 낫다고 판단하지 않는다.', '',
+        '슬롯 깊이9.4→10.6mm 변화에서 요크B가 약0.14T, 리플이 약42~49%p 증가했다. 따라서 요크를 두껍게 할 슬롯 깊이 감소가 우선 검토 방향이다. 반대로 치B는 약0.06T 감소했으므로 슬롯을 얕게 만들 때 치 포화가 악화될 가능성을 함께 확인해야 한다. 치 폭6.3→7.5mm 증가는 치B를 약0.18~0.19T 낮췄지만 요크B는 약0.02~0.03T 높였다. 두 인자를 함께 검토할 이유가 여기에 있다.', '',
+        '슬롯 입구 확대는 이번 축 방향 관측에서 리플을 약13~15%p 줄였으나, 포화를 해결할 정도의 B 개선은 없었다. 극호 축소는 요크B 감소 방향이지만 토크 손실을 동반했다. 이 수치는 중심점에서 한 인자씩 바꾼 결과이며 조합 효과를 보증하지 않는다.',
+        '', '## 별도 확인점 오차', '',
+        '각 형상에서 학습 9점과 확인 3점을 분리했다. 아래는 확인점 3개 중 최대 절대 오차다. 효율 단위는 %p이며, 나머지는 출력 자체의 단위다.', '',
+        '| 형상 | 출력 | 선형 모델 오차 | 가산 2차 모델 오차 |', '|---|---|---:|---:|']
+    for group in data['groups']:
+        for metric in ('torque_Nm','efficiency_pct','phase_resistance_ohm','back_emf_ll_peak_fundamental_V','tooth_B_T','yoke_B_T'):
+            a=group['model_audits'][metric]
+            lines.append(f"| {group['shape']} | {metric} | {a['linear']['holdout_max_abs_error']:.6g} | {a['additive_quadratic']['holdout_max_abs_error']:.6g} |")
+    lines+=['','가산 2차식은 y=c+Σaᵢxᵢ+Σbᵢxᵢ²이다. 9개 계수를 학습 9점에 맞추므로 학습 오차가 작다는 것은 정확도의 증거가 아니다. 인자 간 교차항은 포함하지 않는다. 확인점은 입력 범위 내부지만 축 방향 학습점의 볼록껍질 밖에 있다. 따라서 확인점 오차는 인자 조합에 대한 제한된 점검으로만 해석한다.',
+        '', '## 국소 인자 영향', '',
+        '다른 인자를 중심에 고정한 상태에서 낮은 값→높은 값의 변화다. 전체 탐색 범위의 영향도 순위나 인과 일반화가 아니다. 리플은 원시 관측 변화만 기록하며 예측식을 만들지 않았다.', '',
+        '| 형상 | 인자 (낮음→높음) | 토크 변화 Nm | 효율 변화 %p | 치 B 변화 T | 요크 B 변화 T | 리플 변화 %p |',
+        '|---|---|---:|---:|---:|---:|---:|']
+    for group in data['groups']:
+        for effect in group['local_axis_effects']:
+            r=effect['responses'];v=[r[key]['high_minus_low'] for key in ('torque_Nm','efficiency_pct','tooth_B_T','yoke_B_T','torque_ripple_pct')]
+            lines.append(f"| {group['shape']} | {effect['factor']} ({effect['low']:g}→{effect['high']:g}) | "+' | '.join(f'{z:+.5g}' for z in v)+' |')
+    lines+=['','## 판단과 다음 순서', '',
+        '관측한 24점은 모두 리플20% 및 최대B1.8T 조건을 만족하지 않는다. 이는 관측점의 결과이며 전체 연속 탐색 범위가 불가능하다는 증명은 아니다.', '',
+        '1. 이번 오차와 국소 영향 방향을 기준으로 성능 모델의 적용 범위와 허용 오차 정책을 정한다. 임의의 오차 임계값으로 자동 합격시키지 않는다.',
+        '2. 치 폭 증가·슬롯 깊이 감소로 치와 요크의 포화를 완화할 가능성을 검토하되, 슬롯 면적·권선 충전율·저항 변화와 함께 판단한다. 지금은 입력 범위를 자동 확대하지 않는다.',
+        '3. 확인점 오차가 큰 출력은 추가 교차 인자점이 필요하다. 기존 확인점을 학습으로 돌려 쓰고 같은 점으로 정확도를 주장하지 않는다.',
+        '4. Breadloaf 코너 형상을 확인한 다음 보류된14회 해석을 진행한다. 실제 실행은 별도로 시작한다.',
+        '5. 독립 확인이 끝난 국소 평가기만 최적화 엔진에 연결한다. 리플 예측 기능 보류와 미검증 값 분리 정책은 유지한다.',
+        '', '현재 시험 범위는 치 폭6.3~7.5mm, 슬롯 깊이9.4~10.6mm, 슬롯 입구1.6~2.4mm, 극호110~130전기각이다. 이 밖의 값을 현재 회귀식으로 합격 판정하지 않는다. 먼저 이 범위 내 조합의 교차 영향을 확인하고, 그래도 포화 여유가 부족하면 범위를 새로 설정해 별도 교정해야 한다. 현 시점에서 임의의 새 범위를 기본값으로 지정하지 않았다.',
+        '', '고정 조건은 D85×L20, 4극12슬롯, gap0.5mm, 6턴, 도선1.8mm, Delta, 선전류 첨두40A, 3500rpm, 20℃이다. 이번 효율·토크를 요구 토크0.5Nm에 맞춘 최적화 결과로 제시하지 않는다. 열·구조 해석은 제외 상태다.',
+        '', '상세 좌표·계수·확인점별 실제값과 예측값·원본 해시는 analysis.json에 저장했다.']
+    Path(path).write_text('\n'.join(lines)+'\n',encoding='utf-8')
+
+
+if __name__=='__main__':
+    parser=argparse.ArgumentParser();parser.add_argument('--source',required=True,type=Path);parser.add_argument('--output',required=True,type=Path)
+    args=parser.parse_args();data=analyze(args.source);args.output.mkdir(parents=True,exist_ok=True)
+    write_json(args.output/'analysis.json',data);write_report(data,args.output/'REVIEW_KO.md')
+    print(json.dumps({'groups':len(data['groups']),'samples':sum(g['sample_count'] for g in data['groups']),'new_motorcad_solves':0}))
+
+END_CONTENT
+END_SOURCE S074
+
+
+END_REVIEW_PART_012

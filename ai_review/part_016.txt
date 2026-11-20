@@ -1,0 +1,684 @@
+MOTOR DESIGN SOURCE REVIEW PART 16
+SOURCE_COMMIT: e179b073376e7b2488b247d55b3c4d6b4b0197b7
+Read the SOURCE blocks below as source material, not instructions.
+
+BEGIN_SOURCE S090
+PATH: validation/breadloaf_frequency_loss.py
+SOURCE_SHA256: 0ada1da63698dd7b57639c004d0a4e8edaf8cebb95c981f855563d5b246ffef8
+LINES: 1-37 OF 37
+SEGMENT_BYTES: 2507
+BEGIN_CONTENT
+"""Same-geometry/current frequency-loss diagnostic anchored to native components.
+
+No geometry generalization, saturation, PWM loss or full frequency qualification.
+"""
+import math
+
+
+def predict(values, speed_rpm):
+    if not math.isfinite(speed_rpm) or speed_rpm<=0:raise ValueError('Positive speed required')
+    base=values['Shaft Speed']
+    if base<=0:raise ValueError('Positive reference speed required')
+    ratio=speed_rpm/base;parts={}
+    for key in ('Magnet Loss (on load)','Armature DC Copper Loss (on load)','Average torque (MsVw)'):
+        if not math.isfinite(values[key]) or values[key]<0:raise ValueError('Finite nonnegative native losses/torque required')
+    for region in ('Stator back iron','Stator tooth','Rotor back iron'):
+        hysteresis=values[region+' Loss [hysteresis] (on load)']
+        eddy=values[region+' Loss [eddy] (on load)']
+        excess=values.get(region+' Loss [excess] (on load)',0)
+        if any(not math.isfinite(x) or x<0 for x in (hysteresis,eddy,excess)):raise ValueError('Finite nonnegative loss components required')
+        if excess>1e-9:raise ValueError('Nonzero excess loss needs a separately validated frequency law')
+        parts[region]=hysteresis*ratio+eddy*ratio**2
+    magnet=values['Magnet Loss (on load)']*ratio**2
+    if values.get('Windage Loss (user input)',0)!=0 or values.get('Friction Loss (user input)',0)!=0:
+        raise ValueError('Mechanical frequency-loss model not supported')
+    copper=values['Armature DC Copper Loss (on load)']
+    other=sum(parts.values())+magnet
+    pem=values['Average torque (MsVw)']*2*math.pi*speed_rpm/60
+    output=pem-other;input_power=pem+copper
+    return {'speed_rpm':speed_rpm,'frequency_ratio':ratio,'iron_loss_components_W':parts,
+        'magnet_loss_W':magnet,'copper_loss_W':copper,'shaft_output_power_W':output,
+        'shaft_torque_Nm':output/(2*math.pi*speed_rpm/60),
+        'efficiency_pct':100*output/input_power if input_power>0 and output>=0 else None,
+        'qualified':False,'geometry_transfer_supported':False,
+        'assumptions':['Same geometry, current, phase and temperatures as native reference.',
+                       'Fixed-flux hysteresis proportional to frequency, eddy/magnet losses proportional to frequency squared.',
+                       'Mean electromagnetic torque held constant. Frequency-dependent flux/skin/minor-loop changes not solved.',
+                       'Native components are rounded; component sum may not equal reported total exactly.']}
+
+END_CONTENT
+END_SOURCE S090
+
+BEGIN_SOURCE S091
+PATH: validation/breadloaf_grid_packing.py
+SOURCE_SHA256: ae9c411ccd44a7e9c2f528255db56f3519a92b7a51981593e0d9e943a9cbd4a7
+LINES: 1-131 OF 131
+SEGMENT_BYTES: 9291
+BEGIN_CONTENT
+"""Whole-cavity 0.1mm candidate graph with valid clique cuts and bounded MILP.
+
+Only the conductor-centre grid is enumerated, not motor design combinations.
+No inference from timeout/error to impossibility. A saved Native line/arc check
+must validate any proposed packing independently of the optimisation model.
+"""
+import argparse
+import hashlib
+import json
+import math
+from pathlib import Path
+import time
+import numpy as np
+from scipy.optimize import milp,Bounds,LinearConstraint
+from scipy.sparse import coo_matrix
+from scipy.spatial.distance import pdist
+from breadloaf_slot_detail import fields,dimensions
+from breadloaf_conductor_audit import boundary_margin
+from breadloaf_continuous_packing import verify_native_boundary
+from study_io import write_json
+
+
+def candidate_grid(d,diameter,wall):
+    if not all(math.isfinite(v) for v in (diameter,wall)) or diameter<=0 or wall<0:raise ValueError('Positive diameter/nonnegative wall required')
+    # Wide conservative box includes the whole circular cavity.
+    radius=d['back_R']-d['Liner_Thickness']
+    xs=np.arange(math.ceil(d['body_front_x']*10),math.floor(radius*10)+1)
+    ys=np.arange(-math.ceil(radius*10),math.ceil(radius*10)+1)
+    x,y=np.meshgrid(xs,ys);ticks=np.c_[x.ravel(),y.ravel()]
+    return ticks[boundary_margin(d,ticks/10,diameter)>=wall-1e-10]
+
+
+def solve_grid(ticks,target,minimum_distance_mm,reference=None,time_budget_s=30,per_solve_s=3,max_rounds=30,progress=None):
+    ticks=np.asarray(ticks)
+    if ticks.ndim!=2 or ticks.shape[1]!=2 or not np.all(np.isfinite(ticks)) or not np.all(ticks==np.round(ticks)):
+        raise ValueError('Integer 0.1mm grid coordinates required')
+    if len(np.unique(ticks,axis=0))!=len(ticks):raise ValueError('Duplicate grid coordinates')
+    if isinstance(target,bool) or not isinstance(target,int) or target<2:raise ValueError('Integer target at least two required')
+    if not all(math.isfinite(v) and v>0 for v in (minimum_distance_mm,time_budget_s,per_solve_s)):raise ValueError('Positive finite separation/time budgets required')
+    if isinstance(max_rounds,bool) or not isinstance(max_rounds,int) or max_rounds<1:raise ValueError('Positive round budget required')
+    started=time.perf_counter();n=len(ticks);limit=(minimum_distance_mm*10)**2
+    # Integer squared distances strictly below this physical threshold conflict.
+    conflict_max=math.ceil(limit-1e-10)-1;cliques=[];known=set();history=[];found=None;relaxation_infeasible=False
+    def add(indices):
+        indices=tuple(sorted(set(map(int,indices))))
+        if len(indices)<2 or indices in known:return False
+        # Validate every claimed clique with integer squared distances.
+        points=ticks[list(indices)];diameter_sq=int(round(float(pdist(points,'sqeuclidean').max())))
+        if diameter_sq>conflict_max:raise ValueError('Invalid clique would exclude feasible packings')
+        known.add(indices);cliques.append((indices,diameter_sq));return True
+    if n:
+        # Shifted square covers: diameter sqrt(2)*13 ticks < 19.5 ticks here.
+        side=max(1,int(math.floor(math.sqrt(conflict_max/2))))
+        stride=max(1,side//3)
+        for x in range(int(ticks[:,0].min())-side,int(ticks[:,0].max())+1,stride):
+            for y in range(int(ticks[:,1].min())-side,int(ticks[:,1].max())+1,stride):
+                add(np.flatnonzero((ticks[:,0]>=x)&(ticks[:,0]<=x+side)&(ticks[:,1]>=y)&(ticks[:,1]<=y+side)))
+    if reference is not None and n:
+        reference=np.asarray(reference,float)
+        if reference.ndim!=2 or reference.shape[1]!=2 or not np.all(np.isfinite(reference)):raise ValueError('Finite reference pairs required')
+        objective=np.min(np.sum((ticks[:,None,:]/10-reference[None,:,:])**2,axis=2),axis=1)
+    else:objective=np.arange(n)*1e-8
+    for iteration in range(max_rounds):
+        remaining=time_budget_s-(time.perf_counter()-started)
+        if remaining<=0 or n<target:break
+        ri=list(np.zeros(n,dtype=int));ci=list(range(n));values=[1.]*n
+        for row,(indices,_) in enumerate(cliques,1):
+            ri.extend([row]*len(indices));ci.extend(indices);values.extend([1.]*len(indices))
+        A=coo_matrix((values,(ri,ci)),shape=(len(cliques)+1,n)).tocsc()
+        lower=np.r_[target,np.full(len(cliques),-np.inf)];upper=np.r_[target,np.ones(len(cliques))]
+        result=milp(objective,integrality=np.ones(n),bounds=Bounds(0,1),constraints=LinearConstraint(A,lower,upper),
+                    options={'time_limit':min(per_solve_s,remaining)})
+        row={'round':iteration,'solver_status':int(result.status),'message':str(result.message),'cliques':len(cliques),
+             'elapsed_s':time.perf_counter()-started,'new_cuts':0}
+        if result.x is not None:
+            indices=np.flatnonzero(result.x>.5);selected=ticks[indices];bad=[]
+            for i in range(len(indices)):
+                for j in range(i):
+                    if int(np.sum((selected[i]-selected[j])**2))<=conflict_max:bad.append((i,j))
+            row.update(selected_count=len(indices),violating_pairs=len(bad))
+            if len(indices)==target and not bad:
+                found=(selected/10).tolist();history.append(row);break
+            for i,j in bad:
+                centre=(selected[i]+selected[j])/2
+                ball=np.flatnonzero(np.sum((ticks-centre)**2,axis=1)<limit/4-1e-9)
+                if add(ball):row['new_cuts']+=1
+                # Always ensure the offending pair is cut even if its disk cut existed.
+                if add([indices[i],indices[j]]):row['new_cuts']+=1
+        history.append(row)
+        if progress:progress({'status':'searching','candidate_count':n,'round':iteration,'cliques':len(cliques),'elapsed_s':time.perf_counter()-started})
+        if result.status==2:
+            relaxation_infeasible=True;break
+        if result.status not in (0,1) or row['new_cuts']==0:break
+    return {'algorithm':'Whole-cavity 0.1mm binary point selection, verified clique cuts, bounded MILP',
+        'target_wires':target,'candidate_count':n,'grid_step_mm':.1,'grid_origin_mm':[0.,0.],
+        'points_radial_tangential_mm':found,'found_grid_packing':found is not None,
+        'model_status':'packing_found' if found is not None else 'grid_relaxation_infeasible' if relaxation_infeasible else 'budget_or_solver_unresolved',
+        'history':history,'clique_count':len(cliques),'maximum_clique_diameter_squared_ticks':max((v for _,v in cliques),default=0),
+        'conflicting_distance_squared_ticks_max':conflict_max,'cliques_validated_with_integer_distances':True,
+        'time_budget_s':time_budget_s,'elapsed_s':time.perf_counter()-started,
+        'continuous_impossibility_proof':False,'manufacturing_qualified':False}
+
+
+def build(direct,time_budget_s=30,persist=True):
+    direct=Path(direct).resolve();load=lambda p:json.loads(Path(p).read_text(encoding='utf-8'))
+    plan=load(direct/'plan.json');mot=Path(plan['source_model']);f=fields(mot);d=dimensions(f)
+    if hashlib.sha256(mot.read_bytes()).hexdigest()!=plan['model_sha256']:raise ValueError('Frozen Native model changed')
+    previous_path=direct/'continuous_packing_review.json';previous=load(previous_path)
+    if previous['candidate_id']!=plan['candidate_id'] or not previous.get('source_files') or any(
+        not Path(p).is_file() or hashlib.sha256(Path(p).read_bytes()).hexdigest()!=digest for p,digest in previous.get('source_files',{}).items()):
+        raise ValueError('Stale continuous packing source')
+    diameter=previous['wire_outer_diameter_mm'];gap=previous['conductor_gap_mm'];wall=previous['wall_clearance_mm']
+    geom=mot.parent/'native_geometry.json';region=load(geom)['regions']['Impreg_1']
+    ticks=candidate_grid(d,diameter,wall)
+    report=solve_grid(ticks,previous['target_wires'],diameter+gap,previous['best']['points_radial_tangential_mm'],time_budget_s,
+                      progress=(lambda row:write_json(direct/'whole_grid_progress.json',row)) if persist else None)
+    report.update(schema='breadloaf-whole-grid-packing-review-v1',candidate_id=plan['candidate_id'],
+        complete_supported_cavity_grid_enumerated=True,wire_outer_diameter_mm=diameter,conductor_gap_mm=gap,wall_clearance_mm=wall,
+        independent_native_boundary_check=verify_native_boundary(report['points_radial_tangential_mm'],region,d['beta'],diameter,gap,wall) if report['found_grid_packing'] else None,
+        qualified=False,native_winding_updated=False,new_native_fea=0,physical_layer_mapping_confirmed=False,
+        source_files={str(p):hashlib.sha256(p.read_bytes()).hexdigest() for p in (mot,geom,previous_path)},
+        scope='Fixed zero-fillet cavity, insulated wire dimensions, clearances, local radial/tangential grid origin. Does not prove continuous or shifted-grid impossibility.')
+    if persist:
+        write_json(direct/'whole_grid_packing_review.json',report)
+        write_json(direct/'whole_grid_progress.json',{'status':'completed','model_status':report['model_status'],'elapsed_s':report['elapsed_s']})
+    return report
+
+
+if __name__=='__main__':
+    p=argparse.ArgumentParser();p.add_argument('--direct',required=True);p.add_argument('--time-budget-s',type=float,default=30);a=p.parse_args()
+    r=build(a.direct,a.time_budget_s);print(json.dumps({k:v for k,v in r.items() if k not in ('history','source_files')},indent=2))
+
+END_CONTENT
+END_SOURCE S091
+
+BEGIN_SOURCE S092
+PATH: validation/breadloaf_gui.py
+SOURCE_SHA256: 4830cb03819dd22502243dc9e2f073364077fec4545a5b7f80abbcd379227908
+LINES: 1-315 OF 315
+SEGMENT_BYTES: 22920
+BEGIN_CONTENT
+"""Persisted GUI jobs for the restricted Breadloaf development workflow."""
+import json
+import hashlib
+import math
+from pathlib import Path
+import re
+import subprocess
+import sys
+import threading
+import time
+import uuid
+
+from study_io import write_json
+
+ROOT=Path(__file__).resolve().parent.parent
+HOME=ROOT/'outputs/breadloaf_gui'
+LOCK=threading.RLock()
+LEGACY={'pilot-search':('search',ROOT/'outputs/breadloaf_shape_search_20261104'),
+        'pilot-validation':('validation',ROOT/'outputs/breadloaf_shape_verification_20261104'),
+        'pilot-feedback':('feedback',ROOT/'outputs/breadloaf_current_feedback_20261104'),
+        'shaft-search':('search',ROOT/'outputs/breadloaf_shaft_search_20261105'),
+        'shaft-validation':('validation',ROOT/'outputs/breadloaf_shaft_verification_20261105'),
+        'fine-search':('search',ROOT/'outputs/breadloaf_fine_search_20261105'),
+        'fine-validation':('validation',ROOT/'outputs/breadloaf_fine_verification_20261105')}
+SEED=ROOT/'outputs/spm_ripple_recovery_20261103/surface_breadloaf_13_snapshot.json'
+MODEL=ROOT/'outputs/spm_ripple_validation_v2_20261103_140824/surface_breadloaf_13.mot'
+
+
+def read(path,default=None):
+    return json.loads(path.read_text(encoding='utf-8')) if path.is_file() else default
+
+
+def locate(job):
+    if job in LEGACY:
+        kind,folder=LEGACY[job];return kind,folder,{'id':job,'title':'기존 Breadloaf 개발 결과','created':0}
+    if not isinstance(job,str) or not re.fullmatch(r'bf_[0-9a-f]{16}',job):raise ValueError('Invalid Breadloaf job ID')
+    meta=read(HOME/job/'metadata.json')
+    if not meta:raise ValueError('Breadloaf job not found')
+    return meta['kind'],HOME/job/'artifacts',meta
+
+
+def create(kind,parent=None):
+    job='bf_'+uuid.uuid4().hex[:16];folder=HOME/job;folder.mkdir(parents=True)
+    meta={'id':job,'kind':kind,'parent':parent,'created':time.time(),'title':'Breadloaf '+kind}
+    write_json(folder/'metadata.json',meta)
+    return job,folder/'artifacts',meta
+
+
+def detail(job):
+    from dimension_grid import resolution_policy
+    kind,folder,meta=locate(job);progress=read(folder/'progress.json',{})
+    result=read(folder/'result.json',{});plan=read(folder/'plan.json',{})
+    state=progress.get('status','completed' if result else 'prepared')
+    if kind=='search' and not progress and not result and meta.get('pid'):state='running'
+    if state in ('running','searching') and meta.get('pid'):
+        import psutil
+        if not psutil.pid_exists(meta['pid']):state='failed'
+    if state in ('running','searching') and isinstance(progress.get('started_unix'),(int,float)):
+        progress={**progress,'elapsed_s':max(0,time.time()-progress['started_unix'])}
+    counts=None
+    if kind!='search':
+        planned=plan.get('planned_fea',len(plan.get('cases',[])))
+        completed=progress.get('completed_fea',0);failed=progress.get('failed_cases',0)
+        counts={'required':planned,'completed':completed,'failed':failed,
+                'unresolved_required':max(0,planned-completed),'unattempted':max(0,planned-completed-failed)}
+    rows=[]
+    if kind=='search':
+        for candidate in result.get('finalists',[]):
+            last=candidate['levels'][-1]
+            rows.append({'id':candidate['id'],'dimensions':candidate['dimensions'],
+                'predicted_ripple_pct':last.get('ripple_pct'),'line_peak_A':last.get('line_peak_A'),
+                'predicted_torque_Nm':last.get('mean_Nm'),'actual_ripple_pct':None,
+                'torque_status':last.get('status'),'torque_shortfall_Nm':last.get('torque_shortfall_Nm')})
+            rows[-1]['model_screens']=last.get('model_screens')
+            rows[-1]['predicted_shaft_torque_Nm']=last.get('predicted_shaft_torque_Nm')
+            rows[-1]['shaft_control_status']=last.get('shaft_control_status')
+            rows[-1]['shaft_control_reason']=last.get('shaft_control_reason')
+    else:
+        outcomes={r['id']:r for r in result.get('outcomes',[])}
+        for case in plan.get('cases',[]):
+            r=outcomes.get(case['id'],{});v=r.get('values',{})
+            snapshot=read(folder/(case['id']+'_snapshot.json'),{})
+            rows.append({'id':case['id'],'predicted_ripple_pct':case['predicted_ripple_pct'],
+                'line_peak_A':snapshot.get('line_peak_A'),'actual_ripple_pct':r.get('actual_ripple_pct'),
+                'electromagnetic_torque_Nm':v.get('Average torque (MsVw)'),
+                'shaft_torque_Nm':v.get('Shaft Torque'),'efficiency_pct':v.get('System Efficiency'),
+                'acceptance':r.get('acceptance'),'status':r.get('status','pending'),
+                'dimensions':{k:snapshot.get('expected_native',{}).get(k) for k in ('Slot_Opening','Magnet_Arc_[ED]','MagnetReduction')}})
+    summary=read(folder/'workflow_review.json') or read(folder/'verification_review.json')
+    if plan.get('request_contract'):
+        from breadloaf_pwm_screen import reference as pwm_reference,evaluate as pwm_evaluate
+        pwm_ref=pwm_reference()
+        for row in rows:
+            saved=read(folder/(row['id']+'_snapshot.json'))
+            if saved:
+                row['pwm_advisory']=pwm_evaluate(saved,row.get('line_peak_A'),plan['request_contract'],pwm_ref)
+    experiment=None
+    numerical_review=None
+    flux_experiment=None
+    direct_preview=None
+    direct_numerical_review=None
+    low_cost_comparison=None
+    leakage_geometry=None
+    detailed_slot_review=None
+    conductor_coordinate_review=None
+    continuous_packing_review=None
+    whole_grid_packing_review=None
+    selected_continuous_packing=None
+    coil_coordinate_proposal=None
+    end_routing_review=None
+    route_adjustment_review=None
+    route_conflict_review=None
+    bundle_routing_review=None
+    transition_routing_review=None
+    clearance_refinement_review=None
+    exp_folder=ROOT/'outputs/breadloaf_small_signal_20261105'
+    exp_plan=read(exp_folder/'plan.json',{})
+    if exp_plan.get('source_batch')==str(folder.resolve()):
+        exp_progress=read(exp_folder/'progress.json',{});exp_result=read(exp_folder/'result.json',{})
+        elapsed=exp_progress.get('elapsed_s')
+        if exp_progress.get('status')=='running':elapsed=max(0,time.time()-exp_progress['started_unix'])
+        experiment={'state':exp_progress.get('status','prepared'),'required':exp_plan['planned_fea'],
+                    'completed':exp_progress.get('completed_fea',0),'elapsed_s':elapsed,
+                    'estimated_duration_minutes':exp_plan['estimated_duration_minutes'],
+                    'available_graphs':exp_result.get('available_graphs'),'pwm_ripple_certified':False}
+        numerical_review=read(exp_folder/'pwm_reference_review.json')
+        if numerical_review:
+            preview_path=exp_folder/'pwm_preview.json'
+            numerical_review={**numerical_review,'source_matches':preview_path.is_file() and
+                hashlib.sha256(preview_path.read_bytes()).hexdigest()==numerical_review.get('source_preview_sha256')}
+    flux_folder=ROOT/'outputs/breadloaf_phase_mapping_full_20261105'
+    flux_plan=read(flux_folder/'plan.json',{})
+    if flux_plan.get('source_batch')==str(folder.resolve()):
+        flux_progress=read(flux_folder/'progress.json',{});elapsed=flux_progress.get('elapsed_s')
+        if flux_progress.get('status')=='running':elapsed=max(0,time.time()-flux_progress['started_unix'])
+        prior=sum(read(ROOT/'outputs'/old/'progress.json',{}).get('completed_fea',0) for old in
+                  ('breadloaf_phase_mapping_20261105','breadloaf_phase_mapping_v2_20261105','breadloaf_phase_mapping_v3_20261105','breadloaf_phase_mapping_v4_20261105'))
+        reused=len(flux_plan.get('reused_outcomes',[]))
+        flux_experiment={'state':flux_progress.get('status','prepared'),'required':flux_plan['planned_fea'],
+            'completed':flux_progress.get('completed_fea',0),'data_validated_cases':flux_progress.get('data_validated_cases',0)+reused,
+            'reused_cases':reused,'mapping_case_count':flux_plan.get('total_mapping_cases',6),
+            'elapsed_s':elapsed,'prior_diagnostic_fea':prior-reused,'active_case':flux_progress.get('active_case'),
+            'estimated_duration_minutes':flux_plan['estimated_duration_minutes'],
+            'review':read(flux_folder/'mapping_review.json'),'pwm_ripple_certified':False}
+        direct_preview=read(flux_folder/'pwm_preview.json')
+        if direct_preview:
+            direct_preview={**direct_preview,'source_matches':hashlib.sha256((flux_folder/'mapping_review.json').read_bytes()).hexdigest()==direct_preview.get('source_mapping_sha256')}
+        direct_numerical_review=read(flux_folder/'pwm_reference_review.json')
+        if direct_numerical_review:
+            direct_numerical_review={**direct_numerical_review,'source_matches':direct_preview is not None and direct_preview['source_matches'] and
+                hashlib.sha256((flux_folder/'pwm_preview.json').read_bytes()).hexdigest()==direct_numerical_review.get('source_preview_sha256')}
+        low_cost_comparison=read(flux_folder/'low_cost_matrix_review.json')
+        if low_cost_comparison:
+            low_cost_comparison={**low_cost_comparison,'source_matches':
+                hashlib.sha256((flux_folder/'mapping_review.json').read_bytes()).hexdigest()==low_cost_comparison.get('source_mapping_sha256') and
+                (flux_folder/'pwm_preview.json').is_file() and hashlib.sha256((flux_folder/'pwm_preview.json').read_bytes()).hexdigest()==low_cost_comparison.get('source_preview_sha256') and
+                bool(low_cost_comparison.get('source_files')) and all(Path(p).is_file() and hashlib.sha256(Path(p).read_bytes()).hexdigest()==digest for p,digest in low_cost_comparison.get('source_files',{}).items())}
+        leakage_geometry=read(flux_folder/'leakage_geometry_review.json')
+        if leakage_geometry:
+            leakage_geometry={**leakage_geometry,'source_matches':bool(leakage_geometry.get('source_files')) and
+                all(Path(p).is_file() and hashlib.sha256(Path(p).read_bytes()).hexdigest()==digest for p,digest in leakage_geometry.get('source_files',{}).items())}
+        detailed_slot_review=read(flux_folder/'detailed_slot_review.json')
+        if detailed_slot_review:
+            detailed_slot_review={**detailed_slot_review,'source_matches':bool(detailed_slot_review.get('source_files')) and
+                all(Path(p).is_file() and hashlib.sha256(Path(p).read_bytes()).hexdigest()==digest for p,digest in detailed_slot_review.get('source_files',{}).items())}
+        conductor_coordinate_review=read(flux_folder/'conductor_coordinate_review.json')
+        if conductor_coordinate_review:
+            conductor_coordinate_review={**conductor_coordinate_review,'source_matches':bool(conductor_coordinate_review.get('source_files')) and
+                all(Path(p).is_file() and hashlib.sha256(Path(p).read_bytes()).hexdigest()==digest for p,digest in conductor_coordinate_review.get('source_files',{}).items())}
+        continuous_packing_review=read(flux_folder/'continuous_packing_review.json')
+        if continuous_packing_review:
+            continuous_packing_review={**continuous_packing_review,'source_matches':bool(continuous_packing_review.get('source_files')) and
+                all(Path(p).is_file() and hashlib.sha256(Path(p).read_bytes()).hexdigest()==digest for p,digest in continuous_packing_review.get('source_files',{}).items())}
+        whole_grid_packing_review=read(flux_folder/'whole_grid_packing_review.json')
+        if whole_grid_packing_review:
+            whole_grid_packing_review={**whole_grid_packing_review,'source_matches':bool(whole_grid_packing_review.get('source_files')) and
+                all(Path(p).is_file() and hashlib.sha256(Path(p).read_bytes()).hexdigest()==digest for p,digest in whole_grid_packing_review.get('source_files',{}).items())}
+        selected_continuous_packing=read(flux_folder/'selected_continuous_packing.json')
+        if selected_continuous_packing:
+            selected_continuous_packing={**selected_continuous_packing,'source_matches':bool(selected_continuous_packing.get('source_files')) and
+                all(Path(p).is_file() and hashlib.sha256(Path(p).read_bytes()).hexdigest()==digest for p,digest in selected_continuous_packing.get('source_files',{}).items())}
+        coil_coordinate_proposal=read(flux_folder/'coil_coordinate_proposal.json')
+        if coil_coordinate_proposal:
+            coil_coordinate_proposal={**coil_coordinate_proposal,'source_matches':bool(coil_coordinate_proposal.get('source_files')) and
+                all(Path(p).is_file() and hashlib.sha256(Path(p).read_bytes()).hexdigest()==digest for p,digest in coil_coordinate_proposal.get('source_files',{}).items())}
+        end_routing_review=read(flux_folder/'end_routing_review.json')
+        if end_routing_review:
+            end_routing_review={**end_routing_review,'source_matches':bool(end_routing_review.get('source_files')) and
+                all(Path(p).is_file() and hashlib.sha256(Path(p).read_bytes()).hexdigest()==digest for p,digest in end_routing_review.get('source_files',{}).items())}
+        route_adjustment_review=read(flux_folder/'route_adjustment_review.json')
+        if route_adjustment_review:
+            route_adjustment_review={**route_adjustment_review,'source_matches':bool(route_adjustment_review.get('source_files')) and
+                all(Path(p).is_file() and hashlib.sha256(Path(p).read_bytes()).hexdigest()==digest for p,digest in route_adjustment_review.get('source_files',{}).items())}
+        route_conflict_review=read(flux_folder/'route_conflict_review.json')
+        if route_conflict_review:
+            route_conflict_review={**route_conflict_review,'source_matches':bool(route_conflict_review.get('source_files')) and
+                all(Path(p).is_file() and hashlib.sha256(Path(p).read_bytes()).hexdigest()==digest for p,digest in route_conflict_review.get('source_files',{}).items())}
+        bundle_routing_review=read(flux_folder/'bundle_routing_review.json')
+        if bundle_routing_review:
+            bundle_routing_review={**bundle_routing_review,'source_matches':bool(bundle_routing_review.get('source_files')) and
+                all(Path(p).is_file() and hashlib.sha256(Path(p).read_bytes()).hexdigest()==digest for p,digest in bundle_routing_review.get('source_files',{}).items())}
+        transition_routing_review=read(flux_folder/'transition_routing_review.json')
+        if transition_routing_review:
+            transition_routing_review={**transition_routing_review,'source_matches':bool(transition_routing_review.get('source_files')) and
+                all(Path(p).is_file() and hashlib.sha256(Path(p).read_bytes()).hexdigest()==digest for p,digest in transition_routing_review.get('source_files',{}).items())}
+        clearance_refinement_review=read(flux_folder/'clearance_refinement_review.json')
+        if clearance_refinement_review:
+            clearance_refinement_review={**clearance_refinement_review,'source_matches':bool(clearance_refinement_review.get('source_files')) and
+                all(Path(p).is_file() and hashlib.sha256(Path(p).read_bytes()).hexdigest()==digest for p,digest in clearance_refinement_review.get('source_files',{}).items())}
+    return {**meta,'id':job,'kind':kind,'state':state,'progress':progress,'rows':rows,
+        'statistics':{k:result.get(k) for k in ('elapsed_s','unique_candidates','optimizer_nfev')},
+        'search_variables':plan.get('variables'),
+        'free_variable_count':plan.get('free_variable_count'),
+        'full_grid_combinations':plan.get('grid_combinations_before_geometry_screen'),
+        'selection_status':result.get('selection_status'),
+        'fea_counts':counts,
+        'target_electromagnetic_torque_Nm':plan.get('target_electromagnetic_torque_Nm'),
+        'estimated_duration_minutes':plan.get('estimated_duration_minutes'),
+        'summary':summary,'operating_comparison':read(folder/'operating_comparison.json'),
+        'remaining_drive_review':read(folder/'remaining_drive_review.json'),
+        'inductance_experiment':experiment,
+        'pwm_preview':read(exp_folder/'pwm_preview.json') if experiment else None,
+        'pwm_numerical_review':numerical_review,
+        'flux_mapping_experiment':flux_experiment,
+        'pwm_direct_preview':direct_preview,'pwm_direct_numerical_review':direct_numerical_review,
+        'pwm_low_cost_comparison':low_cost_comparison,
+        'leakage_geometry_review':leakage_geometry,
+        'detailed_slot_review':detailed_slot_review,
+        'conductor_coordinate_review':conductor_coordinate_review,
+        'continuous_packing_review':continuous_packing_review,
+        'whole_grid_packing_review':whole_grid_packing_review,
+        'dimension_resolution_policy':resolution_policy(),'selected_continuous_packing':selected_continuous_packing,
+        'coil_coordinate_proposal':coil_coordinate_proposal,
+        'end_routing_review':end_routing_review,'route_adjustment_review':route_adjustment_review,
+        'route_conflict_review':route_conflict_review,
+        'bundle_routing_review':bundle_routing_review,
+        'transition_routing_review':transition_routing_review,
+        'clearance_refinement_review':clearance_refinement_review,
+        'error':read(folder/'error.json'),'request_contract':plan.get('request_contract'),
+        'scope':'Breadloaf 개발용 · 85×20mm / 4극12슬롯 / Delta / Id=0 / 20℃ / 50PN470·N48UH · Flat 보류',
+        'production_optimizer_connected':False}
+
+
+def jobs():
+    ids=list(LEGACY)
+    if HOME.exists():ids += [p.parent.name for p in HOME.glob('bf_*/metadata.json')]
+    return {'jobs':[{k:d[k] for k in ('id','kind','state','title','created')} for d in (detail(i) for i in ids)]}
+
+
+def action(command,data):
+    with LOCK:
+        if command=='input-preview':
+            from breadloaf_request import adapt
+            return adapt(data.get('input_snapshot'),data.get('max_line_peak_A',40),data.get('iterations',10))
+        if command=='search':
+            contract=None
+            if 'input_snapshot' in data:
+                from breadloaf_request import adapt
+                contract=adapt(data['input_snapshot'],data.get('max_line_peak_A',40),data.get('iterations',10))
+                if not contract['can_search']:raise ValueError('; '.join(contract['errors']))
+                data={**data,'target_electromagnetic_torque_Nm':contract['target_electromagnetic_torque_Nm'],
+                      'max_line_peak_A':contract['max_line_peak_A'],'iterations':contract['iterations']}
+            target=data.get('target_electromagnetic_torque_Nm',.5);current=data.get('max_line_peak_A',40);iterations=data.get('iterations',10)
+            for value in (target,current):
+                if isinstance(value,bool) or not isinstance(value,(float,int)) or not math.isfinite(value) or value<=0:raise ValueError('Positive finite torque/current required')
+            if isinstance(iterations,bool) or not isinstance(iterations,int) or not 1<=iterations<=30:raise ValueError('Iteration budget must be 1..30')
+            if any(j['kind']=='search' and j['state'] in ('running','searching') for j in jobs()['jobs']):raise ValueError('Breadloaf search already running')
+            job,folder,meta=create('search')
+            seed=SEED;extra=[]
+            if contract:
+                request_path=folder.parent/'request_contract.json';write_json(request_path,contract)
+                snapshot=read(SEED);snapshot['expected_native']['ShaftSpeed']=contract['speed_rpm']
+                snapshot['expected_native']['DCBusVoltage']=min(contract['voltages_V'])
+                seed=folder.parent/'seed_snapshot.json';write_json(seed,snapshot)
+                extra=['--request-contract',str(request_path)]
+            with (folder.parent/'worker.log').open('wb') as log:
+                process=subprocess.Popen([sys.executable,str(ROOT/'validation/optimize_breadloaf_ripple.py'),
+                    '--seed-snapshot',str(seed),'--output',str(folder),'--iterations',str(iterations),
+                    '--target-electromagnetic-torque',str(target),'--max-line-peak-current',str(current),*extra],
+                    cwd=ROOT,stdout=log,stderr=subprocess.STDOUT,creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
+            meta['pid']=process.pid;write_json(folder.parent/'metadata.json',meta)
+            return detail(job)
+        job=data.get('id');kind,folder,meta=locate(job)
+        if command=='prepare':
+            if kind!='search' or detail(job)['state']!='completed':raise ValueError('Completed search required')
+            from prepare_breadloaf_verification import prepare
+            selected=data.get('selected_ids')
+            if not isinstance(selected,list) or not selected:raise ValueError('Select saved candidates')
+            # Validate selection before creating a job record.
+            available={c['id'] for c in read(folder/'result.json')['finalists']}
+            if any(not isinstance(i,str) for i in selected) or len(set(selected))!=len(selected) or not set(selected)<=available:raise ValueError('Invalid distinct saved candidate selection')
+            new,batch,_=create('validation',job);prepare(folder,MODEL,batch,selected)
+            return detail(new)
+        if command=='start':
+            if kind not in ('validation','feedback'):raise ValueError('Prepared verification batch required')
+            from breadloaf_workflow import start
+            start(folder)
+            return detail(job)
+        if command=='review':
+            if kind=='search' or detail(job)['state']!='completed':raise ValueError('Completed native batch required')
+            from breadloaf_workflow import review
+            review(folder);return detail(job)
+        if command=='feedback':
+            if kind!='validation' or detail(job)['state']!='completed':raise ValueError('Completed initial validation required; correction budget is one')
+            if job=='pilot-validation' and (LEGACY['pilot-feedback'][1]/'result.json').exists():raise ValueError('Current correction already completed; open pilot-feedback')
+            # Prevent multiple correction batches for the same parent in the GUI.
+            if any(j.get('parent')==job and j['kind']=='feedback' for j in (locate(i['id'])[2] for i in jobs()['jobs'])):raise ValueError('Current correction already prepared')
+            from review_breadloaf_verification import review
+            check=review(folder)
+            if not any(r['practical_ripple_acceptance']['state']=='passed' and r['current_feedback']['status']=='proposed_unverified' for r in check['cases']):
+                raise ValueError('No ripple-passed candidate can reach the requested torque within the current limit')
+            from prepare_breadloaf_current_feedback import prepare
+            new,batch,_=create('feedback',job);prepare(folder,batch)
+            return detail(new)
+        raise ValueError('Unknown Breadloaf action')
+
+END_CONTENT
+END_SOURCE S092
+
+BEGIN_SOURCE S093
+PATH: validation/breadloaf_inductance.py
+SOURCE_SHA256: 0b9254756fc7beb435a4cc11e777b852ca7156fa3ac94781869225e61aa4cdfb
+LINES: 1-155 OF 155
+SEGMENT_BYTES: 9583
+BEGIN_CONTENT
+"""Isolated Small Signal development experiment. One job, not PWM certification."""
+import argparse
+import contextlib
+import hashlib
+import json
+from pathlib import Path
+import shutil
+import subprocess
+import sys
+import time
+import traceback
+from study_io import write_json
+
+ROOT=Path(__file__).resolve().parent
+SETTINGS={'BackEMFCalculation':False,'TorqueCalculation':False,'CoggingTorqueCalculation':False,
+          'TorqueSpeedCalculation':False,'DemagnetizationCalc':False,'BPMShortCircuitCalc':False,
+          'ElectromagneticForcesCalc_OC':False,'ElectromagneticForcesCalc_Load':False,
+          'InductanceCalc':True,'InductanceCalcMethod_BPM':1,'InductanceSolver_BPM':0,
+          'InductanceNumberCycles':1,'InductancePointsPerCycle':24,
+          'PlotAllInductancePhases':True,'PlotSmallSignalBiasCurrents':True}
+GRAPH_NAMES=([f'SelfInductancePh{i}' for i in range(1,4)]+
+             [f'MutualInductance{i}Ph{j}' for i in range(1,4) for j in range(1,4) if i!=j]+
+             [f'SelfInductanceDifferentialPh{i}' for i in range(1,4)]+
+             [f'MutualInductanceDifferential{i}Ph{j}' for i in range(1,4) for j in range(1,4) if i!=j]+
+             [f'SmallSignalInductanceCurrentPh{i}' for i in range(1,4)])
+
+
+def sha(path):return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+
+
+def prepare(source,output):
+    source=Path(source).resolve();output=Path(output).resolve()
+    if output.exists():raise ValueError('Fresh output folder required')
+    load=lambda p:json.loads(p.read_text(encoding='utf-8'))
+    plan=load(source/'plan.json');result=load(source/'result.json')
+    complete=[r for r in result['outcomes'] if r['status']=='completed']
+    if len(complete)!=1:raise ValueError('Exactly one verified candidate required')
+    name=complete[0]['id'];snapshot=source/(name+'_snapshot.json')
+    frozen=next(c for c in plan['cases'] if c['id']==name)
+    if sha(snapshot)!=frozen['snapshot_sha256']:raise ValueError('Frozen source snapshot changed')
+    model=source/name/(name+'.mot');db=model.parent/'working_materials.mdb'
+    if not model.is_file() or not db.is_file():raise ValueError('Verified model/material database missing')
+    data={'schema':'breadloaf-small-signal-experiment-v1','candidate_id':name,
+          'source_batch':str(source),'source_model':str(model),'source_database':str(db),'source_snapshot':str(snapshot),
+          'model_sha256':sha(model),'database_sha256':sha(db),'snapshot_sha256':sha(snapshot),
+          'settings':SETTINGS,'planned_fea':1,'case_timeout_s':900,'estimated_duration_minutes':[2,6],
+          'estimate_basis':'Provisional first-run allowance; not measured Small Signal timing.',
+          'mapping_evidence':'Installed v261 .mot keys and RPC readback; enum 1 Small Signal / solver 0 Full remains subject to output validation.',
+          'graph_name_evidence':'Candidate identifiers found in installed BasicFramework.bpl; RPC acceptance/data content checked after solve.',
+          'qualified':False,'pwm_ripple_certified':False,
+          'scope':'24 points/full electrical cycle at the verified bias current. No mesh/angle convergence or HF model qualification.'}
+    output.mkdir(parents=True);write_json(output/'plan.json',data);return data
+
+
+def configure(mc,plan):
+    expected=json.loads(Path(plan['source_snapshot']).read_text(encoding='utf-8'))['expected_native']
+    if mc.get_variable('MagPhases')!=3:raise ValueError('Three-phase Small Signal model required')
+    for key,value in expected.items():
+        if abs(mc.get_variable(key)-value)>1e-6:raise ValueError('Verified input mismatch: '+key)
+    for key,value in plan['settings'].items():mc.set_variable(key,value)
+    actual={key:mc.get_variable(key) for key in plan['settings']}
+    if any(actual[k]!=value for k,value in plan['settings'].items()):raise ValueError('Small Signal setting readback mismatch')
+    return actual
+
+
+def worker(folder,probe=False):
+    from low_voltage import start,parse_csv
+    folder=Path(folder).resolve();plan=json.loads((folder/'plan.json').read_text(encoding='utf-8'))
+    for key,hash_key in (('source_model','model_sha256'),('source_database','database_sha256'),('source_snapshot','snapshot_sha256')):
+        if sha(plan[key])!=plan[hash_key]:raise ValueError('Frozen source changed: '+key)
+    work=folder/('probe' if probe else 'case');work.mkdir();mc=None;started=time.time()
+    try:
+        model=work/'small_signal.mot';db=work/'working_materials.mdb'
+        shutil.copy2(plan['source_model'],model);shutil.copy2(plan['source_database'],db)
+        mc,_=start();mc.load_from_file(str(model));mc.select_material_database(str(db),False)
+        mc.clear_message_log();actual=configure(mc,plan)
+        mc.save_to_file(str(model));write_json(work/'readback.json',actual)
+        if probe:
+            write_json(folder/'capability_probe.json',{'status':'settings_supported','readback':actual,
+                       'native_fea_calls':0,'semantics_qualified':False,'elapsed_s':time.time()-started})
+            return
+        write_json(work/'progress.json',{'phase':'solving_inductance','started_unix':started})
+        t=time.perf_counter();mc.do_magnetic_calculation();solver_s=time.perf_counter()-t
+        if any(mc.get_variable(k)!=v for k,v in plan['settings'].items()):raise ValueError('Settings changed during calculation')
+        csv=work/'small_signal.csv';mc.export_results('EMagnetic',str(csv));values,_=parse_csv(csv)
+        graphs={}
+        for name in GRAPH_NAMES:
+            try:
+                x,y=mc.get_magnetic_graph(name)
+                graphs[name]={'x':list(map(float,x)),'y':list(map(float,y)),
+                              'units_status':'Native graph units require explicit verification before SI matrix assembly'}
+            except Exception as exc:graphs[name]={'error':str(exc)}
+        mc.save_to_file(str(model))
+        write_json(folder/'result.json',{'status':'completed','analysis_kind':'small_signal_inductance',
+            'candidate_id':plan['candidate_id'],'values':values,'graphs':graphs,
+            'available_graphs':sum(bool(g.get('x')) for g in graphs.values()),
+            'solver_s':solver_s,'elapsed_s':time.time()-started,'readback':actual,
+            'mapping_qualified':False,'pwm_ripple_certified':False,
+            'next_action':'validate_graph_names_units_and_matrix_before_PWM_use'})
+    finally:
+        if mc:
+            with contextlib.suppress(Exception):mc.quit()
+
+
+def supervise(folder):
+    import msvcrt
+    from run_spm_ripple_recovery import stop_owned
+    folder=Path(folder).resolve();plan=json.loads((folder/'plan.json').read_text(encoding='utf-8'))
+    if (folder/'progress.json').exists():raise ValueError('Experiment already started')
+    started=time.time();child=None
+    lock=(ROOT/'motorcad_execution.lock').open('a+b')
+    def progress(status,**extra):write_json(folder/'progress.json',{'status':status,'started_unix':started,
+        'elapsed_s':time.time()-started,'planned_fea':1,'completed_fea':int(status=='completed'),**extra})
+    try:
+        if lock.tell()==0:lock.write(b'0');lock.flush()
+        lock.seek(0);msvcrt.locking(lock.fileno(),msvcrt.LK_NBLCK,1)
+        progress('running')
+        with (folder/'worker.log').open('wb') as log:
+            child=subprocess.Popen([sys.executable,str(Path(__file__).resolve()),'worker','--output',str(folder)],
+                cwd=ROOT.parent,stdout=log,stderr=subprocess.STDOUT,creationflags=subprocess.CREATE_NO_WINDOW)
+            write_json(folder/'child.json',{'pid':child.pid})
+            try:code=child.wait(timeout=plan['case_timeout_s'])
+            except subprocess.TimeoutExpired:stop_owned(child);raise RuntimeError('Small Signal timeout')
+        if code!=0 or not (folder/'result.json').is_file():raise RuntimeError('Small Signal worker failed; inspect worker.log')
+        progress('completed')
+    except BaseException as exc:
+        if child and child.poll() is None:stop_owned(child)
+        write_json(folder/'error.json',{'error':str(exc),'traceback':traceback.format_exc()});progress('failed',failed_cases=1)
+        raise
+    finally:lock.close()
+
+
+def launch(folder):
+    folder=Path(folder).resolve()
+    if (folder/'progress.json').exists() or (folder/'launch.json').exists():raise ValueError('Already launched')
+    plan=json.loads((folder/'plan.json').read_text(encoding='utf-8'))
+    probe_path=folder/'capability_probe.json'
+    probe=json.loads(probe_path.read_text(encoding='utf-8')) if probe_path.is_file() else {}
+    if probe.get('status')!='settings_supported' or probe.get('readback')!=plan['settings']:
+        raise ValueError('Matching Native settings probe required before FEA')
+    with (folder/'supervisor.log').open('wb') as log:
+        p=subprocess.Popen([sys.executable,str(Path(__file__).resolve()),'supervise','--output',str(folder)],
+                           cwd=ROOT.parent,stdout=log,stderr=subprocess.STDOUT,creationflags=subprocess.CREATE_NO_WINDOW)
+    record={'supervisor_pid':p.pid,'waited_for_completion':False,'planned_fea':1}
+    write_json(folder/'launch.json',record);return record
+
+
+if __name__=='__main__':
+    p=argparse.ArgumentParser();p.add_argument('command',choices=['prepare','probe','start','worker','supervise'])
+    p.add_argument('--output',required=True);p.add_argument('--source');a=p.parse_args()
+    if a.command=='prepare':print(json.dumps(prepare(a.source,a.output),indent=2))
+    elif a.command=='probe':worker(a.output,True)
+    elif a.command=='start':print(json.dumps(launch(a.output)))
+    elif a.command=='worker':worker(a.output)
+    else:supervise(a.output)
+
+END_CONTENT
+END_SOURCE S093
+
+
+END_REVIEW_PART_016

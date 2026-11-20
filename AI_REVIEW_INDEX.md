@@ -1,0 +1,305 @@
+# 외부 AI 검토용 소스 목차
+
+GitHub 폴더 화면을 탐색하지 않고 아래 원문 링크로 소스를 읽을 수 있습니다. 압축 파일이 아닙니다.
+대상 소스 커밋: `e179b073376e7b2488b247d55b3c4d6b4b0197b7`. 소스 233개, 분할 텍스트 31개.
+현재 저장소 공개는 사용자 요청에 따른 설정입니다. 과거 프롬프트의 비공개 전제는 적용하지 않습니다.
+
+[검토 시작 안내](https://raw.githubusercontent.com/hano44-akf/motor-design/main/ai_review/00_START_HERE.txt)
+[전체 파일·해시·분할 위치 명세](https://raw.githubusercontent.com/hano44-akf/motor-design/main/ai_review/manifest.json)
+
+## 읽는 방법
+
+- 각 텍스트에는 원래 경로, SOURCE_ID, 전체 파일 SHA-256, 원본 줄 범위와 시작·끝 표식이 있습니다.
+- 한 파일이 여러 파트에 나뉘면 manifest의 segments를 따라 모두 읽어야 전문 검토입니다.
+- 내용은 지정된 Git 커밋의 소스입니다. 이후 변경을 포함한 최신 파일이라고 가정하지 마세요.
+- 모의 테스트 통과·코드 정적 검토·실제 해석 검증은 구분하세요.
+- 재질 DB와 제외된 해석 자료는 이 패키지에 없습니다. 설치·실행 재현 가능성을 별도로 평가하세요.
+- 일부 AI는 원문 URL도 제한할 수 있습니다. 실제 읽은 SOURCE_ID와 미수신 구간을 먼저 밝히세요.
+
+## 우선 참고 문서
+
+- [README.md](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/README.md)
+- [PROGRAM_SCOPE_KO.md](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/PROGRAM_SCOPE_KO.md)
+- [.gitignore](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/.gitignore)
+
+## 순서별 소스 텍스트
+
+| 파트 | 크기 | 포함 원본 |
+|---|---:|---|
+| [part_001.txt](https://raw.githubusercontent.com/hano44-akf/motor-design/main/ai_review/part_001.txt) | 41,179 bytes | `validation/formula_job.py`, `validation/optimize_low_voltage.py`, `validation/operating_control.py`, `validation/formula_assessment.py`, `validation/run_assessment.py`, `validation/result_policy.py` |
+| [part_002.txt](https://raw.githubusercontent.com/hano44-akf/motor-design/main/ai_review/part_002.txt) | 41,753 bytes | `validation/verify_formula_job.py`, `validation/verification_conditions.py`, `validation/result_review.py`, `validation/request_schema.py`, `validation/model_capabilities.py`, `validation/evaluation_policy.py`, `validation/controller_limits.py`, `validation/flux_limits.py` |
+| [part_003.txt](https://raw.githubusercontent.com/hano44-akf/motor-design/main/ai_review/part_003.txt) | 41,490 bytes | `validation/rotor_catalog.py`, `validation/geometry_adapters.py`, `validation/spm_geometry.py`, `validation/detailed_spm_recipe.py`, `validation/winding_layout.py`, `validation/low_voltage.py` |
+| [part_004.txt](https://raw.githubusercontent.com/hano44-akf/motor-design/main/ai_review/part_004.txt) | 28,665 bytes | `interface/server.py`, `interface/backend.js` |
+| [part_005.txt](https://raw.githubusercontent.com/hano44-akf/motor-design/main/ai_review/part_005.txt) | 43,842 bytes | `interface/studio-v2.js`, `interface/design-workflow.js`, `interface/result-review.js` |
+| [part_006.txt](https://raw.githubusercontent.com/hano44-akf/motor-design/main/ai_review/part_006.txt) | 26,163 bytes | `collect_materials.py`, `convert_magnet.py`, `export_granta.py`, `finish_granta.py`, `interface/breadloaf-workflow.css` |
+| [part_007.txt](https://raw.githubusercontent.com/hano44-akf/motor-design/main/ai_review/part_007.txt) | 47,436 bytes | `interface/breadloaf-workflow.js` |
+| [part_008.txt](https://raw.githubusercontent.com/hano44-akf/motor-design/main/ai_review/part_008.txt) | 47,549 bytes | `interface/breadloaf-workflow.js`, `interface/check-backend.cjs`, `interface/check-breadloaf-comparison.cjs`, `interface/check-breadloaf-input.cjs`, `interface/check-breadloaf-local.cjs`, `interface/check-breadloaf-workflow.cjs`, `interface/check-controller.cjs`, `interface/check-csv.cjs`, `interface/check-design-workflow.cjs`, `interface/check-flux.cjs`, `interface/check-real-results.cjs` |
+| [part_009.txt](https://raw.githubusercontent.com/hano44-akf/motor-design/main/ai_review/part_009.txt) | 49,252 bytes | `interface/check-result-review.cjs`, `interface/check-rotor-catalog.cjs`, `interface/check-spm-geometry.cjs`, `interface/check-surface-shapes.cjs`, `interface/check-task-manager.cjs`, `interface/check-v2.cjs`, `interface/check-winding.cjs`, `interface/check.cjs`, `interface/control-airgap-options.js`, `interface/csv-export.js`, `interface/dimension-options.js`, `interface/export_catalog.py`, `interface/flux-options.js` |
+| [part_010.txt](https://raw.githubusercontent.com/hano44-akf/motor-design/main/ai_review/part_010.txt) | 45,230 bytes | `interface/index.html`, `interface/launch.ps1`, `interface/rotor-options.js` |
+| [part_011.txt](https://raw.githubusercontent.com/hano44-akf/motor-design/main/ai_review/part_011.txt) | 49,252 bytes | `interface/spm-options.js`, `interface/steel-catalog.js`, `interface/switching-options.js`, `interface/task-manager.css`, `interface/task-manager.js`, `interface/upgrade.py`, `material_coverage.py` |
+| [part_012.txt](https://raw.githubusercontent.com/hano44-akf/motor-design/main/ai_review/part_012.txt) | 45,049 bytes | `material_probe.py`, `normalize_materials.py`, `package_materials.py`, `prepare_granta_batch.py`, `review_representative_materials.py`, `run_granta_batch.py`, `test_collection.py`, `test_normalization.py`, `validation/acceptance.py`, `validation/analyze_detailed_spm.py` |
+| [part_013.txt](https://raw.githubusercontent.com/hano44-akf/motor-design/main/ai_review/part_013.txt) | 45,585 bytes | `validation/analyze_spm_interaction.py`, `validation/analyze_steel_limits.py`, `validation/audit_breadloaf_screens.py`, `validation/audit_progress.py`, `validation/audit_spm_ripple.py`, `validation/background_validation.py`, `validation/benchmark_control_airgap.py`, `validation/breadloaf_boundary.py` |
+| [part_014.txt](https://raw.githubusercontent.com/hano44-akf/motor-design/main/ai_review/part_014.txt) | 38,325 bytes | `validation/breadloaf_bundle_routing.py`, `validation/breadloaf_clearance_refinement.py`, `validation/breadloaf_coil_assignment.py`, `validation/breadloaf_conductor_audit.py` |
+| [part_015.txt](https://raw.githubusercontent.com/hano44-akf/motor-design/main/ai_review/part_015.txt) | 47,063 bytes | `validation/breadloaf_continuous_packing.py`, `validation/breadloaf_end_routing.py`, `validation/breadloaf_flux_probe.py` |
+| [part_016.txt](https://raw.githubusercontent.com/hano44-akf/motor-design/main/ai_review/part_016.txt) | 45,371 bytes | `validation/breadloaf_frequency_loss.py`, `validation/breadloaf_grid_packing.py`, `validation/breadloaf_gui.py`, `validation/breadloaf_inductance.py` |
+| [part_017.txt](https://raw.githubusercontent.com/hano44-akf/motor-design/main/ai_review/part_017.txt) | 42,098 bytes | `validation/breadloaf_inductance_comparison.py`, `validation/breadloaf_leakage_geometry.py`, `validation/breadloaf_local_model.py`, `validation/breadloaf_loss_dataset.py`, `validation/breadloaf_operating_comparison.py`, `validation/breadloaf_packing_selection.py` |
+| [part_018.txt](https://raw.githubusercontent.com/hano44-akf/motor-design/main/ai_review/part_018.txt) | 44,733 bytes | `validation/breadloaf_pwm_preview.py`, `validation/breadloaf_pwm_reference.py`, `validation/breadloaf_pwm_screen.py`, `validation/breadloaf_remaining_review.py`, `validation/breadloaf_request.py` |
+| [part_019.txt](https://raw.githubusercontent.com/hano44-akf/motor-design/main/ai_review/part_019.txt) | 48,573 bytes | `validation/breadloaf_route_adjustment.py`, `validation/breadloaf_route_conflicts.py`, `validation/breadloaf_screens.py`, `validation/breadloaf_search_space.py`, `validation/breadloaf_shaft_control.py`, `validation/breadloaf_slot_detail.py` |
+| [part_020.txt](https://raw.githubusercontent.com/hano44-akf/motor-design/main/ai_review/part_020.txt) | 39,009 bytes | `validation/breadloaf_transition_routing.py`, `validation/breadloaf_workflow.py`, `validation/build_rotor_catalog.py`, `validation/calibrate_surface_parallel.py`, `validation/capture_error.py`, `validation/compare_surface_shapes.py`, `validation/csv_metadata.py` |
+| [part_021.txt](https://raw.githubusercontent.com/hano44-akf/motor-design/main/ai_review/part_021.txt) | 48,176 bytes | `validation/design_job.py`, `validation/detailed_review.py`, `validation/detailed_spm_plan.py`, `validation/dimension_grid.py`, `validation/dismiss_owned_error.py`, `validation/export_csv.py`, `validation/export_pole_slot_review.py`, `validation/final_validation.py`, `validation/magnet_boundary_check.py`, `validation/mesh_review.py` |
+| [part_022.txt](https://raw.githubusercontent.com/hano44-akf/motor-design/main/ai_review/part_022.txt) | 48,855 bytes | `validation/motorcad_adapter.py`, `validation/motorcad_open.py`, `validation/native_torque_feedback.py`, `validation/native_winding_review.py`, `validation/optimize_breadloaf_ripple.py`, `validation/pilot_4p.py`, `validation/pilot_arc120.py`, `validation/pilot_corrected.py`, `validation/plan_spm_interaction.py`, `validation/plan_spm_range_probe.py`, `validation/prepare_breadloaf_current_feedback.py`, `validation/prepare_breadloaf_loss_B.py` |
+| [part_023.txt](https://raw.githubusercontent.com/hano44-akf/motor-design/main/ai_review/part_023.txt) | 49,119 bytes | `validation/prepare_breadloaf_verification.py`, `validation/prepare_spm_ripple_recovery.py`, `validation/probe_breadloaf_geometry.py`, `validation/probe_model.py`, `validation/probe_rotor_type_geometry.py`, `validation/read_startup.py`, `validation/refine_breadloaf_ripple.py`, `validation/report_grid_review.py`, `validation/review_breadloaf_verification.py`, `validation/review_saved_job.py` |
+| [part_024.txt](https://raw.githubusercontent.com/hano44-akf/motor-design/main/ai_review/part_024.txt) | 47,045 bytes | `validation/review_spm_saturation.py`, `validation/rotor_mapping_session.py`, `validation/run_detailed_spm_batch.py`, `validation/run_spm_ripple_recovery.py`, `validation/run_validation.py`, `validation/run_validation_400v.py`, `validation/spm_ripple.py`, `validation/spm_ripple_calibration.py` |
+| [part_025.txt](https://raw.githubusercontent.com/hano44-akf/motor-design/main/ai_review/part_025.txt) | 46,262 bytes | `validation/spm_ripple_operating_point.py`, `validation/study_breadloaf_operating_point.py`, `validation/study_io.py`, `validation/summarize_low_voltage.py`, `validation/summarize_validation.py`, `validation/task_adapters.py`, `validation/task_queue.py` |
+| [part_026.txt](https://raw.githubusercontent.com/hano44-akf/motor-design/main/ai_review/part_026.txt) | 46,255 bytes | `validation/task_store.py`, `validation/test_audit_spm_ripple.py`, `validation/test_background_validation.py`, `validation/test_breadloaf_boundary.py`, `validation/test_breadloaf_bundle_routing.py`, `validation/test_breadloaf_clearance_refinement.py`, `validation/test_breadloaf_coil_assignment.py`, `validation/test_breadloaf_conductor_audit.py`, `validation/test_breadloaf_continuous_packing.py`, `validation/test_breadloaf_end_routing.py` |
+| [part_027.txt](https://raw.githubusercontent.com/hano44-akf/motor-design/main/ai_review/part_027.txt) | 48,642 bytes | `validation/test_breadloaf_flux_probe.py`, `validation/test_breadloaf_grid_packing.py`, `validation/test_breadloaf_gui.py`, `validation/test_breadloaf_inductance.py`, `validation/test_breadloaf_inductance_comparison.py`, `validation/test_breadloaf_leakage_geometry.py`, `validation/test_breadloaf_local_model.py`, `validation/test_breadloaf_loss_B.py`, `validation/test_breadloaf_operating_comparison.py`, `validation/test_breadloaf_packing_selection.py`, `validation/test_breadloaf_pwm_direct.py`, `validation/test_breadloaf_pwm_preview.py`, `validation/test_breadloaf_pwm_reference.py`, `validation/test_breadloaf_pwm_screen.py`, `validation/test_breadloaf_refinement.py` |
+| [part_028.txt](https://raw.githubusercontent.com/hano44-akf/motor-design/main/ai_review/part_028.txt) | 47,849 bytes | `validation/test_breadloaf_remaining_review.py`, `validation/test_breadloaf_request.py`, `validation/test_breadloaf_route_adjustment.py`, `validation/test_breadloaf_route_conflicts.py`, `validation/test_breadloaf_screens.py`, `validation/test_breadloaf_search.py`, `validation/test_breadloaf_search_space.py`, `validation/test_breadloaf_shaft_control.py`, `validation/test_breadloaf_slot_detail.py`, `validation/test_breadloaf_transition_routing.py`, `validation/test_breadloaf_workflow.py`, `validation/test_controller_limits.py`, `validation/test_core_contracts.py` |
+| [part_029.txt](https://raw.githubusercontent.com/hano44-akf/motor-design/main/ai_review/part_029.txt) | 46,083 bytes | `validation/test_design_job.py`, `validation/test_detailed_spm_analysis.py`, `validation/test_detailed_spm_recipe.py`, `validation/test_dimension_grid.py`, `validation/test_flux_limits.py`, `validation/test_formula_workflow.py`, `validation/test_magnet_boundary_check.py`, `validation/test_native_torque_feedback.py`, `validation/test_native_winding_review.py`, `validation/test_operating_control.py`, `validation/test_result_review.py`, `validation/test_review_fixes.py`, `validation/test_rotor_catalog.py` |
+| [part_030.txt](https://raw.githubusercontent.com/hano44-akf/motor-design/main/ai_review/part_030.txt) | 49,140 bytes | `validation/test_spm_geometry.py`, `validation/test_spm_interaction_analysis.py`, `validation/test_spm_interaction_plan.py`, `validation/test_spm_ripple.py`, `validation/test_spm_ripple_calibration.py`, `validation/test_spm_ripple_operating_point.py`, `validation/test_spm_saturation_review.py`, `validation/test_task_queue.py`, `validation/test_topology_study.py`, `validation/test_verification_conditions.py`, `validation/test_voltage_fallback.py`, `validation/test_winding_layout.py`, `validation/topology_study.py`, `validation/validate_candidates.py` |
+| [part_031.txt](https://raw.githubusercontent.com/hano44-akf/motor-design/main/ai_review/part_031.txt) | 20,440 bytes | `validation/validate_spm_ripple.py`, `validation/verification_scope.py`, `validation/verify_spm_mapping.py`, `verify_library.py` |
+
+## 파일별 원본 링크
+
+| SOURCE_ID | 원본 | 줄 수 | 텍스트 파트 |
+|---|---|---:|---|
+| S001 | [validation/formula_job.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/formula_job.py) | 116 | part_001.txt |
+| S002 | [validation/optimize_low_voltage.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/optimize_low_voltage.py) | 150 | part_001.txt |
+| S003 | [validation/operating_control.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/operating_control.py) | 110 | part_001.txt |
+| S004 | [validation/formula_assessment.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/formula_assessment.py) | 41 | part_001.txt |
+| S005 | [validation/run_assessment.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/run_assessment.py) | 94 | part_001.txt |
+| S006 | [validation/result_policy.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/result_policy.py) | 43 | part_001.txt |
+| S007 | [validation/verify_formula_job.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/verify_formula_job.py) | 151 | part_002.txt |
+| S008 | [validation/verification_conditions.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/verification_conditions.py) | 35 | part_002.txt |
+| S009 | [validation/result_review.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/result_review.py) | 73 | part_002.txt |
+| S010 | [validation/request_schema.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/request_schema.py) | 130 | part_002.txt |
+| S011 | [validation/model_capabilities.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/model_capabilities.py) | 43 | part_002.txt |
+| S012 | [validation/evaluation_policy.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/evaluation_policy.py) | 21 | part_002.txt |
+| S013 | [validation/controller_limits.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/controller_limits.py) | 80 | part_002.txt |
+| S014 | [validation/flux_limits.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/flux_limits.py) | 34 | part_002.txt |
+| S015 | [validation/rotor_catalog.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/rotor_catalog.py) | 210 | part_003.txt |
+| S016 | [validation/geometry_adapters.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/geometry_adapters.py) | 34 | part_003.txt |
+| S017 | [validation/spm_geometry.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/spm_geometry.py) | 110 | part_003.txt |
+| S018 | [validation/detailed_spm_recipe.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/detailed_spm_recipe.py) | 75 | part_003.txt |
+| S019 | [validation/winding_layout.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/winding_layout.py) | 65 | part_003.txt |
+| S020 | [validation/low_voltage.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/low_voltage.py) | 118 | part_003.txt |
+| S021 | [interface/server.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/interface/server.py) | 204 | part_004.txt |
+| S022 | [interface/backend.js](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/interface/backend.js) | 78 | part_004.txt |
+| S023 | [interface/studio-v2.js](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/interface/studio-v2.js) | 48 | part_005.txt |
+| S024 | [interface/design-workflow.js](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/interface/design-workflow.js) | 107 | part_005.txt |
+| S025 | [interface/result-review.js](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/interface/result-review.js) | 39 | part_005.txt |
+| S026 | [collect_materials.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/collect_materials.py) | 200 | part_006.txt |
+| S027 | [convert_magnet.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/convert_magnet.py) | 66 | part_006.txt |
+| S028 | [export_granta.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/export_granta.py) | 114 | part_006.txt |
+| S029 | [finish_granta.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/finish_granta.py) | 63 | part_006.txt |
+| S030 | [interface/breadloaf-workflow.css](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/interface/breadloaf-workflow.css) | 1 | part_006.txt |
+| S031 | [interface/breadloaf-workflow.js](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/interface/breadloaf-workflow.js) | 144 | part_007.txt, part_008.txt |
+| S032 | [interface/check-backend.cjs](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/interface/check-backend.cjs) | 15 | part_008.txt |
+| S033 | [interface/check-breadloaf-comparison.cjs](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/interface/check-breadloaf-comparison.cjs) | 199 | part_008.txt |
+| S034 | [interface/check-breadloaf-input.cjs](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/interface/check-breadloaf-input.cjs) | 38 | part_008.txt |
+| S035 | [interface/check-breadloaf-local.cjs](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/interface/check-breadloaf-local.cjs) | 33 | part_008.txt |
+| S036 | [interface/check-breadloaf-workflow.cjs](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/interface/check-breadloaf-workflow.cjs) | 48 | part_008.txt |
+| S037 | [interface/check-controller.cjs](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/interface/check-controller.cjs) | 23 | part_008.txt |
+| S038 | [interface/check-csv.cjs](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/interface/check-csv.cjs) | 24 | part_008.txt |
+| S039 | [interface/check-design-workflow.cjs](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/interface/check-design-workflow.cjs) | 53 | part_008.txt |
+| S040 | [interface/check-flux.cjs](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/interface/check-flux.cjs) | 19 | part_008.txt |
+| S041 | [interface/check-real-results.cjs](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/interface/check-real-results.cjs) | 14 | part_008.txt |
+| S042 | [interface/check-result-review.cjs](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/interface/check-result-review.cjs) | 34 | part_009.txt |
+| S043 | [interface/check-rotor-catalog.cjs](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/interface/check-rotor-catalog.cjs) | 53 | part_009.txt |
+| S044 | [interface/check-spm-geometry.cjs](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/interface/check-spm-geometry.cjs) | 47 | part_009.txt |
+| S045 | [interface/check-surface-shapes.cjs](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/interface/check-surface-shapes.cjs) | 26 | part_009.txt |
+| S046 | [interface/check-task-manager.cjs](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/interface/check-task-manager.cjs) | 93 | part_009.txt |
+| S047 | [interface/check-v2.cjs](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/interface/check-v2.cjs) | 9 | part_009.txt |
+| S048 | [interface/check-winding.cjs](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/interface/check-winding.cjs) | 25 | part_009.txt |
+| S049 | [interface/check.cjs](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/interface/check.cjs) | 3 | part_009.txt |
+| S050 | [interface/control-airgap-options.js](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/interface/control-airgap-options.js) | 97 | part_009.txt |
+| S051 | [interface/csv-export.js](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/interface/csv-export.js) | 46 | part_009.txt |
+| S052 | [interface/dimension-options.js](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/interface/dimension-options.js) | 14 | part_009.txt |
+| S053 | [interface/export_catalog.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/interface/export_catalog.py) | 9 | part_009.txt |
+| S054 | [interface/flux-options.js](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/interface/flux-options.js) | 33 | part_009.txt |
+| S055 | [interface/index.html](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/interface/index.html) | 39 | part_010.txt |
+| S056 | [interface/launch.ps1](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/interface/launch.ps1) | 3 | part_010.txt |
+| S057 | [interface/rotor-options.js](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/interface/rotor-options.js) | 172 | part_010.txt |
+| S058 | [interface/spm-options.js](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/interface/spm-options.js) | 46 | part_011.txt |
+| S059 | [interface/steel-catalog.js](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/interface/steel-catalog.js) | 1 | part_011.txt |
+| S060 | [interface/switching-options.js](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/interface/switching-options.js) | 84 | part_011.txt |
+| S061 | [interface/task-manager.css](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/interface/task-manager.css) | 1 | part_011.txt |
+| S062 | [interface/task-manager.js](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/interface/task-manager.js) | 167 | part_011.txt |
+| S063 | [interface/upgrade.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/interface/upgrade.py) | 6 | part_011.txt |
+| S064 | [material_coverage.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/material_coverage.py) | 113 | part_011.txt |
+| S065 | [material_probe.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/material_probe.py) | 62 | part_012.txt |
+| S066 | [normalize_materials.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/normalize_materials.py) | 178 | part_012.txt |
+| S067 | [package_materials.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/package_materials.py) | 17 | part_012.txt |
+| S068 | [prepare_granta_batch.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/prepare_granta_batch.py) | 40 | part_012.txt |
+| S069 | [review_representative_materials.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/review_representative_materials.py) | 64 | part_012.txt |
+| S070 | [run_granta_batch.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/run_granta_batch.py) | 75 | part_012.txt |
+| S071 | [test_collection.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/test_collection.py) | 28 | part_012.txt |
+| S072 | [test_normalization.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/test_normalization.py) | 25 | part_012.txt |
+| S073 | [validation/acceptance.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/acceptance.py) | 34 | part_012.txt |
+| S074 | [validation/analyze_detailed_spm.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/analyze_detailed_spm.py) | 136 | part_012.txt |
+| S075 | [validation/analyze_spm_interaction.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/analyze_spm_interaction.py) | 118 | part_013.txt |
+| S076 | [validation/analyze_steel_limits.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/analyze_steel_limits.py) | 77 | part_013.txt |
+| S077 | [validation/audit_breadloaf_screens.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/audit_breadloaf_screens.py) | 37 | part_013.txt |
+| S078 | [validation/audit_progress.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/audit_progress.py) | 11 | part_013.txt |
+| S079 | [validation/audit_spm_ripple.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/audit_spm_ripple.py) | 114 | part_013.txt |
+| S080 | [validation/background_validation.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/background_validation.py) | 182 | part_013.txt |
+| S081 | [validation/benchmark_control_airgap.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/benchmark_control_airgap.py) | 84 | part_013.txt |
+| S082 | [validation/breadloaf_boundary.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/breadloaf_boundary.py) | 39 | part_013.txt |
+| S083 | [validation/breadloaf_bundle_routing.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/breadloaf_bundle_routing.py) | 115 | part_014.txt |
+| S084 | [validation/breadloaf_clearance_refinement.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/breadloaf_clearance_refinement.py) | 100 | part_014.txt |
+| S085 | [validation/breadloaf_coil_assignment.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/breadloaf_coil_assignment.py) | 158 | part_014.txt |
+| S086 | [validation/breadloaf_conductor_audit.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/breadloaf_conductor_audit.py) | 145 | part_014.txt |
+| S087 | [validation/breadloaf_continuous_packing.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/breadloaf_continuous_packing.py) | 214 | part_015.txt |
+| S088 | [validation/breadloaf_end_routing.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/breadloaf_end_routing.py) | 180 | part_015.txt |
+| S089 | [validation/breadloaf_flux_probe.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/breadloaf_flux_probe.py) | 267 | part_015.txt |
+| S090 | [validation/breadloaf_frequency_loss.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/breadloaf_frequency_loss.py) | 37 | part_016.txt |
+| S091 | [validation/breadloaf_grid_packing.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/breadloaf_grid_packing.py) | 131 | part_016.txt |
+| S092 | [validation/breadloaf_gui.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/breadloaf_gui.py) | 315 | part_016.txt |
+| S093 | [validation/breadloaf_inductance.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/breadloaf_inductance.py) | 155 | part_016.txt |
+| S094 | [validation/breadloaf_inductance_comparison.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/breadloaf_inductance_comparison.py) | 152 | part_017.txt |
+| S095 | [validation/breadloaf_leakage_geometry.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/breadloaf_leakage_geometry.py) | 170 | part_017.txt |
+| S096 | [validation/breadloaf_local_model.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/breadloaf_local_model.py) | 122 | part_017.txt |
+| S097 | [validation/breadloaf_loss_dataset.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/breadloaf_loss_dataset.py) | 57 | part_017.txt |
+| S098 | [validation/breadloaf_operating_comparison.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/breadloaf_operating_comparison.py) | 56 | part_017.txt |
+| S099 | [validation/breadloaf_packing_selection.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/breadloaf_packing_selection.py) | 44 | part_017.txt |
+| S100 | [validation/breadloaf_pwm_preview.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/breadloaf_pwm_preview.py) | 232 | part_018.txt |
+| S101 | [validation/breadloaf_pwm_reference.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/breadloaf_pwm_reference.py) | 77 | part_018.txt |
+| S102 | [validation/breadloaf_pwm_screen.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/breadloaf_pwm_screen.py) | 118 | part_018.txt |
+| S103 | [validation/breadloaf_remaining_review.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/breadloaf_remaining_review.py) | 89 | part_018.txt |
+| S104 | [validation/breadloaf_request.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/breadloaf_request.py) | 101 | part_018.txt |
+| S105 | [validation/breadloaf_route_adjustment.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/breadloaf_route_adjustment.py) | 144 | part_019.txt |
+| S106 | [validation/breadloaf_route_conflicts.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/breadloaf_route_conflicts.py) | 98 | part_019.txt |
+| S107 | [validation/breadloaf_screens.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/breadloaf_screens.py) | 114 | part_019.txt |
+| S108 | [validation/breadloaf_search_space.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/breadloaf_search_space.py) | 50 | part_019.txt |
+| S109 | [validation/breadloaf_shaft_control.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/breadloaf_shaft_control.py) | 75 | part_019.txt |
+| S110 | [validation/breadloaf_slot_detail.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/breadloaf_slot_detail.py) | 205 | part_019.txt |
+| S111 | [validation/breadloaf_transition_routing.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/breadloaf_transition_routing.py) | 147 | part_020.txt |
+| S112 | [validation/breadloaf_workflow.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/breadloaf_workflow.py) | 114 | part_020.txt |
+| S113 | [validation/build_rotor_catalog.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/build_rotor_catalog.py) | 129 | part_020.txt |
+| S114 | [validation/calibrate_surface_parallel.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/calibrate_surface_parallel.py) | 53 | part_020.txt |
+| S115 | [validation/capture_error.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/capture_error.py) | 38 | part_020.txt |
+| S116 | [validation/compare_surface_shapes.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/compare_surface_shapes.py) | 46 | part_020.txt |
+| S117 | [validation/csv_metadata.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/csv_metadata.py) | 62 | part_020.txt |
+| S118 | [validation/design_job.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/design_job.py) | 242 | part_021.txt |
+| S119 | [validation/detailed_review.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/detailed_review.py) | 41 | part_021.txt |
+| S120 | [validation/detailed_spm_plan.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/detailed_spm_plan.py) | 63 | part_021.txt |
+| S121 | [validation/dimension_grid.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/dimension_grid.py) | 34 | part_021.txt |
+| S122 | [validation/dismiss_owned_error.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/dismiss_owned_error.py) | 14 | part_021.txt |
+| S123 | [validation/export_csv.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/export_csv.py) | 67 | part_021.txt |
+| S124 | [validation/export_pole_slot_review.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/export_pole_slot_review.py) | 17 | part_021.txt |
+| S125 | [validation/final_validation.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/final_validation.py) | 19 | part_021.txt |
+| S126 | [validation/magnet_boundary_check.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/magnet_boundary_check.py) | 79 | part_021.txt |
+| S127 | [validation/mesh_review.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/mesh_review.py) | 114 | part_021.txt |
+| S128 | [validation/motorcad_adapter.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/motorcad_adapter.py) | 45 | part_022.txt |
+| S129 | [validation/motorcad_open.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/motorcad_open.py) | 87 | part_022.txt |
+| S130 | [validation/native_torque_feedback.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/native_torque_feedback.py) | 35 | part_022.txt |
+| S131 | [validation/native_winding_review.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/native_winding_review.py) | 68 | part_022.txt |
+| S132 | [validation/optimize_breadloaf_ripple.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/optimize_breadloaf_ripple.py) | 202 | part_022.txt |
+| S133 | [validation/pilot_4p.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/pilot_4p.py) | 8 | part_022.txt |
+| S134 | [validation/pilot_arc120.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/pilot_arc120.py) | 8 | part_022.txt |
+| S135 | [validation/pilot_corrected.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/pilot_corrected.py) | 8 | part_022.txt |
+| S136 | [validation/plan_spm_interaction.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/plan_spm_interaction.py) | 65 | part_022.txt |
+| S137 | [validation/plan_spm_range_probe.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/plan_spm_range_probe.py) | 41 | part_022.txt |
+| S138 | [validation/prepare_breadloaf_current_feedback.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/prepare_breadloaf_current_feedback.py) | 65 | part_022.txt |
+| S139 | [validation/prepare_breadloaf_loss_B.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/prepare_breadloaf_loss_B.py) | 79 | part_022.txt |
+| S140 | [validation/prepare_breadloaf_verification.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/prepare_breadloaf_verification.py) | 71 | part_023.txt |
+| S141 | [validation/prepare_spm_ripple_recovery.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/prepare_spm_ripple_recovery.py) | 65 | part_023.txt |
+| S142 | [validation/probe_breadloaf_geometry.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/probe_breadloaf_geometry.py) | 57 | part_023.txt |
+| S143 | [validation/probe_model.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/probe_model.py) | 20 | part_023.txt |
+| S144 | [validation/probe_rotor_type_geometry.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/probe_rotor_type_geometry.py) | 39 | part_023.txt |
+| S145 | [validation/read_startup.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/read_startup.py) | 17 | part_023.txt |
+| S146 | [validation/refine_breadloaf_ripple.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/refine_breadloaf_ripple.py) | 99 | part_023.txt |
+| S147 | [validation/report_grid_review.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/report_grid_review.py) | 138 | part_023.txt |
+| S148 | [validation/review_breadloaf_verification.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/review_breadloaf_verification.py) | 80 | part_023.txt |
+| S149 | [validation/review_saved_job.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/review_saved_job.py) | 48 | part_023.txt |
+| S150 | [validation/review_spm_saturation.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/review_spm_saturation.py) | 92 | part_024.txt |
+| S151 | [validation/rotor_mapping_session.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/rotor_mapping_session.py) | 29 | part_024.txt |
+| S152 | [validation/run_detailed_spm_batch.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/run_detailed_spm_batch.py) | 126 | part_024.txt |
+| S153 | [validation/run_spm_ripple_recovery.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/run_spm_ripple_recovery.py) | 142 | part_024.txt |
+| S154 | [validation/run_validation.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/run_validation.py) | 36 | part_024.txt |
+| S155 | [validation/run_validation_400v.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/run_validation_400v.py) | 37 | part_024.txt |
+| S156 | [validation/spm_ripple.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/spm_ripple.py) | 149 | part_024.txt |
+| S157 | [validation/spm_ripple_calibration.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/spm_ripple_calibration.py) | 67 | part_024.txt |
+| S158 | [validation/spm_ripple_operating_point.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/spm_ripple_operating_point.py) | 54 | part_025.txt |
+| S159 | [validation/study_breadloaf_operating_point.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/study_breadloaf_operating_point.py) | 61 | part_025.txt |
+| S160 | [validation/study_io.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/study_io.py) | 36 | part_025.txt |
+| S161 | [validation/summarize_low_voltage.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/summarize_low_voltage.py) | 42 | part_025.txt |
+| S162 | [validation/summarize_validation.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/summarize_validation.py) | 45 | part_025.txt |
+| S163 | [validation/task_adapters.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/task_adapters.py) | 91 | part_025.txt |
+| S164 | [validation/task_queue.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/task_queue.py) | 138 | part_025.txt |
+| S165 | [validation/task_store.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/task_store.py) | 291 | part_026.txt |
+| S166 | [validation/test_audit_spm_ripple.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/test_audit_spm_ripple.py) | 26 | part_026.txt |
+| S167 | [validation/test_background_validation.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/test_background_validation.py) | 15 | part_026.txt |
+| S168 | [validation/test_breadloaf_boundary.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/test_breadloaf_boundary.py) | 37 | part_026.txt |
+| S169 | [validation/test_breadloaf_bundle_routing.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/test_breadloaf_bundle_routing.py) | 49 | part_026.txt |
+| S170 | [validation/test_breadloaf_clearance_refinement.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/test_breadloaf_clearance_refinement.py) | 59 | part_026.txt |
+| S171 | [validation/test_breadloaf_coil_assignment.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/test_breadloaf_coil_assignment.py) | 75 | part_026.txt |
+| S172 | [validation/test_breadloaf_conductor_audit.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/test_breadloaf_conductor_audit.py) | 66 | part_026.txt |
+| S173 | [validation/test_breadloaf_continuous_packing.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/test_breadloaf_continuous_packing.py) | 62 | part_026.txt |
+| S174 | [validation/test_breadloaf_end_routing.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/test_breadloaf_end_routing.py) | 62 | part_026.txt |
+| S175 | [validation/test_breadloaf_flux_probe.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/test_breadloaf_flux_probe.py) | 86 | part_027.txt |
+| S176 | [validation/test_breadloaf_grid_packing.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/test_breadloaf_grid_packing.py) | 58 | part_027.txt |
+| S177 | [validation/test_breadloaf_gui.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/test_breadloaf_gui.py) | 57 | part_027.txt |
+| S178 | [validation/test_breadloaf_inductance.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/test_breadloaf_inductance.py) | 44 | part_027.txt |
+| S179 | [validation/test_breadloaf_inductance_comparison.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/test_breadloaf_inductance_comparison.py) | 62 | part_027.txt |
+| S180 | [validation/test_breadloaf_leakage_geometry.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/test_breadloaf_leakage_geometry.py) | 72 | part_027.txt |
+| S181 | [validation/test_breadloaf_local_model.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/test_breadloaf_local_model.py) | 42 | part_027.txt |
+| S182 | [validation/test_breadloaf_loss_B.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/test_breadloaf_loss_B.py) | 55 | part_027.txt |
+| S183 | [validation/test_breadloaf_operating_comparison.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/test_breadloaf_operating_comparison.py) | 56 | part_027.txt |
+| S184 | [validation/test_breadloaf_packing_selection.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/test_breadloaf_packing_selection.py) | 43 | part_027.txt |
+| S185 | [validation/test_breadloaf_pwm_direct.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/test_breadloaf_pwm_direct.py) | 59 | part_027.txt |
+| S186 | [validation/test_breadloaf_pwm_preview.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/test_breadloaf_pwm_preview.py) | 55 | part_027.txt |
+| S187 | [validation/test_breadloaf_pwm_reference.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/test_breadloaf_pwm_reference.py) | 47 | part_027.txt |
+| S188 | [validation/test_breadloaf_pwm_screen.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/test_breadloaf_pwm_screen.py) | 75 | part_027.txt |
+| S189 | [validation/test_breadloaf_refinement.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/test_breadloaf_refinement.py) | 18 | part_027.txt |
+| S190 | [validation/test_breadloaf_remaining_review.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/test_breadloaf_remaining_review.py) | 49 | part_028.txt |
+| S191 | [validation/test_breadloaf_request.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/test_breadloaf_request.py) | 63 | part_028.txt |
+| S192 | [validation/test_breadloaf_route_adjustment.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/test_breadloaf_route_adjustment.py) | 43 | part_028.txt |
+| S193 | [validation/test_breadloaf_route_conflicts.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/test_breadloaf_route_conflicts.py) | 47 | part_028.txt |
+| S194 | [validation/test_breadloaf_screens.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/test_breadloaf_screens.py) | 52 | part_028.txt |
+| S195 | [validation/test_breadloaf_search.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/test_breadloaf_search.py) | 71 | part_028.txt |
+| S196 | [validation/test_breadloaf_search_space.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/test_breadloaf_search_space.py) | 69 | part_028.txt |
+| S197 | [validation/test_breadloaf_shaft_control.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/test_breadloaf_shaft_control.py) | 54 | part_028.txt |
+| S198 | [validation/test_breadloaf_slot_detail.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/test_breadloaf_slot_detail.py) | 69 | part_028.txt |
+| S199 | [validation/test_breadloaf_transition_routing.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/test_breadloaf_transition_routing.py) | 46 | part_028.txt |
+| S200 | [validation/test_breadloaf_workflow.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/test_breadloaf_workflow.py) | 55 | part_028.txt |
+| S201 | [validation/test_controller_limits.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/test_controller_limits.py) | 79 | part_028.txt |
+| S202 | [validation/test_core_contracts.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/test_core_contracts.py) | 106 | part_028.txt |
+| S203 | [validation/test_design_job.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/test_design_job.py) | 34 | part_029.txt |
+| S204 | [validation/test_detailed_spm_analysis.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/test_detailed_spm_analysis.py) | 34 | part_029.txt |
+| S205 | [validation/test_detailed_spm_recipe.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/test_detailed_spm_recipe.py) | 66 | part_029.txt |
+| S206 | [validation/test_dimension_grid.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/test_dimension_grid.py) | 16 | part_029.txt |
+| S207 | [validation/test_flux_limits.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/test_flux_limits.py) | 43 | part_029.txt |
+| S208 | [validation/test_formula_workflow.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/test_formula_workflow.py) | 121 | part_029.txt |
+| S209 | [validation/test_magnet_boundary_check.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/test_magnet_boundary_check.py) | 45 | part_029.txt |
+| S210 | [validation/test_native_torque_feedback.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/test_native_torque_feedback.py) | 27 | part_029.txt |
+| S211 | [validation/test_native_winding_review.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/test_native_winding_review.py) | 36 | part_029.txt |
+| S212 | [validation/test_operating_control.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/test_operating_control.py) | 81 | part_029.txt |
+| S213 | [validation/test_result_review.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/test_result_review.py) | 51 | part_029.txt |
+| S214 | [validation/test_review_fixes.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/test_review_fixes.py) | 125 | part_029.txt |
+| S215 | [validation/test_rotor_catalog.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/test_rotor_catalog.py) | 93 | part_029.txt |
+| S216 | [validation/test_spm_geometry.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/test_spm_geometry.py) | 80 | part_030.txt |
+| S217 | [validation/test_spm_interaction_analysis.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/test_spm_interaction_analysis.py) | 45 | part_030.txt |
+| S218 | [validation/test_spm_interaction_plan.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/test_spm_interaction_plan.py) | 25 | part_030.txt |
+| S219 | [validation/test_spm_ripple.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/test_spm_ripple.py) | 68 | part_030.txt |
+| S220 | [validation/test_spm_ripple_calibration.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/test_spm_ripple_calibration.py) | 38 | part_030.txt |
+| S221 | [validation/test_spm_ripple_operating_point.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/test_spm_ripple_operating_point.py) | 43 | part_030.txt |
+| S222 | [validation/test_spm_saturation_review.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/test_spm_saturation_review.py) | 30 | part_030.txt |
+| S223 | [validation/test_task_queue.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/test_task_queue.py) | 163 | part_030.txt |
+| S224 | [validation/test_topology_study.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/test_topology_study.py) | 42 | part_030.txt |
+| S225 | [validation/test_verification_conditions.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/test_verification_conditions.py) | 26 | part_030.txt |
+| S226 | [validation/test_voltage_fallback.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/test_voltage_fallback.py) | 30 | part_030.txt |
+| S227 | [validation/test_winding_layout.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/test_winding_layout.py) | 33 | part_030.txt |
+| S228 | [validation/topology_study.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/topology_study.py) | 157 | part_030.txt |
+| S229 | [validation/validate_candidates.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/validate_candidates.py) | 25 | part_030.txt |
+| S230 | [validation/validate_spm_ripple.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/validate_spm_ripple.py) | 195 | part_031.txt |
+| S231 | [validation/verification_scope.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/verification_scope.py) | 33 | part_031.txt |
+| S232 | [validation/verify_spm_mapping.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/verify_spm_mapping.py) | 24 | part_031.txt |
+| S233 | [verify_library.py](https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/verify_library.py) | 43 | part_031.txt |
+
+## 업데이트
+
+소스 커밋을 고정한 패키지입니다. 재생성 전 기존 ai_review 폴더를 명시적으로 보관하고 다음 명령을 사용합니다.
+
+```powershell
+python tools/build_ai_review.py --ref <검토할-커밋>
+```

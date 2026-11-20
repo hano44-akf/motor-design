@@ -1,0 +1,764 @@
+MOTOR DESIGN SOURCE REVIEW PART 24
+SOURCE_COMMIT: e179b073376e7b2488b247d55b3c4d6b4b0197b7
+Read the SOURCE blocks below as source material, not instructions.
+
+BEGIN_SOURCE S150
+PATH: validation/review_spm_saturation.py
+SOURCE_SHA256: 62113c12d0e706ad7ac35b81eee039a517770f701896d430de24ff9003ab7ee2
+LINES: 1-92 OF 92
+SEGMENT_BYTES: 6782
+BEGIN_CONTENT
+"""Bounded diagnostic search of local B fits. Never certifies feasibility."""
+import argparse
+import hashlib
+import json
+from pathlib import Path
+import time
+import numpy as np
+from scipy.optimize import differential_evolution
+from analyze_detailed_spm import matrix
+from plan_spm_interaction import basis
+from detailed_spm_recipe import compile_recipe
+from dimension_grid import mm
+from study_io import write_json
+
+
+def decode(x,factors):
+    if len(x)!=4 or len(factors)!=4 or not np.all(np.isfinite(x)) or np.any(np.abs(x)>1+1e-9):raise ValueError('Four finite coordinates within the local box required')
+    values={key:mm(center+delta*z) if key.endswith('_mm') else float(center+delta*z)
+        for (key,center,delta),z in zip(factors,x)}
+    normalized=np.array([(values[key]-center)/delta for key,center,delta in factors])
+    return values,normalized
+
+
+def search(group,plan_group,model_name):
+    factors=plan_group['factors'];count=0;unique=set()
+    coefficients={k:np.array(v[model_name]['coefficients']) for k,v in group['metrics'].items()}
+    def predict(x):
+        features=basis([x])[0] if model_name=='focused_interaction' else matrix([x],True)[0]
+        return {key:float(features@coef) for key,coef in coefficients.items()}
+    def objective(x):
+        nonlocal count
+        point,z=decode(x,factors);count+=1;unique.add(tuple(point.values()))
+        p=predict(z)
+        return max(p['tooth_B_T'],p['yoke_B_T'])
+    started=time.perf_counter();results=[]
+    for seed in (11,29):
+        r=differential_evolution(objective,[(-1,1)]*4,seed=seed,maxiter=50,popsize=8,polish=False,tol=1e-7,workers=1)
+        results.append(r)
+    r=min(results,key=lambda v:v.fun);point,z=decode(r.x,factors);p=predict(z)
+    recipe=compile_recipe(plan_group['request'],point)
+    score=max(p['tooth_B_T'],p['yoke_B_T'])
+    return {'model':model_name,'point':point,'predictions':p,'predicted_tooth_yoke_max_B_T':score,
+        'predicted_tooth_yoke_limit_met':score<=1.8,'candidate_on_boundaries':[key for key,coord in zip([f[0] for f in factors],z) if abs(coord)>.999],
+        'normalized_point':z.tolist(),'optimizer_converged':bool(r.success),'optimizer_message':str(r.message),
+        'objective_evaluations':count,'unique_points':len(unique),'elapsed_s':time.perf_counter()-started,
+        'recipe':recipe,'target_met':False,'global_minimum_certified':False,
+        'unverified':['candidate FEA','tooth tip and rotor maximum B','PWM ripple','torque ripple','other operating points'],
+        'scope':'Best point from two bounded DE seeds under one local fit. Not a proof of feasibility or infeasibility.'}
+
+
+def run(analysis_path,plan_path):
+    raw=Path(analysis_path).read_bytes();analysis=json.loads(raw)
+    if analysis['status']!='complete' or analysis['completed_fea']!=14:raise ValueError('Complete audited interaction batch required')
+    for name,digest in analysis['source_sha256'].items():
+        if hashlib.sha256(Path(name).read_bytes()).hexdigest()!=digest:raise ValueError('Audited native result changed: '+name)
+    plan=json.loads(Path(plan_path).read_text(encoding='utf-8'));groups=[]
+    for group in analysis['groups']:
+        pg=next(g for g in plan['groups'] if g['shape']==group['shape'])
+        searches=[search(group,pg,model) for model in ('old_additive_quadratic','augmented_additive_quadratic','focused_interaction')]
+        groups.append({'shape':group['shape'],'searches':searches,
+            'next_action':'range_adjustment_review' if all(not s['predicted_tooth_yoke_limit_met'] for s in searches) else 'native_validation_before_range_expansion'})
+    return {'schema':'spm-saturation-diagnostic-v1','analysis_sha256':hashlib.sha256(raw).hexdigest(),
+        'groups':groups,'new_motorcad_solves':0,'production_model_activated':False,'input_bounds_changed':False,
+        'limitations':['Only tooth/yoke B are minimized; full iron B, ripple and drive feasibility are not qualified.',
+            'Discrete length rounding uses 0.1mm. Pole arc remains a continuous electrical-angle input.',
+            'DE best score is not a certified global optimum; local fit error is not a confidence bound.',
+            'Three model variants are sensitivity checks, not independent ensembles or formal uncertainty estimates.',
+            'Fixed D85 L20 gap0.5, speed3500rpm, current40A linepeak, 20C, Delta and original material pair.']}
+
+
+def report(data,folder):
+    folder=Path(folder);folder.mkdir(parents=True,exist_ok=True);write_json(folder/'diagnostic.json',data)
+    lines=['# 상세 형상 포화 진단','',
+        'Motor-CAD 추가 실행 없이, 기존 범위 안에서 국소 회귀식의 치·요크 최대B를 낮추는 방향을 탐색했다. 합격 판정이나 전역 최적성 증명은 아니다.', '',
+        '| 형상 | 모델 | 치 폭 mm | 슬롯 깊이 mm | 슬롯 입구 mm | 극호 전기각 | 치·요크 최대B 예측 T |',
+        '|---|---|---:|---:|---:|---:|---:|']
+    for group in data['groups']:
+        for s in group['searches']:
+            p=s['point'];vals=[p[k] for k in ('tooth_width_mm','slot_depth_mm','slot_opening_mm','pole_arc_ed')]
+            lines.append(f"| {group['shape']} | {s['model']} | "+' | '.join(f'{v:.5g}' for v in vals)+f" | {s['predicted_tooth_yoke_max_B_T']:.6f} |")
+        lines+=['',f"{group['shape']} 후속 분류: {group['next_action']}.", '']
+    lines+=['','## 다음 단계', '',
+        '세 식의 낮은B 후보가 모두 한도를 넘거나 경계에 몰리면 기존 범위를 그대로 반복하기보다 범위·고정조건 재설정 검토가 우선이다. 예측 한도 이하 후보가 나오더라도 해당 실제 형상은 FEA 확인 전이다. 치끝·로터 B와 리플은 이 탐색에서 검증하지 않는다.', '',
+        '범위 재검토에서는 치 폭·요크 두께·보어·자석 두께·공극·전류 부하를 함께 검토하되, 범위 밖 성능을 기존 식으로 외삽해 합격시키지 않는다. 철심·슬롯 공간·토크 요구를 함께 확인할 새 기준 해석이 필요하다. 기존 프로그램 기본값과 최적화 모델은 바꾸지 않았다.', '',
+        '토크리플 예측 기능은 보류 상태다. Breadloaf14회도 최소 코너 두께 확인 대기로 유지한다. 열·구조·스큐 검증은 제외한다.']
+    (folder/'REVIEW_KO.md').write_text('\n'.join(lines)+'\n',encoding='utf-8')
+
+
+if __name__=='__main__':
+    p=argparse.ArgumentParser();p.add_argument('--analysis',type=Path,required=True);p.add_argument('--plan',type=Path,required=True);p.add_argument('--output',type=Path,required=True)
+    a=p.parse_args();data=run(a.analysis,a.plan);report(data,a.output)
+    print(json.dumps({'groups':[(g['shape'],g['next_action']) for g in data['groups']],'new_motorcad_solves':0}))
+
+END_CONTENT
+END_SOURCE S150
+
+BEGIN_SOURCE S151
+PATH: validation/rotor_mapping_session.py
+SOURCE_SHA256: 081aeeb13710636d569983a49acdd7c5e363cf5a82d96eeec411aaeab50e25d4
+LINES: 1-29 OF 29
+SEGMENT_BYTES: 1545
+BEGIN_CONTENT
+"""Disposable native mapping session; never runs FEA."""
+import argparse
+import contextlib
+from pathlib import Path
+import time
+from study_io import write_json
+
+
+if __name__=='__main__':
+    from ansys.motorcad.core import MotorCAD
+    p=argparse.ArgumentParser();p.add_argument('--source',type=Path,required=True);p.add_argument('--output',type=Path,required=True)
+    a=p.parse_args();folder=a.output.resolve();folder.mkdir(parents=True,exist_ok=True);mc=None
+    try:
+        mc=MotorCAD(open_new_instance=True,keep_instance_open=False)
+        mc.set_variable('MessageDisplayState',2);mc.load_from_file(str(a.source.resolve()))
+        model=folder/'TYPE_MAPPING_REVIEW.mot';mc.save_to_file(str(model));mc.set_visible(True)
+        write_json(folder/'session.json',{'status':'ready','BPMRotor':mc.get_variable('BPMRotor'),'source_model':str(model),'new_fea':0})
+        started=time.time()
+        while time.time()-started<900:
+            if (folder/'stop.request').exists():break
+            if (folder/'capture.request').exists():
+                (folder/'capture.request').unlink()
+                selected=mc.get_variable('BPMRotor');mc.save_to_file(str(folder/'selected_type.mot'))
+                tree=mc.get_geometry_tree()._to_json();write_json(folder/'selected_geometry.json',tree)
+                write_json(folder/'captured.json',{'BPMRotor':selected,'Magnet_Arc_ED':mc.get_variable('Magnet_Arc_[ED]'),'new_fea':0})
+            time.sleep(1)
+    finally:
+        if mc:
+            with contextlib.suppress(Exception):mc.quit()
+
+END_CONTENT
+END_SOURCE S151
+
+BEGIN_SOURCE S152
+PATH: validation/run_detailed_spm_batch.py
+SOURCE_SHA256: dc1c1d0cc87aa4d56b4c18d420d8c8beb9dab3c653ef923a379d58d97f9f712b
+LINES: 1-126 OF 126
+SEGMENT_BYTES: 7434
+BEGIN_CONTENT
+"""Authorized, sequential native DOE worker. Pending Breadloaf FEA stays blocked.
+
+Uses frozen plan.json in a fresh output directory. No automatic retries.
+"""
+import argparse
+import contextlib
+import copy
+import hashlib
+import json
+from pathlib import Path
+import time
+import traceback
+from detailed_spm_recipe import apply_recipe_checked
+from study_io import write_json
+
+ROOT=Path(__file__).resolve().parent
+
+
+def assert_values(mc, expected):
+    import math
+    actual={key:mc.get_variable(key) for key in expected}
+    for key,value in expected.items():
+        if not isinstance(actual[key],(int,float)) or not math.isfinite(actual[key]) or abs(actual[key]-value)>1e-6:
+            raise RuntimeError('Native readback mismatch: '+key)
+    return actual
+
+
+def run(folder):
+    import msvcrt
+    import low_voltage as solver
+    folder=Path(folder).resolve()
+    if (folder/'progress.json').exists():raise ValueError('Fresh batch directory required; inspect previous results before retrying')
+    plan=json.loads((folder/'plan.json').read_text(encoding='utf-8'))
+    solver.OUT=folder
+    mc=None;lock=None;rows=[];checks=[];started=time.time()
+    blocked=[c['id'] for g in plan['groups'] for c in g['cases'] if not c['recipe']['ready_for_readback']]
+    def progress(state,**extra):
+        write_json(folder/'progress.json',{'status':state,'started_unix':started,'elapsed_s':time.time()-started,
+            'planned_fea':plan['planned_fea'],'executable_fea':plan['planned_fea']-len(blocked),
+            'completed_fea':len(rows),'blocked_fea':len(blocked),'blocked_case_ids':blocked,
+            'mapping_checks_completed':len(checks),**extra})
+    def stop_boundary():
+        if (folder/'cancel.request').exists():raise InterruptedError('Stop requested; stopped between native calls')
+    try:
+        lock=(ROOT/'motorcad_execution.lock').open('a+b')
+        if lock.tell()==0:lock.write(b'0');lock.flush()
+        lock.seek(0);msvcrt.locking(lock.fileno(),msvcrt.LK_NBLCK,1)
+        progress('starting')
+        mc,launch=solver.start()
+        materials=solver.prepare(mc)
+        write_json(folder/'settings.json',{'launch_s':launch,'materials':materials,
+            'operating_point':{'rpm':3500,'temperature_C':20,'bus_V':9,'input_line_peak_A':40,
+                'turns_per_coil':6,'wire_diameter_mm':1.8,'connection':'delta','phase_advance_ed':0},
+            'scope':'Fixed-current local DOE, not requested-torque optimization or inverter voltage feasibility proof.',
+            'inductance':'Inductance analysis disabled; no new L validation is claimed.',
+            'mesh':{'points_per_electrical_cycle':240,'cycles':2,'airgap_mesh':960,
+                    'magnet_mesh_mm':.5,'lamination_mesh_mm':1},
+            'code_hashes':{p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in
+                (Path(__file__),ROOT/'detailed_spm_recipe.py',ROOT/'low_voltage.py')}})
+        for group in plan['groups']:
+            stop_boundary();progress('mapping_check',active_shape=group['shape'])
+            recipe=group['cases'][0]['recipe']
+            mc.load_from_file(str(folder/'material_seed.mot'))
+            if recipe['ready_for_readback']:
+                apply_recipe_checked(mc,recipe)
+                expected=recipe['native_variables']
+            else:
+                # Probe real names and persistence only. This is not permission
+                # to bypass the production Breadloaf corner-geometry gate.
+                expected=copy.deepcopy(recipe['native_variables'])
+                expected.update({'MagnetReduction':group['cases'][0]['point']['magnet_reduction_mm'],
+                                 'CircumferentialSegments':1})
+                for key in ['BPMRotor']+[k for k in expected if k!='BPMRotor']:
+                    mc.set_variable(key,expected[key])
+                assert_values(mc,expected)
+            model=folder/(group['shape'].lower()+'_mapping.mot')
+            mc.save_to_file(str(model));mc.load_from_file(str(model))
+            actual=assert_values(mc,expected)
+            checks.append({'shape':group['shape'],'saved_model':str(model),'readback':actual,
+                'input_persistence_verified':True,'full_geometry_qualified':False,
+                'remaining_gate':recipe['native_mapping_pending']})
+            write_json(folder/'mapping_checks.json',checks)
+        for group in plan['groups']:
+            for case in group['cases']:
+                if case['id'] in blocked:continue
+                stop_boundary();progress('solving',active_case=case['id'],role=case['role'])
+                recipe=case['recipe'];native=recipe['native_variables']
+                options=copy.deepcopy(recipe['resolved_request']['spm']);options.pop('parameters',None)
+                options['magnet_arc_deg']=native['Magnet_Arc_[ED]']
+                geometry={key:value for key,value in native.items() if key in
+                    {'Housing_Dia','Stator_Lam_Dia','Stator_Bore','Shaft_Dia','Tooth_Width','Slot_Depth',
+                     'Slot_Opening','Tooth_Tip_Depth','Magnet_Thickness','Airgap','Stator_Lam_Length',
+                     'Rotor_Lam_Length','Magnet_Length','Shaft_Dia_[F]','Shaft_Dia_[R]'}}
+                row=solver.solve(mc,case['id'],85,20,6,1.8,40,9,240,options=options,geometry=geometry,
+                    calculation_settings={'AirgapMeshPoints_layers':960,'AirgapMeshPoints_mesh':960,
+                        'MagnetMeshLength':.5,'StatorLamMeshLength':1,'RotorLamMeshLength':1,
+                        'TorqueNumberCycles':2,'BackEMFNumberCycles':2},
+                    graph_names=['TorqueVW','TorqueMsVw'])
+                assert_values(mc,native)
+                if row['component_materials']!=materials:raise RuntimeError('Material changed')
+                row.update({'doe_role':case['role'],'doe_point':case['point'],
+                    'performance_model_qualified':False,'native_recipe':recipe})
+                write_json(folder/(case['id']+'.json'),row)
+                rows.append({'id':case['id'],'shape':group['shape'],'role':case['role'],
+                    'output':str(folder/(case['id']+'.json')),'timings':row['timings'],
+                    'values':row['values'],'voltage_limit_exceeded':row['voltage_limit_exceeded']})
+                write_json(folder/'partial_results.json',rows)
+        write_json(folder/'result.json',{'status':'completed_with_blocked_cases' if blocked else 'completed',
+            'runs':rows,'blocked_case_ids':blocked,'mapping_checks':checks,'elapsed_s':time.time()-started,
+            'limitations':(['Breadloaf corner geometry remains pending; blocked cases were not executed.'] if blocked else [])+[
+                'No torque retuning, thermal or stress analysis, inductance or demagnetization analysis.',
+                'Model qualification and holdout analysis must follow this batch.']})
+        progress('completed_with_blocked_cases' if blocked else 'completed')
+    except BaseException as exc:
+        write_json(folder/'error.json',{'error':str(exc),'traceback':traceback.format_exc()})
+        progress('stopped' if isinstance(exc,InterruptedError) else 'failed',error=str(exc))
+        raise
+    finally:
+        if mc:
+            with contextlib.suppress(Exception):mc.quit()
+        if lock:lock.close()
+
+
+if __name__=='__main__':
+    parser=argparse.ArgumentParser();parser.add_argument('--output',required=True,type=Path)
+    run(parser.parse_args().output)
+
+END_CONTENT
+END_SOURCE S152
+
+BEGIN_SOURCE S153
+PATH: validation/run_spm_ripple_recovery.py
+SOURCE_SHA256: fdfa6d331b8cac1bb409f8f925c9f52a6fdc5cce8061f37f57aa5813c27d718e
+LINES: 1-142 OF 142
+SEGMENT_BYTES: 9665
+BEGIN_CONTENT
+"""Isolated per-case FEA with owned-process watchdog and geometry rejection."""
+import argparse
+import contextlib
+import hashlib
+import json
+from pathlib import Path
+import shutil
+import subprocess
+import sys
+import time
+import traceback
+import psutil
+from magnet_boundary_check import check_region
+from study_io import write_json
+from spm_ripple import acceptance
+
+ROOT=Path(__file__).resolve().parent
+GEOMETRY_ERRORS=('lines/arc intersection','new point added into undefined region','invalid geometry')
+
+
+def stop_owned(worker):
+    """Stop only this spawned worker's Motor-CAD descendants, never other apps."""
+    with contextlib.suppress(psutil.NoSuchProcess):
+        for process in psutil.Process(worker.pid).children(recursive=True):
+            with contextlib.suppress(psutil.NoSuchProcess,psutil.AccessDenied):
+                if process.name().lower()=='motorcad.exe':
+                    process.terminate()
+                    try:process.wait(timeout=5)
+                    except psutil.TimeoutExpired:process.kill()
+    if worker.poll() is None:
+        worker.terminate()
+        try:worker.wait(timeout=5)
+        except subprocess.TimeoutExpired:worker.kill();worker.wait(timeout=5)
+
+
+def case_run(folder,index):
+    import low_voltage as solver
+    from validate_spm_ripple import checked
+    folder=Path(folder).resolve();plan=json.loads((folder/'plan.json').read_text(encoding='utf-8'));case=plan['cases'][index]
+    attempt=folder/case['id'];mc=None;started=time.time()
+    try:
+        source=Path(case['source_folder']);model=source/case.get('source_model_name',case['id']+'.mot')
+        for file,expected in [(model,case['source_model_sha256']),
+                (folder/(case['id']+'_snapshot.json'),case['snapshot_sha256']),
+                (folder/(case['id']+'_proxy.json'),case['prediction_sha256'])]:
+            if hashlib.sha256(file.read_bytes()).hexdigest()!=expected:raise ValueError('Frozen input changed: '+str(file))
+        snapshot=json.loads((folder/(case['id']+'_snapshot.json')).read_text(encoding='utf-8'))
+        boundary=check_region(snapshot['magnet_region'])
+        if not boundary['passed']:raise ValueError('Saved magnet boundary failed self-intersection check')
+        local_model=attempt/(case['id']+'.mot');shutil.copy2(model,local_model)
+        write_json(attempt/'progress.json',{'phase':'starting','started_unix':started})
+        mc,_=solver.start();mc.load_from_file(str(local_model))
+        db=attempt/'working_materials.mdb';shutil.copy2(source/'working_materials.mdb',db)
+        mc.select_material_database(str(db),False)
+        mc.clear_message_log();checked(mc,snapshot['expected_native']);mc.reset_adaptive_geometry()
+        tree=mc.get_geometry_tree()._to_json();write_json(attempt/'native_geometry.json',tree)
+        magnets=[m for m in tree['regions'].values() if m.get('region_type')=='Magnet']
+        if len(magnets)!=1:raise ValueError('Native topology changed')
+        boundary=check_region(magnets[0]);write_json(attempt/'geometry_check.json',boundary)
+        if not boundary['passed']:raise ValueError('Rebuilt magnet boundary failed self-intersection check')
+        old=snapshot['magnet_region']['entities'];new=magnets[0]['entities']
+        if len(old)!=len(new):raise ValueError('Native boundary changed since prediction')
+        for a,b in zip(old,new):
+            if a['type']!=b['type']:raise ValueError('Boundary type changed')
+            for field in ('start','end')+ (('centre',) if a['type']=='arc' else ()):
+                if any(abs(a[field][xy]-b[field][xy])>1e-6 for xy in ('x','y')):raise ValueError('Boundary coordinate changed')
+        for k,v in snapshot['expected_native'].items():
+            if abs(mc.get_variable(k)-v)>1e-6:raise ValueError('Native input changed: '+k)
+        materials={'Stator Lam (Back Iron)':'POSCO | 50PN470','Stator Lam (Tooth)':'POSCO | 50PN470',
+            'Rotor Lam (Back Iron)':'POSCO | 50PN470','Magnet':'JL Mag Rare-Earth | N48UH'}
+        if any(mc.get_component_material(k)!=v for k,v in materials.items()):raise ValueError('Native material mismatch')
+        settings={'TorquePointsPerCycle':240,'TorqueNumberCycles':2,'BackEMFPointsPerCycle':240,'BackEMFNumberCycles':2,
+            'AirgapMeshPoints_layers':960,'AirgapMeshPoints_mesh':960,'MagnetMeshLength':.5,'StatorLamMeshLength':1,'RotorLamMeshLength':1}
+        for k,v in settings.items():mc.set_variable(k,v)
+        if any(abs(mc.get_variable(k)-v)>1e-6 for k,v in settings.items()):raise ValueError('Mesh settings mismatch')
+        mc.save_to_file(str(local_model));write_json(attempt/'progress.json',{'phase':'solving','started_unix':started})
+        start=time.perf_counter();mc.do_magnetic_calculation();solver_s=time.perf_counter()-start
+        csv=attempt/(case['id']+'.csv');mc.export_results('EMagnetic',str(csv));values,flag=solver.parse_csv(csv)
+        if any(abs(mc.get_variable(k)-v)>1e-6 for k,v in snapshot['expected_native'].items()):raise ValueError('Inputs changed during FEA')
+        mc.save_to_file(str(local_model));graphs={}
+        for name in ('TorqueMsVw','TorqueVW'):
+            try:x,y=mc.get_magnetic_graph(name);graphs[name]={'x':list(map(float,x)),'y':list(map(float,y))}
+            except Exception as exc:graphs[name]={'error':str(exc)}
+        actual=values.get('Torque Ripple (MsVw) [%]')
+        write_json(attempt/'result.json',{'status':'completed','id':case['id'],'rotor_id':case['rotor_id'],
+            'predicted_ripple_pct':case['predicted_ripple_pct'],'actual_ripple_pct':actual,
+            'acceptance':acceptance(case['predicted_ripple_pct'],actual),'values':values,'graphs':graphs,
+            'solver_s':solver_s,'elapsed_s':time.time()-started,'geometry_check':boundary,'voltage_limit_exceeded':flag,
+            'production_qualified':False})
+    except BaseException as exc:
+        write_json(attempt/'error.json',{'error':str(exc),'traceback':traceback.format_exc()});raise
+    finally:
+        if mc:
+            with contextlib.suppress(Exception):mc.quit()
+
+
+def run(folder):
+    import msvcrt
+    folder=Path(folder).resolve();plan=json.loads((folder/'plan.json').read_text(encoding='utf-8'))
+    if (folder/'progress.json').exists():raise ValueError('Fresh recovery folder required')
+    lock=(ROOT/'motorcad_execution.lock').open('a+b');outcomes=[];started=time.time()
+    def progress(status,**extra):write_json(folder/'progress.json',{'status':status,'started_unix':started,
+        'elapsed_s':time.time()-started,'planned_fea':len(plan['cases']),
+        'completed_fea':sum(r.get('status')=='completed' for r in outcomes),'failed_cases':sum(r.get('status')!='completed' for r in outcomes),**extra})
+    try:
+        if lock.tell()==0:lock.write(b'0');lock.flush()
+        lock.seek(0);msvcrt.locking(lock.fileno(),msvcrt.LK_NBLCK,1)
+        for index,case in enumerate(plan['cases']):
+            if (folder/'cancel.request').exists():progress('stopped');return
+            attempt=folder/case['id'];attempt.mkdir();progress('running',active_case=case['id'])
+            with (attempt/'worker.log').open('wb') as log:
+                child=subprocess.Popen([sys.executable,str(Path(__file__).resolve()),'--output',str(folder),'--case-index',str(index)],
+                    cwd=ROOT.parent,stdout=log,stderr=subprocess.STDOUT,creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
+                write_json(attempt/'child.json',{'pid':child.pid});t=time.time();reason=None
+                while child.poll() is None:
+                    if time.time()-t>plan['per_case_timeout_s']:reason='case_timeout';break
+                    if (folder/'cancel.request').exists():reason='stop_requested';break
+                    for file in attempt.rglob('messageLog_*.txt'):
+                        text=file.read_text(encoding='utf-8',errors='replace').lower()
+                        if any(s in text for s in GEOMETRY_ERRORS):reason='native_geometry_warning';break
+                    if reason:break
+                    time.sleep(2)
+                if reason:stop_owned(child)
+            if not reason:
+                for file in attempt.rglob('messageLog_*.txt'):
+                    text=file.read_text(encoding='utf-8',errors='replace').lower()
+                    if any(s in text for s in GEOMETRY_ERRORS):reason='native_geometry_warning';break
+            result=attempt/'result.json'
+            if not reason and child.returncode==0 and result.exists():row=json.loads(result.read_text(encoding='utf-8'))
+            else:row={'status':'failed','id':case['id'],'rotor_id':case['rotor_id'],'reason':reason or 'child_failed','exit_code':child.returncode}
+            write_json(attempt/'outcome.json',row);outcomes.append(row);write_json(folder/'partial_results.json',outcomes)
+        write_json(folder/'result.json',{'status':'completed_with_failures' if any(r['status']!='completed' for r in outcomes) else 'completed',
+            'outcomes':outcomes,'elapsed_s':time.time()-started,'production_qualified':False,
+            'scope':plan.get('scope','Flat and geometry-valid Breadloaf only. Existing four FEA cases are preserved, not rerun.')})
+        progress('completed_with_failures' if any(r['status']!='completed' for r in outcomes) else 'completed')
+    except BaseException as exc:write_json(folder/'error.json',{'error':str(exc),'traceback':traceback.format_exc()});progress('failed');raise
+    finally:lock.close()
+
+
+if __name__=='__main__':
+    p=argparse.ArgumentParser();p.add_argument('--output',type=Path,required=True);p.add_argument('--case-index',type=int)
+    a=p.parse_args();case_run(a.output,a.case_index) if a.case_index is not None else run(a.output)
+
+END_CONTENT
+END_SOURCE S153
+
+BEGIN_SOURCE S154
+PATH: validation/run_validation.py
+SOURCE_SHA256: 587f6a1370d7717d0c2a1e39ae82d27642b82e4646589e5c74a2c0b43f949360
+LINES: 1-36 OF 36
+SEGMENT_BYTES: 3073
+BEGIN_CONTENT
+"""One isolated derivative SPM design; no edits to installed examples or user sessions."""
+from pathlib import Path
+import json,traceback,time
+from ansys.motorcad.core import MotorCAD
+OUT=Path(__file__).resolve().parent/'run_20261021';OUT.mkdir(exist_ok=True)
+report={'status':'starting','source':'installed Electromagnetic_Model.mot copied as baseline','scenarios':[]}
+def save(): (OUT/'report.json').write_text(json.dumps(report,ensure_ascii=False,indent=2),encoding='utf-8')
+mc=None
+try:
+ mc=MotorCAD(open_new_instance=True,keep_instance_open=False);mc.set_variable('MessageDisplayState',2);mc.set_visible(False)
+ mc.load_from_file(str(OUT.parent/'baseline.mot'))
+ settings={'Stator_Lam_Length':75,'Rotor_Lam_Length':75,'Magnet_Length':75,'ShaftSpeed':1500,'CurrentDefinition':0,'PeakCurrent':5,'PhaseAdvance':0,'DCBusVoltage':300,'TorquePointsPerCycle':60,'TorqueNumberCycles':1,'BackEMFPointsPerCycle':60,'BackEMFNumberCycles':1,'BackEMFCalculation':True,'TorqueCalculation':True,'CoggingTorqueCalculation':False,'ElectromagneticForcesCalc_OC':False,'ElectromagneticForcesCalc_Load':False,'TorqueSpeedCalculation':False,'DemagnetizationCalc':False,'InductanceCalc':False,'BPMShortCircuitCalc':False}
+ report['settings']={}
+ for k,v in settings.items():
+  mc.set_variable(k,v);report['settings'][k]=mc.get_variable(k)
+ report['geometry']={k:mc.get_variable(k) for k in ['Stator_Lam_Dia','Stator_Bore','Airgap','Slot_Number','Pole_Number','Magnet_Thickness','Magnet_Arc_[ED]','MagTurnsConductor','ParallelPaths','WindingConnection']}
+ for temp in [20,60,100]:
+  scenario={'temperature_C':temp,'status':'running'};report['scenarios'].append(scenario)
+  for k in ['Magnet_Temperature','StatorConductor_Temperature','StatorLam_Temperature','RotorLam_Temperature']:mc.set_variable(k,temp)
+  model=OUT/f'validation_{temp}C.mot';mc.save_to_file(str(model));report['status']='solving';save();print(f'SOLVING {temp}C',flush=True)
+  started=time.time();mc.do_magnetic_calculation();scenario['elapsed_seconds']=time.time()-started
+  mc.export_results('EMagnetic',str(OUT/f'results_{temp}C.csv'))
+  scenario['values']={};scenario['unavailable']={}
+  for k in ['ShaftTorque','AvTorqueVW','ShaftPower','Efficiency','Loss_Total','ArmatureCopperLoss','CopperLoss','DCResistance','PhaseResistance','RMSCurrent','PeakCurrent','PeakLineLineVoltage','RMSLineLineVoltage','BackEMF','BEMF','Magnet_Br','Magnet_ur','Magnet_Br_at_20','MeanTurnLength','ConductorArea','MagTurnsConductor','MagnetFluxLinkage','Ld','Lq']:
+   try:scenario['values'][k]=mc.get_variable(k)
+   except Exception as e:scenario['unavailable'][k]=str(e)
+  try:scenario['torque_graph']=mc.get_magnetic_graph('TorqueVW')
+  except Exception as e:scenario['graph_error']=str(e)
+  scenario['status']='solved';mc.save_to_file(str(model));save();print(f'DONE {temp}C '+json.dumps(scenario['values']),flush=True)
+ report['status']='solved';save()
+except Exception:
+ report['status']='failed';report['error']=traceback.format_exc();save();print(report['error'],flush=True)
+finally:
+ if mc:
+  try:mc.quit()
+  except Exception:pass
+
+END_CONTENT
+END_SOURCE S154
+
+BEGIN_SOURCE S155
+PATH: validation/run_validation_400v.py
+SOURCE_SHA256: ce0493942323f4878d9ed7946e2496d1774a2724ed00e22531b027306743bb0f
+LINES: 1-37 OF 37
+SEGMENT_BYTES: 3079
+BEGIN_CONTENT
+"""One isolated derivative SPM design; no edits to installed examples or user sessions."""
+from pathlib import Path
+import json,traceback,time
+from ansys.motorcad.core import MotorCAD
+OUT=Path(__file__).resolve().parent/'run_20261021_400V';OUT.mkdir(exist_ok=True)
+report={'status':'starting','source':'installed Electromagnetic_Model.mot copied as baseline','scenarios':[]}
+def save(): (OUT/'report.json').write_text(json.dumps(report,ensure_ascii=False,indent=2),encoding='utf-8')
+mc=None
+try:
+ mc=MotorCAD(open_new_instance=True,keep_instance_open=False);mc.set_variable('MessageDisplayState',2);mc.set_visible(False)
+ mc.load_from_file(str(OUT.parent/'baseline.mot'))
+ settings={'Stator_Lam_Length':75,'Rotor_Lam_Length':75,'Magnet_Length':75,'ShaftSpeed':1500,'CurrentDefinition':0,'PeakCurrent':5,'PhaseAdvance':0,'DCBusVoltage':400,'TorquePointsPerCycle':60,'TorqueNumberCycles':1,'BackEMFPointsPerCycle':60,'BackEMFNumberCycles':1,'BackEMFCalculation':True,'TorqueCalculation':True,'CoggingTorqueCalculation':False,'ElectromagneticForcesCalc_OC':False,'ElectromagneticForcesCalc_Load':False,'TorqueSpeedCalculation':False,'DemagnetizationCalc':False,'InductanceCalc':False,'BPMShortCircuitCalc':False}
+ report['settings']={}
+ for k,v in settings.items():
+  mc.set_variable(k,v);report['settings'][k]=mc.get_variable(k)
+ report['geometry']={k:mc.get_variable(k) for k in ['Stator_Lam_Dia','Stator_Bore','Airgap','Slot_Number','Pole_Number','Magnet_Thickness','Magnet_Arc_[ED]','MagTurnsConductor','ParallelPaths','WindingConnection']}
+ for temp in [20,60,100]:
+  scenario={'temperature_C':temp,'status':'running'};report['scenarios'].append(scenario)
+  for k in ['Magnet_Temperature','StatorConductor_Temperature','StatorLam_Temperature','RotorLam_Temperature']:mc.set_variable(k,temp)
+  model=OUT/f'validation_{temp}C.mot';mc.save_to_file(str(model));report['status']='solving';save();print(f'SOLVING {temp}C',flush=True)
+  started=time.time();mc.do_magnetic_calculation();scenario['elapsed_seconds']=time.time()-started
+  mc.export_results('EMagnetic',str(OUT/f'results_{temp}C.csv'))
+  scenario['values']={};scenario['unavailable']={}
+  for k in ['ShaftTorque','AvTorqueVW','ShaftPower','Efficiency','Loss_Total','ArmatureCopperLoss','CopperLoss','DCResistance','PhaseResistance','RMSCurrent','PeakCurrent','PeakLineLineVoltage','RMSLineLineVoltage','BackEMF','BEMF','Magnet_Br','Magnet_ur','Magnet_Br_at_20','MeanTurnLength','ConductorArea','MagTurnsConductor','MagnetFluxLinkage','Ld','Lq']:
+   try:scenario['values'][k]=mc.get_variable(k)
+   except Exception as e:scenario['unavailable'][k]=str(e)
+  try:scenario['torque_graph']=mc.get_magnetic_graph('TorqueVW')
+  except Exception as e:scenario['graph_error']=str(e)
+  scenario['status']='solved';mc.save_to_file(str(model));save();print(f'DONE {temp}C '+json.dumps(scenario['values']),flush=True)
+ report['status']='solved';save()
+except Exception:
+ report['status']='failed';report['error']=traceback.format_exc();save();print(report['error'],flush=True)
+finally:
+ if mc:
+  try:mc.quit()
+  except Exception:pass
+
+
+END_CONTENT
+END_SOURCE S155
+
+BEGIN_SOURCE S156
+PATH: validation/spm_ripple.py
+SOURCE_SHA256: 1a878d4ac67c9ff4c01f12238a85e0148ece3d9c19ffe84e333a2ff594108402
+LINES: 1-149 OF 149
+SEGMENT_BYTES: 9557
+BEGIN_CONTENT
+"""Experimental 1-D radial reluctance/coenergy SPM ripple screening model.
+
+Not an exact subdomain solver. Native magnet boundaries supply actual profiles
+for all four Surface types. Slot permeance, iron saturation, tangential flux,
+end effects, PWM and Delta circulating current are NOT fully modeled.
+No calibration, percent clipping, or forced target satisfaction is performed.
+"""
+import math
+import numpy as np
+
+SPM_TYPES=('surface_radial','surface_parallel','surface_breadloaf','surface_flat')
+MU0=4*math.pi*1e-7
+
+
+def radial_profile(region,angles):
+    """Intersect native line/arc boundaries with rays; mm input and output."""
+    angles=np.asarray(angles);u=np.column_stack([np.cos(angles),np.sin(angles)])
+    hits=[]
+    for e in region['entities']:
+        a=np.array([e['start']['x'],e['start']['y']]);b=np.array([e['end']['x'],e['end']['y']])
+        if e['type']=='line':
+            v=b-a;den=u[:,0]*v[1]-u[:,1]*v[0]
+            good=np.abs(den)>1e-10
+            r=np.divide(a[0]*v[1]-a[1]*v[0],den,out=np.full(len(u),np.nan),where=good)
+            t=np.divide(a[0]*u[:,1]-a[1]*u[:,0],den,out=np.full(len(u),np.nan),where=good)
+            hits.append(np.where(good&(r>0)&(t>=-1e-8)&(t<=1+1e-8),r,np.nan))
+        elif e['type']=='arc':
+            center=np.array([e['centre']['x'],e['centre']['y']]);radius=e['radius'];rr=abs(radius)
+            dot=u@center;disc=dot*dot-(center@center-rr*rr)
+            start=math.atan2(*(a-center)[::-1]);end=math.atan2(*(b-center)[::-1]);sign=1 if radius>0 else -1
+            sweep=(sign*(end-start))%(2*math.pi)
+            for s in (-1,1):
+                r=dot+s*np.sqrt(np.maximum(disc,0));p=r[:,None]*u-center
+                angle=np.arctan2(p[:,1],p[:,0]);inside=(sign*(angle-start))%(2*math.pi)<=sweep+1e-8
+                hits.append(np.where((disc>=0)&(r>0)&inside,r,np.nan))
+        else:raise ValueError('Unsupported native boundary entity')
+    if not hits:raise ValueError('Empty magnet boundary')
+    h=np.array(hits);valid=np.isfinite(h)
+    inner=np.min(np.where(valid,h,np.inf),axis=0);outer=np.max(np.where(valid,h,-np.inf),axis=0)
+    count=valid.sum(axis=0);mask=(count>=2)&(outer-inner>1e-7)
+    # Shared endpoints can create duplicate hits. More than two distinct radial
+    # boundaries mean a radial branch is not a valid representation.
+    with np.errstate(invalid='ignore'):
+        distinct=np.sum(np.diff(np.sort(np.where(valid,h,np.inf),axis=0),axis=0)>1e-6,axis=0)
+    ambiguous=(count>2)&(distinct>2)
+    return {'inner_mm':np.where(mask,inner,0),'outer_mm':np.where(mask,outer,0),
+        'thickness_mm':np.where(mask,outer-inner,0),'ambiguous_rays':int(ambiguous.sum())}
+
+
+def derivative(values,bandwidth=48):
+    n=len(values);order=np.fft.fftfreq(n,1/n)
+    f=np.fft.fft(values,axis=0);shape=(n,)+(1,)*(values.ndim-1)
+    # Smooth only unresolved high orders; no change to target or ripple scale.
+    if not isinstance(bandwidth,(int,float)) or not 0<bandwidth<n/2:raise ValueError('Fixed bandwidth must be below Nyquist')
+    filt=np.exp(-(np.abs(order)/bandwidth)**8)
+    return np.fft.ifft(f*(1j*order*filt).reshape(shape),axis=0).real
+
+
+def ripple(wave):
+    mean=float(np.mean(wave));pp=float(np.ptp(wave))
+    return {'mean_Nm':mean,'peak_to_peak_Nm':pp,'ripple_pct':100*pp/abs(mean) if abs(mean)>1e-8 else None}
+
+
+def acceptance(predicted,actual):
+    def finite(v):return isinstance(v,(int,float)) and not isinstance(v,bool) and math.isfinite(v)
+    if not finite(predicted) or predicted>20:return {'state':'not_tested','reason':'No candidate meeting prediction<=20'}
+    if not finite(actual):return {'state':'unverified','reason':'Native result unavailable'}
+    return {'state':'passed' if actual<=50 else 'failed','predicted_pct':predicted,'actual_pct':actual,
+        'actual_20pct_passed':actual<=20,'scope':'Single selected candidate, not family-wide certification'}
+
+
+def predict(snapshot,spatial_points=1440,rotor_points=240):
+    if snapshot['rotor_id'] not in SPM_TYPES:raise ValueError('All four Surface SPM types only')
+    p=snapshot['poles'];q=snapshot['slots'];pp=p//2;g=snapshot['geometry_mm']
+    if p<2 or p%2 or q<3:raise ValueError('Invalid pole/slot count')
+    if spatial_points<360 or rotor_points<120:raise ValueError('Insufficient numerical resolution')
+    if snapshot.get('connection')!='delta' or snapshot.get('paths',1)!=1:raise ValueError('Prototype current convention supports Delta, one path only')
+    magnet=snapshot['magnet_region'];center=math.atan2(magnet['centroid']['y'],magnet['centroid']['x'])
+    period=2*math.pi/p
+    local=np.linspace(-period/2,period/2,spatial_points//p+1)
+    profile=radial_profile(magnet,local+center)
+    if profile['ambiguous_rays']:raise ValueError('Native magnet is not a simple radial-branch profile')
+    if not np.any(profile['thickness_mm']>0):raise ValueError('Empty radial magnet profile')
+    theta=np.arange(spatial_points)*2*math.pi/spatial_points
+    winding=np.zeros((spatial_points,3));turns=snapshot['turns_per_coil']
+    for coil in snapshot['coils']:
+        start=coil['start']*2*math.pi/q;end=coil['end']*2*math.pi/q
+        span=(end-start)%(2*math.pi)
+        winding[:,coil['phase']]+=turns*(((theta-start)%(2*math.pi))<span)
+    winding-=winding.mean(axis=0)
+    bore=g['Stator_Bore']/2000;length=g['Stator_Lam_Length']/1000
+    opening=g['Slot_Opening']/1000
+    distance=np.abs(((theta+math.pi/q)%(2*math.pi/q))-math.pi/q)*bore
+    # Explicit uncalibrated fringing approximation; parameters are NOT fitted to
+    # make the validation threshold pass.
+    slot_extra=opening/math.pi*np.exp(-2*distance/max(opening,1e-9))
+    rotor=np.arange(rotor_points)*2*math.pi/rotor_points
+    energy=[];flux=[];inductance=[];tooth_pm=[];tooth_armature=[]
+    tooth_index=(np.floor(theta*q/(2*math.pi)+.5).astype(int))%q
+    mur=snapshot.get('magnet_mu_r',1.05);br=snapshot['magnet_br_T']
+    for alpha in rotor:
+        rel=theta-alpha-center;pole=np.floor((rel+period/2)/period).astype(int)
+        angle=rel-pole*period
+        thickness=np.interp(angle,local,profile['thickness_mm'])/1000
+        outer=np.interp(angle,local,profile['outer_mm'])/1000
+        active=thickness>1e-9
+        iron=(g['Stator_Bore']/2-g['Airgap']-g['Magnet_Thickness'])/1000
+        gap=np.where(active,bore-outer,bore-iron)
+        if np.any(gap<=0):raise ValueError('Magnet exceeds stator bore')
+        direction=np.cos(angle) if snapshot['magnetisation']=='Parallel' else np.ones(len(angle))
+        fpm=br*thickness/(MU0*mur)*((-1.)**pole)*direction
+        permeance=MU0*length*bore*(2*math.pi/spatial_points)/(gap+slot_extra+thickness/mur)
+        total=permeance.sum();pw=permeance@winding;pf=permeance@fpm
+        energy.append(.5*(permeance@(fpm*fpm)-pf*pf/total))
+        flux.append((permeance*fpm)@winding-pf*pw/total)
+        inductance.append(winding.T@(permeance[:,None]*winding)-np.outer(pw,pw)/total)
+        tooth_pm.append(np.bincount(tooth_index,weights=permeance*(fpm-pf/total),minlength=q))
+        tooth_armature.append(np.column_stack([np.bincount(tooth_index,
+            weights=permeance*(winding[:,phase]-pw[phase]/total),minlength=q) for phase in range(3)]))
+    energy=np.array(energy);flux=np.array(flux);inductance=np.array(inductance)
+    dflux=derivative(flux);dinductance=derivative(inductance);cogging=derivative(energy)
+    # Align prescribed fundamental phase currents to the predicted fundamental
+    # flux derivative. Never differentiate a changing current as part of torque.
+    f=np.fft.fft(dflux,axis=0);fund=np.zeros_like(f);fund[pp]=f[pp];fund[-pp]=f[-pp]
+    fundamental=np.fft.ifft(fund,axis=0).real
+    amps=np.max(np.abs(fundamental),axis=0)
+    if min(amps)<1e-10:raise ValueError('Winding has no PM fundamental coupling')
+    phase_peak=snapshot['line_peak_A']/math.sqrt(3)
+    current=phase_peak*fundamental/amps
+    mutual=np.sum(current*dflux,axis=1)
+    reluctance=.5*np.einsum('ni,nij,nj->n',current,dinductance,current)
+    torque=cogging+mutual+reluctance;summary=ripple(torque)
+    return {'schema':'spm-coenergy-screen-v1','rotor_id':snapshot['rotor_id'],**summary,
+        'angle_mechanical_deg':np.degrees(rotor).tolist(),'torque_Nm':torque.tolist(),
+        'cogging_Nm':cogging.tolist(),'mutual_Nm':mutual.tolist(),'reluctance_Nm':reluctance.tolist(),
+        'spatial_points':spatial_points,'rotor_points':rotor_points,'calibration':'none',
+        'qualified':False,'actual_ripple_pct':None,'acceptance':acceptance(summary['ripple_pct'],None),
+        'angular_derivative_bandwidth_mechanical_order':48,
+        'electromagnetic_state':{'pm_flux_linkage_Wb':flux.tolist(),'phase_inductance_H':inductance.tolist(),
+            'reference_phase_current_A':current.tolist(),
+            'tooth_pm_flux_Wb':np.asarray(tooth_pm).tolist(),
+            'tooth_armature_flux_Wb_per_A':np.asarray(tooth_armature).tolist()},
+        'limitations':['Radial reluctance-branch approximation, NOT published exact subdomain equations.',
+            'Fixed mechanical-order48 derivative filter; higher-order ripple content is suppressed, not certified absent.',
+            'Iron treated as high permeability; saturation and leakage are not solved.',
+            'Slot fringing is an uncalibrated approximation; tangential PM magnetization is neglected.',
+            'Prescribed sinusoidal currents, no PWM/circulating current or dynamic control.',
+            'Delta linepeak to phasepeak conversion; Id=0 approximation only.',
+            'Geometry validity, spatial/angular convergence and independent FEA agreement are required.']}
+
+END_CONTENT
+END_SOURCE S156
+
+BEGIN_SOURCE S157
+PATH: validation/spm_ripple_calibration.py
+SOURCE_SHA256: 0073ce44c082d8a9314a331d193501babfbdb0695f0a00e6aad83cbf15a96ee8
+LINES: 1-67 OF 67
+SEGMENT_BYTES: 3964
+BEGIN_CONTENT
+"""Shared component-gain/phase calibration on development data only.
+
+Never fit direct ripple ratios or clip output toward the acceptance threshold.
+Independent candidate-level FEA remains required after fitting.
+"""
+import numpy as np
+from scipy.optimize import least_squares
+from spm_ripple import ripple,acceptance
+
+COMPONENTS=('cogging_Nm','mutual_Nm','reluctance_Nm')
+
+
+def transform(proxy,parameters):
+    arrays=np.array([proxy[k] for k in COMPONENTS],dtype=float)
+    n=arrays.shape[1];order=np.fft.fftfreq(n,1/n)
+    gain=np.asarray(parameters[:3]);phase=parameters[3];decay=parameters[4]
+    factors=np.exp(1j*order*phase-decay*np.abs(order))
+    spectrum=(gain[:,None]*np.fft.fft(arrays,axis=1)).sum(axis=0)*factors
+    return np.fft.ifft(spectrum).real
+
+
+def fit(rows):
+    if len(rows)<6:raise ValueError('At least six development records required')
+    targets=[]
+    for row in rows:
+        actual=np.asarray(row['actual_waveform_Nm'],dtype=float)
+        if len(actual)!=len(row['proxy']['torque_Nm']) or not np.all(np.isfinite(actual)):raise ValueError('Aligned full-mechanical-cycle samples required')
+        targets.append(actual)
+    def residual(parameters):
+        errors=[]
+        for row,actual in zip(rows,targets):
+            predicted=transform(row['proxy'],parameters)
+            # Ripple must not disappear in a mean-torque-dominated least-squares
+            # loss. Fit mean and AC waveform as separate, normalized responses.
+            errors.append(np.sqrt(len(actual))*(predicted.mean()-actual.mean())/max(abs(float(actual.mean())),.1))
+            errors.extend(((predicted-predicted.mean())-(actual-actual.mean()))/max(float(actual.std()),.01))
+        # Mild regularization does not encode a desired ripple or pass rate.
+        return np.r_[errors,.01*(parameters[:3]-1)]
+    fits=[]
+    for shift in (0,np.pi/24,-np.pi/24):
+        fits.append(least_squares(residual,[1,1,1,shift,0],
+            bounds=([-3,.1,-3,-np.pi/6,-.015],[3,2,3,np.pi/6,.06]),max_nfev=200))
+    result=min(fits,key=lambda r:float(np.sum(r.fun*r.fun)))
+    return {'schema':'spm-component-calibration-v1','parameters':result.x.tolist(),
+        'parameter_names':['cogging_gain','mutual_gain','reluctance_gain','mechanical_phase_rad','spectral_decay_per_order'],
+        'training_ids':[r['id'] for r in rows],'training_shapes':sorted({r['rotor_id'] for r in rows}),
+        'training_rmse_relative':float(np.sqrt(np.mean(result.fun[:-3]**2))),
+        'optimizer_success':bool(result.success),'qualified':False,
+        'gain_policy':'Signed cogging/reluctance corrections are development residuals, not verified physical material constants.',
+        'scope':'Development fit only, no independent validation. Flat transfer is unverified.',
+        'training_comparison':[{'id':r['id'],'predicted_ripple_pct':ripple(transform(r['proxy'],result.x))['ripple_pct'],
+            'actual_ripple_pct':ripple(a)['ripple_pct']} for r,a in zip(rows,targets)]}
+
+
+def apply(proxy,calibration,*,allow_unseen_shape=False):
+    rotor=proxy.get('rotor_id')
+    seen=rotor is not None and rotor in calibration['training_shapes']
+    if not seen and not allow_unseen_shape:
+        raise ValueError('Calibration has no development data for rotor shape: '+str(rotor)+
+                         '. Cross-family transfer requires explicit experimental opt-in.')
+    wave=transform(proxy,np.array(calibration['parameters']));summary=ripple(wave)
+    return {**proxy,'raw_ripple_pct':proxy['ripple_pct'],**summary,'torque_Nm':wave.tolist(),
+        'calibration':'spm-component-calibration-v1','calibration_training_ids':calibration['training_ids'],
+        'qualified':False,'optimization_eligible':False,
+        'calibration_domain':'trained_shape_unqualified' if seen else 'unseen_shape_experimental_transfer',
+        'acceptance':acceptance(summary['ripple_pct'],None),
+        'scope':'Component/phase corrected development model; independent FEA required.'}
+
+END_CONTENT
+END_SOURCE S157
+
+
+END_REVIEW_PART_024

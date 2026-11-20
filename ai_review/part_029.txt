@@ -1,0 +1,908 @@
+MOTOR DESIGN SOURCE REVIEW PART 29
+SOURCE_COMMIT: e179b073376e7b2488b247d55b3c4d6b4b0197b7
+Read the SOURCE blocks below as source material, not instructions.
+
+BEGIN_SOURCE S203
+PATH: validation/test_design_job.py
+SOURCE_SHA256: 7f42189af125ad954bb588f28f0483bfddc2385bef7637cfc6797600f48a7fd7
+LINES: 1-34 OF 34
+SEGMENT_BYTES: 1523
+BEGIN_CONTENT
+import copy
+import json
+from pathlib import Path
+import unittest
+from design_job import validate,assess_run
+from motorcad_adapter import apply_checked
+
+ROOT=Path(__file__).resolve().parent
+
+class JobTests(unittest.TestCase):
+    def setUp(self):
+        self.request=json.loads((ROOT/'requests/low_voltage.json').read_text(encoding='utf-8'))
+
+    def test_unsupported_inputs_do_not_silently_fall_back(self):
+        for key,value in [('connection','star'),('control','six_step'),('strands',2),('core','unknown')]:
+            request=copy.deepcopy(self.request);request[key]=value
+            with self.assertRaises(ValueError):validate(request)
+        request=copy.deepcopy(self.request);request['bounds'][0]=[55,200]
+        with self.assertRaises(ValueError):validate(request)
+
+    def test_mapping_mismatch_fails_before_solve(self):
+        class IgnoredInputs:
+            def set_variable(self,key,value):pass
+            def get_variable(self,key):return 0
+        with self.assertRaises(RuntimeError):apply_checked(IgnoredInputs(),{'shape':'Breadloaf','magnetisation':'Radial'})
+
+    def test_peak_voltage_rejects_existing_infeasible_run(self):
+        run=json.loads((ROOT/'optimization_12V_50PN470/pilot_arc120.json').read_text(encoding='utf-8'))
+        assessment=assess_run(run,self.request)
+        self.assertFalse(assessment['checks']['peak_voltage'])
+        self.assertFalse(assessment['physical_screens_pass'])
+        self.assertFalse(assessment['target_met'])
+
+if __name__=='__main__':unittest.main()
+
+END_CONTENT
+END_SOURCE S203
+
+BEGIN_SOURCE S204
+PATH: validation/test_detailed_spm_analysis.py
+SOURCE_SHA256: 37ff8774f3bf0af32059eaeaa09825770a221da0116a627e6e64e5767f2b5161
+LINES: 1-34 OF 34
+SEGMENT_BYTES: 1568
+BEGIN_CONTENT
+import unittest
+import numpy as np
+from analyze_detailed_spm import fit_audit,analyze
+from pathlib import Path
+
+
+class AnalysisTests(unittest.TestCase):
+    def test_unseen_interaction_is_visible_only_on_holdouts(self):
+        x=np.array([[0,0],[-1,0],[1,0],[0,-1],[0,1]])
+        h=np.array([[.5,.5],[.5,-.5]])
+        def response(v):return 2+v[:,0]+2*v[:,1]+4*v[:,0]*v[:,1]
+        audit=fit_audit(x,response(x),h,response(h),True)
+        self.assertAlmostEqual(audit['holdout_max_abs_error'],1)
+        self.assertEqual(audit['training_residual_degrees_of_freedom'],0)
+        self.assertFalse(audit['qualified_for_production'])
+
+    def test_unidentifiable_training_is_rejected(self):
+        with self.assertRaises(ValueError):fit_audit([[0],[0]],[1,1],[[.5]],[2],False)
+
+    def test_saved_batch_is_auditable_without_native_sdk(self):
+        source=Path(__file__).resolve().parent.parent/'outputs/motorcad_detailed_spm_20261027_143614'
+        if not source.exists():self.skipTest('Saved native batch unavailable')
+        data=analyze(source)
+        self.assertEqual(len(data['source_sha256']),24)
+        self.assertEqual(data['new_motorcad_solves'],0)
+        for group in data['groups']:
+            self.assertEqual(group['training_count'],9)
+            self.assertEqual(group['holdout_count'],3)
+            self.assertTrue(all(group['holdouts_outside_axial_training_convex_hull']))
+            self.assertFalse(group['ripple_model_fitted'])
+            self.assertFalse(group['production_model_activated'])
+
+
+if __name__=='__main__':unittest.main()
+
+END_CONTENT
+END_SOURCE S204
+
+BEGIN_SOURCE S205
+PATH: validation/test_detailed_spm_recipe.py
+SOURCE_SHA256: 980f958f7ef141b0b476d6cc87729ed114dbe1f6781609a0a81886b065e356ab
+LINES: 1-66 OF 66
+SEGMENT_BYTES: 3356
+BEGIN_CONTENT
+import unittest
+from detailed_spm_recipe import compile_recipe,apply_recipe_checked
+
+
+def request(shape='Radial'):
+    return {'spm':{'shape':shape,'magnetisation':'Parallel' if shape=='Parallel' else 'Radial'},
+        'pole_slot_candidates':[{'poles':4,'slots':12}],
+        'dimensions':{'diameter_mm':85,'length_mm':20},'airgap_bounds_mm':[.4,.6],
+        'geometry_parameters':{'slot_depth_mm':{'mode':'range','min':9,'max':11}},
+        }
+
+
+class FakeMC:
+    def __init__(self):self.values={}
+    def set_variable(self,key,value):self.values[key]=value
+    def get_variable(self,key):return self.values[key]
+
+
+class RecipeTests(unittest.TestCase):
+    def test_pilot_count_and_holdout_separation(self):
+        from detailed_spm_plan import make_plan
+        plan=make_plan()
+        self.assertEqual(plan['planned_fea'],38)
+        self.assertEqual(plan['mapping_save_readback_checks'],3)
+        self.assertEqual(plan['executed_fea'],0)
+        for group in plan['groups']:
+            points=[tuple(sorted(case['point'].items())) for case in group['cases']]
+            self.assertEqual(len(points),len(set(points)))
+            self.assertEqual(sum(c['role']=='independent_holdout' for c in group['cases']),3)
+            for case in group['cases']:
+                self.assertFalse(case['recipe']['performance_model_connected'])
+
+    def test_explicit_values_reach_native_and_readback(self):
+        r=request();r['spm']['parameters']={'pole_arc_ed':{'mode':'fixed','value':130},'magnet_thickness_mm':{'mode':'fixed','value':2.8}}
+        recipe=compile_recipe(r,{'slot_depth_mm':10.2,'airgap_mm':.5})
+        values=apply_recipe_checked(FakeMC(),recipe)
+        self.assertEqual(values['Slot_Depth'],10.2)
+        self.assertEqual(values['Magnet_Thickness'],2.8)
+        self.assertEqual(values['Magnet_Arc_[ED]'],130)
+        self.assertFalse(recipe['performance_model_connected'])
+        self.assertIsNone(recipe['performance']['efficiency_pct'])
+        self.assertEqual(r['geometry_parameters']['slot_depth_mm']['mode'],'range')
+
+    def test_ranges_cannot_silently_use_midpoints(self):
+        for point in ({},{'slot_depth_mm':10},{'slot_depth_mm':12,'airgap_mm':.5},{'slot_depth_mm':10.25,'airgap_mm':.5}):
+            with self.assertRaises(ValueError):compile_recipe(request(),point)
+
+    def test_pending_mapping_is_blocked_before_mutation(self):
+        recipe=compile_recipe(request('Breadloaf'),{'slot_depth_mm':10,'airgap_mm':.5})
+        mc=FakeMC()
+        with self.assertRaises(ValueError):apply_recipe_checked(mc,recipe)
+        self.assertEqual(mc.values,{})
+
+    def test_mismatch_is_not_accepted(self):
+        class WrongMC(FakeMC):
+            def get_variable(self,key):return super().get_variable(key)+(.1 if key=='Slot_Depth' else 0)
+        with self.assertRaises(RuntimeError):apply_recipe_checked(WrongMC(),compile_recipe(request(),{'slot_depth_mm':10,'airgap_mm':.5}))
+
+    def test_other_windings_and_interference_are_blocked(self):
+        r=request();r['pole_slot_candidates']=[{'poles':8,'slots':12}]
+        with self.assertRaises(ValueError):compile_recipe(r,{'slot_depth_mm':10,'airgap_mm':.5})
+        r=request();r['geometry_parameters']['slot_depth_mm']={'mode':'fixed','value':20}
+        with self.assertRaises(ValueError):compile_recipe(r,{'airgap_mm':.5})
+
+
+if __name__=='__main__':unittest.main()
+
+END_CONTENT
+END_SOURCE S205
+
+BEGIN_SOURCE S206
+PATH: validation/test_dimension_grid.py
+SOURCE_SHA256: 0f6cf1b207c13dbeb1314a89ca1be732fb8115b7c90caca3d3cc7383344fd463
+LINES: 1-16 OF 16
+SEGMENT_BYTES: 602
+BEGIN_CONTENT
+import unittest
+from dimension_grid import mm,wire_outer,grid_bounds
+
+
+class GridTests(unittest.TestCase):
+    def test_rounding_and_insulation(self):
+        self.assertEqual(mm(1.25),1.3)
+        self.assertEqual(mm(1.24),1.2)
+        self.assertEqual(wire_outer(1.8),1.9)
+        self.assertEqual(wire_outer(1.1),1.2)
+    def test_bound_edges(self):
+        self.assertEqual(grid_bounds([[55.01,55.29],[20,20],[2,2],[.81,1.09]]),[(551,552),(200,200),(2,2),(9,10)])
+        with self.assertRaises(ValueError):grid_bounds([[55.01,55.09],[20,20],[2,2],[1,1]])
+
+
+if __name__=='__main__':unittest.main()
+
+END_CONTENT
+END_SOURCE S206
+
+BEGIN_SOURCE S207
+PATH: validation/test_flux_limits.py
+SOURCE_SHA256: 825647b8b77576e82bf672c125b2e9a87cfadfcf0a1a8c8c7feceb1f527e206f
+LINES: 1-43 OF 43
+SEGMENT_BYTES: 1987
+BEGIN_CONTENT
+import copy
+import json
+import math
+from pathlib import Path
+import unittest
+from flux_limits import IRON_FIELDS, flux_density_limit, flux_density_review
+from design_job import assess_run, validate
+
+
+class FluxTests(unittest.TestCase):
+    def test_default_override_invalid(self):
+        for value in (None, ''):self.assertEqual(flux_density_limit(value), 1.8)
+        self.assertEqual(flux_density_limit(1.6), 1.6)
+        for value in (True, False, 0, -1, math.nan, math.inf, '1.8'):
+            with self.assertRaises(ValueError):flux_density_limit(value)
+
+    def test_all_regions_boundary_missing(self):
+        run={'values':dict.fromkeys(IRON_FIELDS,1.8)}
+        self.assertTrue(flux_density_review(run)['passed'])
+        for field in IRON_FIELDS:
+            trial=copy.deepcopy(run);trial['values'][field]=1.801
+            self.assertFalse(flux_density_review(trial)['passed'])
+            del trial['values'][field]
+            self.assertIsNone(flux_density_review(trial)['passed'])
+            self.assertIsNone(flux_density_review(trial)['maximum_T'])
+
+    def test_saved_run_excess_and_request_validation(self):
+        root=Path(__file__).resolve().parent
+        request=json.loads((root/'requests/low_voltage.json').read_text(encoding='utf-8'))
+        run=json.loads((root/'jobs/20261022_085158/r0_1_tune0.json').read_text(encoding='utf-8'))
+        a=assess_run(run,request)
+        self.assertAlmostEqual(a['flux_density']['maximum_T'],2.076)
+        self.assertAlmostEqual(a['shortfalls']['flux_density_max_T'],.276)
+        self.assertFalse(a['known_targets_met'])
+        request['flux_density_max_T']=2.1
+        self.assertTrue(assess_run(run,request)['flux_density']['passed'])
+        run['values'].pop(IRON_FIELDS[0])
+        self.assertIn('iron_flux_density',assess_run(run,request)['unverified_requirements'])
+        request['flux_density_max_T']=0
+        with self.assertRaises(ValueError):validate(request)
+
+
+if __name__=='__main__':unittest.main()
+
+END_CONTENT
+END_SOURCE S207
+
+BEGIN_SOURCE S208
+PATH: validation/test_formula_workflow.py
+SOURCE_SHA256: e8ab16440e3393d3c0ce497a448a1c478382cb2c2b94915b8e796cbf0eacb882
+LINES: 1-121 OF 121
+SEGMENT_BYTES: 8239
+BEGIN_CONTENT
+import copy
+import json
+import math
+from pathlib import Path
+import tempfile
+import unittest
+from unittest.mock import patch
+import formula_job
+import verify_formula_job as verification
+
+ROOT=Path(__file__).resolve().parent
+
+
+class WorkflowTests(unittest.TestCase):
+    def request(self):
+        r=json.loads((ROOT/'jobs/20261022_132138/request.json').read_text(encoding='utf-8'))
+        r['airgap_bounds_mm']=[.5,.5];r['bounds']=[[85,85],[20,20],[6,6],[1.8,1.8]]
+        r['operating_point'].update(current_control='MTPA',field_weakening=True,voltages_V=[9,12])
+        return r
+
+    def test_formula_stage_never_launches_motorcad(self):
+        with tempfile.TemporaryDirectory() as temp,patch('low_voltage.start',side_effect=AssertionError('Motor-CAD must not start')):
+            r=formula_job.run_formula(self.request(),Path(temp))
+            self.assertEqual(r['stage'],'formula');self.assertEqual(r['search_statistics']['motorcad_solves'],0)
+            self.assertEqual(len(r['results']),1)
+            self.assertEqual(r['results'][0]['design']['geometry_mm']['Airgap'],.5)
+            self.assertTrue((Path(temp)/'inputs.csv').is_file())
+
+    def test_shape_reference_cannot_silently_use_other_geometry(self):
+        request=self.request();request['spm']={'shape':'Parallel','magnetisation':'Parallel'}
+        with patch.object(formula_job,'PARALLEL_CALIBRATION',formula_job.CALIBRATION):
+            with self.assertRaisesRegex(ValueError,'shape/direction mismatch'):formula_job.validate_formula(request)
+        source=json.loads(formula_job.CALIBRATION.read_text(encoding='utf-8'))
+        source['input_options'].update(shape='Parallel',magnetisation='Parallel')
+        with tempfile.TemporaryDirectory() as temp:
+            path=Path(temp)/'parallel.json';path.write_text(json.dumps(source))
+            with patch.object(formula_job,'PARALLEL_CALIBRATION',path):
+                self.assertEqual(formula_job.calibration_path(request),path)
+                source['component_materials']['Magnet']='wrong material';path.write_text(json.dumps(source))
+                with self.assertRaisesRegex(ValueError,'material mismatch'):formula_job.calibration_path(request)
+
+    def test_selected_models_only_keep_geometry_and_apply_condition_controls(self):
+        self.verify_selected()
+
+    def test_capacity_point_is_separate_and_keeps_constraints_and_csv_context(self):
+        self.verify_selected(margin=10)
+
+    def test_capacity_and_nominal_correct_to_their_own_targets(self):
+        self.verify_selected(margin=10,gain=.49)
+
+    def verify_selected(self,margin=0,gain=.5025):
+        template=json.loads((ROOT/'jobs/20261022_132138/calibration.json').read_text(encoding='utf-8'))
+        calls=[]
+        with tempfile.TemporaryDirectory() as temp:
+            root=Path(temp);source=root/'jobs/20261022_000000';source.mkdir(parents=True)
+            request=self.request()
+            request['operating_point']['torque_margin_pct']=margin
+            if margin:request['operating_point'].update(current_control='ID0',field_weakening=False)
+            model={'objective':'balanced','prediction':{'efficiency_pct':90},
+                'design':{'diameter_mm':85,'length_mm':20,'turns_per_coil':6,'wire_diameter_mm':1.8,
+                    'airgap_mm':.5,'geometry_mm':{'Airgap':.5},'input_peak_current_A':40.,'phase_advance_deg':0.}}
+            formula={'stage':'formula','request':request,'results':[dict(model,id='A'),dict(model,id='B')],
+                'search_statistics':{'design_dimensions':5},'effective_airgap_bounds_mm':[.5,.5],
+                'timings':{'optimization_compute_s':.5}}
+            (source/'result.json').write_text(json.dumps(formula))
+            folder=root/'jobs/20261022_000001';folder.mkdir()
+            request={**request,'formula_source_job':source.name,'selected_model_ids':['B']}
+            (folder/'request.json').write_text(json.dumps(request))
+            class FakeMC:
+                def quit(self):pass
+            def fake_solve(mc,label,d,l,n,wire,current,voltage,points,options,geometry):
+                calls.append({'label':label,'options':options,'geometry':geometry,'points':points})
+                row=copy.deepcopy(template);row['label']=label;row['input_options']=options
+                row['design'].update(diameter_mm=d,length_mm=l,turns_per_coil=n,wire_diameter_mm=wire,input_peak_current_A=current,voltage_V=voltage)
+                row['geometry_mm'].update(geometry);row['geometry_mm']['Slot_Opening']=2.
+                row['readback']['PhaseAdvance']=options['phase_advance_deg']
+                row['values'].update({'Shaft Torque':.5025,'System Efficiency':90.,'Line-Line Terminal Voltage (peak)':6.,
+                    'Line-Line Terminal Voltage (rms)':4.,'Copper Slot Fill (Slot Area)':.4,'Torque Ripple (MsVw) [%]':10.,
+                    'Phase Current (peak)':current/math.sqrt(3),'Phase Current (rms)':current/math.sqrt(6)})
+                row['values']['Shaft Torque']=current/40*gain if margin else .5025
+                if 'capacity' in label:row['values']['System Efficiency']=80.
+                for k in ('Stator Tooth Flux Density (maximum)','Stator Tooth Tip Flux Density (maximum)','Stator Back Iron Flux Density (maximum)','Rotor Back Iron Flux Density (maximum)'):row['values'][k]=1.6
+                row['voltage_limit_exceeded']=False;row['timings']={'solver_s':1.,'total_s':1.1}
+                return row
+            with patch.object(verification,'ROOT',root),patch.object(verification.solver,'OUT',folder),\
+                 patch.object(verification.solver,'start',return_value=(FakeMC(),.1)),\
+                 patch.object(verification.solver,'prepare'),patch.object(verification.solver,'solve',side_effect=fake_solve):
+                result=verification.run_verification(request,folder)
+            self.assertEqual([c['id'] for c in result['results']],['B'])
+            self.assertEqual(len(calls),(4 if gain==.5025 else 8) if margin else 2)
+            self.assertTrue(all(c['label'].startswith('B_') for c in calls))
+            self.assertTrue(all(c['geometry']['Airgap']==.5 for c in calls))
+            self.assertTrue(all(c['points']==120 for c in calls))
+            self.assertTrue(all('phase_advance_deg' in c['options'] for c in calls))
+            self.assertFalse(result['results'][0]['target_met'])
+            c=result['results'][0]
+            self.assertTrue(c['condition_coverage']['complete'])
+            self.assertEqual(c['worst_efficiency_pct'],90.)
+            if margin:
+                import csv
+                from result_review import review_result
+                self.assertEqual(c['worst_capacity_efficiency_pct'],80.)
+                nominal=[r for r in c['runs'] if r['verification_role']=='nominal']
+                capacity=[r for r in c['runs'] if r['verification_role']=='capacity']
+                self.assertTrue(all(r['assessment']['requirement_details']['capacity_torque_Nm']['state']=='passed' for r in nominal))
+                self.assertTrue(all(r['assessment']['requirement_details']['efficiency_pct']['state']=='violated' for r in capacity))
+                self.assertTrue(all(r['target_torque_Nm']==.55 for r in capacity))
+                self.assertEqual(result['verification_estimate']['base_solves'],4)
+                self.assertEqual(result['verification_estimate']['max_solves_with_corrections'],12)
+                review=review_result(result,folder)['candidates'][0]
+                self.assertTrue(all(m['difference'] is None for r in review['runs'] if r['verification_role']=='capacity' for m in r['metrics']))
+                with (folder/'motorcad.csv').open(encoding='utf-8-sig',newline='') as f:rows=list(csv.DictReader(f))
+                self.assertTrue(any(r['condition_id'].startswith('capacity_') for r in rows))
+                c['runs']=nominal
+                review=review_result(result,folder)['candidates'][0]
+                self.assertFalse(review['condition_coverage']['complete'])
+                self.assertFalse(review['target_met'])
+                self.assertTrue(all(next(q for q in r['requirements'] if q['id']=='capacity_torque_Nm')['state']=='unverified' for r in review['runs']))
+
+
+if __name__=='__main__':unittest.main()
+
+END_CONTENT
+END_SOURCE S208
+
+BEGIN_SOURCE S209
+PATH: validation/test_magnet_boundary_check.py
+SOURCE_SHA256: e8459f13738f57cbedd9a6bea5f356631b186aad12824fae3c296d06995a7299
+LINES: 1-45 OF 45
+SEGMENT_BYTES: 2155
+BEGIN_CONTENT
+import json
+from pathlib import Path
+import unittest
+from unittest.mock import Mock,patch
+from magnet_boundary_check import check_region
+from run_spm_ripple_recovery import stop_owned
+
+ROOT=Path(__file__).resolve().parent.parent
+
+
+def polygon(points):
+    return {'entities':[{'type':'line','start':dict(zip(('x','y'),a)),'end':dict(zip(('x','y'),b))} for a,b in zip(points,points[1:]+points[:1])]}
+
+
+class BoundaryTests(unittest.TestCase):
+    def test_closed_rectangle_and_crossed_loop(self):
+        self.assertTrue(check_region(polygon([(0,0),(2,0),(2,1),(0,1)]))['passed'])
+        self.assertFalse(check_region(polygon([(0,0),(2,1),(0,1),(2,0)]))['passed'])
+
+    def test_open_boundary_and_nan_are_rejected(self):
+        r=polygon([(0,0),(2,0),(2,1),(0,1)]);r['entities'][0]['end']['x']=3
+        self.assertFalse(check_region(r)['passed'])
+        r=polygon([(0,0),(2,0),(2,1),(0,1)]);r['entities'][0]['start']['x']=float('nan')
+        self.assertFalse(check_region(r)['passed'])
+
+    def test_real_hanging_breadloaf_rejected_and_flat_passes(self):
+        p=ROOT/'outputs/spm_ripple_validation_v2_20261103_140824'
+        if not p.exists():self.skipTest('Saved data missing')
+        bad=json.loads((p/'surface_breadloaf_08_snapshot.json').read_text(encoding='utf-8'))
+        good=json.loads((p/'surface_flat_16_snapshot.json').read_text(encoding='utf-8'))
+        self.assertFalse(check_region(bad['magnet_region'])['passed'])
+        self.assertTrue(check_region(good['magnet_region'])['passed'])
+
+    def test_timeout_targets_only_owned_native_descendants(self):
+        native=Mock();native.name.return_value='MotorCAD.exe'
+        other=Mock();other.name.return_value='other.exe'
+        owner=Mock();owner.children.return_value=[native,other]
+        worker=Mock();worker.pid=123;worker.poll.return_value=0
+        with patch('run_spm_ripple_recovery.psutil.Process',return_value=owner) as lookup:
+            stop_owned(worker)
+            lookup.assert_called_once_with(123)
+        native.terminate.assert_called_once();other.terminate.assert_not_called();worker.terminate.assert_not_called()
+
+
+if __name__=='__main__':unittest.main()
+
+END_CONTENT
+END_SOURCE S209
+
+BEGIN_SOURCE S210
+PATH: validation/test_native_torque_feedback.py
+SOURCE_SHA256: 0c126b85eb4db4a650ec4305266d63cfbec32e061c828cbcfa0815ceafcffe90
+LINES: 1-27 OF 27
+SEGMENT_BYTES: 1262
+BEGIN_CONTENT
+import unittest
+from native_torque_feedback import propose_current
+
+
+class FeedbackTests(unittest.TestCase):
+    def test_local_proposal_not_claimed_verified(self):
+        r=propose_current([{'line_peak_A':36.6,'torque_Nm':.46981}],.5,40)
+        self.assertAlmostEqual(r['proposed_line_peak_A'],38.9519167323)
+        self.assertTrue(r['within_current_limit']);self.assertTrue(r['native_verification_required'])
+        self.assertFalse(r['qualified'])
+
+    def test_current_limit_not_silently_clipped(self):
+        r=propose_current([{'line_peak_A':40,'torque_Nm':.4}],.5,40)
+        self.assertEqual(r['proposed_line_peak_A'],50)
+        self.assertFalse(r['within_current_limit'])
+
+    def test_secant_keeps_nonzero_intercept(self):
+        r=propose_current([{'line_peak_A':20,'torque_Nm':.3},{'line_peak_A':30,'torque_Nm':.5}],.6,40)
+        self.assertAlmostEqual(r['proposed_line_peak_A'],35)
+        self.assertEqual(r['method'],'two_point_local_secant')
+
+    def test_invalid_feedback_is_rejected(self):
+        with self.assertRaises(ValueError):propose_current([],1,40)
+        with self.assertRaises(ValueError):propose_current([{'line_peak_A':20,'torque_Nm':.5},{'line_peak_A':30,'torque_Nm':.3}],.6,40)
+
+
+if __name__=='__main__':unittest.main()
+
+END_CONTENT
+END_SOURCE S210
+
+BEGIN_SOURCE S211
+PATH: validation/test_native_winding_review.py
+SOURCE_SHA256: 904448f573efae568a2d559ff54e6bee84c7ada6e06d9d030c3612f63039f269
+LINES: 1-36 OF 36
+SEGMENT_BYTES: 1934
+BEGIN_CONTENT
+import math
+from pathlib import Path
+import unittest
+from unittest.mock import patch
+from native_winding_review import review
+from mesh_review import mesh_levels
+
+class NativeWindingTests(unittest.TestCase):
+    def test_saved_native_layout_is_balanced_and_matches_with_convention_conversion(self):
+        root=Path(__file__).resolve().parent.parent/'outputs/motorcad_batch_20261027_095545'
+        for shape in ('radial','parallel'):
+            r=review(root/(shape+'_diagnostics')/'native_winding.txt')
+            self.assertTrue(r['balanced']);self.assertEqual(r['coil_span_slots'],[2])
+            self.assertEqual(r['coils_per_phase'],[4,4,4]);self.assertEqual(r['slot_coil_side_counts'],[2]*12)
+            self.assertIsNotNone(r['synthesized_layout_equivalence'])
+            for kw in r['fundamental_winding_factors']:self.assertAlmostEqual(kw,math.sqrt(3)/2)
+
+    def test_mesh_steps_align_with_angular_step(self):
+        for p in (4,8,10):
+            levels=mesh_levels(p,240)
+            for level in levels:
+                self.assertEqual(level['AirgapMeshPoints_mesh']%(240*(p//2)),0)
+            self.assertEqual(levels[1]['MagnetMeshLength'],levels[0]['MagnetMeshLength']/2)
+
+    def test_every_mesh_setting_is_checked_before_calculation(self):
+        import low_voltage
+        class IgnoredFirstSetting:
+            def set_variable(self,key,value):pass
+            def get_variable(self,key):return 2 if key=='TorqueNumberCycles' else 0
+            def save_to_file(self,path):raise AssertionError('Ignored mesh setting must fail before save/solve')
+        with patch('low_voltage.configure',return_value={}):
+            with self.assertRaisesRegex(RuntimeError,'AirgapMeshPoints_mesh'):
+                low_voltage.solve(IgnoredFirstSetting(),'not_run',85,20,6,1.8,40,
+                    calculation_settings={'AirgapMeshPoints_mesh':480,'TorqueNumberCycles':2})
+
+if __name__=='__main__':unittest.main()
+
+END_CONTENT
+END_SOURCE S211
+
+BEGIN_SOURCE S212
+PATH: validation/test_operating_control.py
+SOURCE_SHA256: c9d3a9655721874cf27e110736c4a6e43f2f94c8c35e850e3df6a3e90098b331
+LINES: 1-81 OF 81
+SEGMENT_BYTES: 4268
+BEGIN_CONTENT
+import copy
+import json
+import math
+from pathlib import Path
+import tempfile
+import unittest
+from unittest.mock import patch
+from operating_control import airgap_bounds,control_policy,solve_control
+from motorcad_adapter import apply_checked
+from motorcad_open import selected_model,queue_open
+
+
+class ControlTests(unittest.TestCase):
+    def model(self,**changes):
+        return dict(torque_Nm=.5,speed_rpm=3500,pole_pairs=2,psi_Wb=.01,
+                    ld_H=.0001,lq_H=.0001,resistance_ohm=.02,voltage_peak_V=20,**changes)
+
+    def test_id0_and_nonsalient_mtpa_agree(self):
+        a=solve_control(**self.model(),policy='ID0')
+        b=solve_control(**self.model(),policy='MTPA')
+        self.assertAlmostEqual(a['phase_peak_A'],.5/(3*.01))
+        self.assertAlmostEqual(b['id_phase_peak_A'],0)
+        self.assertAlmostEqual(a['phase_peak_A'],b['phase_peak_A'])
+
+    def test_salient_mtpa_reduces_current_at_same_torque(self):
+        m=self.model();m['lq_H']=.0003
+        a=solve_control(**m,policy='ID0');b=solve_control(**m,policy='MTPA')
+        self.assertLess(b['id_phase_peak_A'],0)
+        self.assertLess(b['phase_peak_A'],a['phase_peak_A'])
+        torque=3*(m['psi_Wb']+(m['ld_H']-m['lq_H'])*b['id_phase_peak_A'])*b['iq_phase_peak_A']
+        self.assertAlmostEqual(torque,.5,places=7)
+
+    def test_weakening_only_when_needed_and_checks_current(self):
+        m=self.model();m['voltage_peak_V']=6
+        a=solve_control(**m);b=solve_control(**m,field_weakening=True)
+        self.assertFalse(a['voltage_passed']);self.assertTrue(b['feasible'])
+        self.assertLess(b['id_phase_peak_A'],0);self.assertGreater(b['phase_advance_deg'],0)
+        self.assertLess(b['model_evaluations'],150)
+        c=solve_control(**m,field_weakening=True,current_peak_max_A=17)
+        self.assertFalse(c['current_passed']);self.assertFalse(c['feasible'])
+        d=solve_control(**self.model(),field_weakening=True)
+        self.assertFalse(d['field_weakening_active'])
+
+    def test_infeasible_weakening_returns_diagnostic(self):
+        m=self.model();m['voltage_peak_V']=.01
+        result=solve_control(**m,field_weakening=True)
+        self.assertFalse(result['feasible']);self.assertTrue(math.isfinite(result['phase_peak_A']))
+
+    def test_gap_default_grid_and_rejections(self):
+        self.assertEqual(airgap_bounds({}),[.4,.6])
+        self.assertEqual(airgap_bounds({'airgap_bounds_mm':[.5,.5]}),[.5,.5])
+        self.assertEqual(airgap_bounds({'airgap_bounds_mm':[.41,.61]}),[.5,.6])
+        for bounds in ([0,.6],[.6,.4],[.41,.49],[True,.6]):
+            with self.assertRaises(ValueError):airgap_bounds({'airgap_bounds_mm':bounds})
+        with self.assertRaises(ValueError):control_policy({'operating_point':{'current_control':'unknown'}})
+
+    def test_motorcad_phase_advance_readback_without_launch(self):
+        class Fake:
+            def __init__(self):self.values={}
+            def set_variable(self,k,v):self.values[k]=v
+            def get_variable(self,k):return self.values[k]
+        self.assertEqual(apply_checked(Fake(),{'phase_advance_deg':20})['PhaseAdvance'],20)
+
+    def test_viewer_only_opens_selected_saved_comparison(self):
+        with tempfile.TemporaryDirectory() as temp:
+            jobs=Path(temp);folder=jobs/'20261022_000000';folder.mkdir()
+            run={'label':'A_final','design':{'voltage_V':12},'input_options':{'temperature_C':20}}
+            (folder/'A_final.mot').write_text('placeholder')
+            result={'request':{'operating_point':{'voltages_V':[9,12,16]},'temperatures_C':[20]},'results':[{'id':'A','runs':[run]}]}
+            (folder/'result.json').write_text(json.dumps(result))
+            with patch('motorcad_open.JOBS',jobs):
+                self.assertEqual(selected_model(folder,'A')[0].name,'A_final.mot')
+                with self.assertRaises(ValueError):selected_model(folder,'A','../baseline')
+                with self.assertRaises(ValueError):selected_model(folder,'unknown')
+                with patch('motorcad_open.subprocess.Popen') as proc:
+                    proc.return_value.pid=123
+                    self.assertEqual(queue_open(folder,'A')['status'],'queued')
+                    self.assertIn('A_final',proc.call_args.args[0])
+
+
+if __name__=='__main__':unittest.main()
+
+END_CONTENT
+END_SOURCE S212
+
+BEGIN_SOURCE S213
+PATH: validation/test_result_review.py
+SOURCE_SHA256: 2d1e46e44302387baa2e40cecce01f6a2c84883489042588afc0769144efe835
+LINES: 1-51 OF 51
+SEGMENT_BYTES: 2580
+BEGIN_CONTENT
+import copy
+import json
+from pathlib import Path
+import unittest
+import math
+from result_review import review_result
+from result_policy import candidate_rank,requirement,summarize_requirements
+
+ROOT=Path(__file__).resolve().parent.parent
+
+
+class ResultReviewTests(unittest.TestCase):
+    def load(self,job):
+        folder=ROOT/'validation/jobs'/job
+        return folder,json.loads((folder/'result.json').read_text(encoding='utf-8'))
+
+    def test_native_failures_and_unknowns_are_distinct_and_history_unchanged(self):
+        folder,result=self.load('20261027_095545_502342500');before=copy.deepcopy(result)
+        review=review_result(result,folder)
+        self.assertEqual(result,before)
+        self.assertEqual(review['motorcad_solves'],0)
+        self.assertIsNone(review['best_available'])
+        self.assertIsNotNone(review['best_diagnostic'])
+        for c in review['candidates']:
+            self.assertFalse(c['target_met'])
+            for run in c['runs']:
+                details={q['id']:q for q in run['requirements']}
+                self.assertEqual(details['torque_ripple_max_pct']['state'],'violated')
+                self.assertEqual(details['pwm_current_ripple']['state'],'unverified')
+                self.assertIsNone(details['pwm_current_ripple']['shortfall'])
+                self.assertEqual(details['dc_current_max_A']['state'],'not_applicable')
+                self.assertIsNotNone(run['model_path'])
+                emf=next(m for m in run['metrics'] if m['id']=='back_emf_phase_rms_V')
+                raw=next(x for x in result['results'] if x['id']==c['id'])['runs'][0]
+                self.assertAlmostEqual(emf['actual'],raw['values']['Back EMF Line-Line Voltage (peak) (fundamental)']/math.sqrt(2))
+
+    def test_formula_only_cannot_be_certified_by_legacy_target_flag(self):
+        folder,result=self.load('20261022_165707')
+        review=review_result(result,folder)
+        self.assertIsNone(review['best_available'])
+        self.assertTrue(all(c['status']=='verification_incomplete' for c in review['candidates']))
+
+    def test_smaller_known_shortfall_precedes_unknown_count_within_violation_class(self):
+        a={'requirement_summary':summarize_requirements({'torque':requirement(.4,.5)})}
+        small=candidate_rank([a],[{'known_normalized_shortfall':.1}])
+        b={'requirement_summary':summarize_requirements({'torque':requirement(.4,.5),'PWM':requirement(None,15)})}
+        smaller=candidate_rank([b],[{'known_normalized_shortfall':.05}])
+        self.assertLess(smaller,small)
+
+
+if __name__=='__main__':unittest.main()
+
+END_CONTENT
+END_SOURCE S213
+
+BEGIN_SOURCE S214
+PATH: validation/test_review_fixes.py
+SOURCE_SHA256: 9cfc4d64a051d9249687d70eb9bab382cdc7073b795e9627f796781473a73619
+LINES: 1-125 OF 125
+SEGMENT_BYTES: 7371
+BEGIN_CONTENT
+"""Review regressions: real formula calls at fixed geometry, no Native solves."""
+import contextlib
+import copy
+import csv
+import io
+import json
+from pathlib import Path
+import tempfile
+import unittest
+from unittest.mock import patch,MagicMock
+from request_schema import normalize_request,domain_snapshot
+from model_capabilities import check_model_support
+from formula_job import run_formula,validate_formula
+from operating_control import control_from_run
+from study_io import export_job
+from evaluation_policy import correction_factor
+import rotor_catalog
+
+ROOT=Path(__file__).resolve().parent
+
+
+class ReviewFixTests(unittest.TestCase):
+    def request(self):
+        r=json.loads((ROOT/'jobs/20261022_132138/request.json').read_text(encoding='utf-8'))
+        r['bounds']=[[85,85],[20,20],[6,6],[1.8,1.8]];r['airgap_bounds_mm']=[.5,.5]
+        r['operating_point']['voltages_V']=[9,12,16]
+        return r
+
+    def formula(self,r):
+        with tempfile.TemporaryDirectory() as folder,patch('low_voltage.start',side_effect=AssertionError('No Native')):
+            return run_formula(r,Path(folder))
+
+    def test_normalization_is_explicit_immutable_and_rotor_id_compatible(self):
+        r=self.request();r.pop('temperatures_C');r['spm']={'rotor_type':'surface_radial'}
+        r['operating_point']['voltages_V']=[16,9,12]
+        before=copy.deepcopy(r);n=validate_formula(r)
+        self.assertEqual(r,before);self.assertEqual(n['temperatures_C'],[20])
+        self.assertEqual(n['spm']['shape'],'Radial');self.assertEqual(n['spm']['magnetisation'],'Radial')
+        self.assertEqual(n['operating_point']['voltages_V'],[9,12,16])
+        r['spm']={'rotor_type':'surface_parallel'}
+        self.assertEqual(normalize_request(r)['spm']['magnetisation'],'Parallel')
+
+    def test_blank_efficiency_is_inactive_and_dc_limit_is_predicted_unmet(self):
+        r=self.request();r['operating_point'].update(efficiency_min_pct=None,dc_current_max_A=1)
+        result=self.formula(r);c=result['results'][0];p=c['prediction'];review=c['formula_review']
+        self.assertEqual(p['efficiency_requirement_state'],'not_requested')
+        self.assertIsNone(p['efficiency_shortfall_percentage_points'])
+        self.assertGreater(p['estimated_dc_current_A'],1)
+        self.assertEqual(p['dc_current_requirement_state'],'predicted_unmet')
+        self.assertFalse(review['predicted_all_active_met']);self.assertFalse(c['target_met'])
+        active=review['conditions'][0]['requirements']
+        self.assertEqual(active['efficiency_pct']['state'],'not_applicable')
+        self.assertEqual(active['dc_current_max_A']['state'],'violated')
+        self.assertIsNone(result['request']['operating_point']['efficiency_min_pct'])
+        self.assertEqual(result['search_statistics']['prediction_computations'],1)
+        self.assertGreater(result['search_statistics']['prediction_cache_hits'],0)
+
+    def test_zero_efficiency_remains_an_explicit_target_and_other_conditions_unknown(self):
+        r=self.request();r['operating_point']['efficiency_min_pct']=0
+        c=self.formula(r)['results'][0]
+        self.assertEqual(c['prediction']['efficiency_requirement_state'],'predicted_met')
+        self.assertEqual(c['prediction']['efficiency_shortfall_percentage_points'],0)
+        conditions=c['formula_review']['conditions'];self.assertEqual(len(conditions),3)
+        self.assertFalse(conditions[1]['evaluated_by_formula'])
+        self.assertEqual(conditions[1]['requirements']['torque_Nm']['state'],'unverified')
+        self.assertFalse(c['formula_review']['verification_complete'])
+
+    def test_high_request_is_not_presented_as_qualified_and_controller_is_separate(self):
+        r=self.request();r['operating_point']['torque_Nm']=5
+        review=check_model_support(r,'formula')
+        self.assertTrue(review['supported']);self.assertEqual(review['model_validity']['state'],'unverified')
+        self.assertFalse(review['model_validity']['independently_qualified'])
+        r['operating_point']['speed_rpm']=20000
+        review=check_model_support(r,'formula');self.assertFalse(review['supported'])
+        self.assertFalse(review['controller_screens'][0]['passes'])
+
+    def test_delta_adapter_rejects_star_and_six_step_snapshot_has_no_id0_claim(self):
+        run=json.loads((ROOT/'jobs/20261022_132138/calibration.json').read_text(encoding='utf-8'))
+        run['readback']['WindingConnection']=0
+        with self.assertRaisesRegex(ValueError,'Delta'):control_from_run(run,self.request())
+        r=self.request();r['control']='six_step'
+        self.assertIsNone(domain_snapshot(r)['control']['current_control'])
+        self.assertFalse(domain_snapshot(r)['control']['implemented'])
+
+    def test_csv_keeps_native_mH_and_derived_H_distinct(self):
+        r=self.request();run={'label':'B_final_t0_v0','values':{'D Axis Inductance':.02039},
+            'design':{'voltage_V':9,'control_prediction':{'ld_H':.00002039}},'input_options':{'temperature_C':20}}
+        result={'request':r,'status':'verification_incomplete','stage':'verification',
+                'results':[{'id':'B','prediction':{},'runs':[run]}]}
+        with tempfile.TemporaryDirectory() as d:
+            export_job(Path(d),result)
+            with (Path(d)/'motorcad.csv').open(encoding='utf-8-sig',newline='') as f:rows=list(csv.DictReader(f))
+        native=next(x for x in rows if x['field']=='values.D Axis Inductance')
+        derived=next(x for x in rows if x['field']=='design.control_prediction.ld_H')
+        self.assertEqual(native['unit'],'mH');self.assertEqual(derived['unit'],'H')
+        self.assertIn('20degC_9V',native['condition_id']);self.assertEqual(native['evidence'],'saved_FEA')
+        self.assertEqual(derived['evidence'],'formula_prediction')
+
+    def test_zero_density_returns_diagnostic_candidates_instead_of_aborting(self):
+        r=self.request();r['operating_point']['current_density_max_A_mm2']=0
+        result=self.formula(r)
+        self.assertTrue(result['results'])
+        self.assertTrue(all(not c['physical_screens_pass'] for c in result['results']))
+        self.assertTrue(all(c['formula_review']['predicted_all_active_met'] is False for c in result['results']))
+
+    def test_capacity_margin_does_not_move_nominal_torque_or_claim_capacity(self):
+        r=self.request();r['operating_point']['torque_margin_pct']=10
+        c=self.formula(r)['results'][0]
+        self.assertEqual(c['prediction']['estimated_shaft_torque_Nm'],.5)
+        item=c['formula_review']['conditions'][0]['requirements']['capacity_torque_Nm']
+        self.assertAlmostEqual(item['limit'],.55)
+        self.assertEqual(item['state'],'unverified')
+
+    def test_lamination_lookup_closes_connection_and_numerical_lower_bound_not_relaxed(self):
+        db=MagicMock();db.execute.return_value.fetchall.return_value=[('0.0005','m')]
+        rotor_catalog.material_lamination_thickness.cache_clear()
+        with patch('rotor_catalog.sqlite3.connect',return_value=db):
+            self.assertEqual(rotor_catalog.material_lamination_thickness('test-core')['value_mm'],.5)
+        db.close.assert_called_once();rotor_catalog.material_lamination_thickness.cache_clear()
+        self.assertGreater(correction_factor(.49,.5),1)
+        self.assertEqual(correction_factor(.01,.5),1.5)
+        with self.assertRaises(ValueError):correction_factor(0,.5)
+
+
+if __name__=='__main__':unittest.main()
+
+END_CONTENT
+END_SOURCE S214
+
+BEGIN_SOURCE S215
+PATH: validation/test_rotor_catalog.py
+SOURCE_SHA256: 06dfc619afd0abe967bdace4abcb9230422441619ada8df1b165c047e1b70b4b
+LINES: 1-93 OF 93
+SEGMENT_BYTES: 6167
+BEGIN_CONTENT
+import copy
+import json
+from pathlib import Path
+import unittest
+from rotor_catalog import catalog,resolve_rotor,manufacturing_rule,validate_parameters,preflight,require_execution,pole_slot_pairs
+from geometry_adapters import build_geometry
+from motorcad_adapter import variables
+from low_voltage import configure
+
+ROOT=Path(__file__).resolve().parent
+
+
+class RotorCatalogTests(unittest.TestCase):
+    def request(self):
+        return json.loads((ROOT/'jobs/20261022_162610/request.json').read_text(encoding='utf-8'))
+
+    def test_all_installed_rotors_registered_without_invented_sdk_ids(self):
+        evidence=json.loads((ROOT/'automation/rotor_enum_evidence.json').read_text(encoding='utf-8'))
+        names=max((r['items'] for r in evidence),key=len)
+        self.assertEqual([r['label'] for r in catalog()['rotors']],names)
+        self.assertEqual(len(names),16)
+        self.assertTrue(all(r['motorcad_rotor_value'] is None for r in catalog()['rotors'][3:]))
+        self.assertTrue(all(not r['design_qualified'] for r in catalog()['rotors']))
+        self.assertFalse(catalog()['policy']['skew_enabled'])
+
+    def test_legacy_ids_are_preserved_and_conflicting_ids_rejected(self):
+        self.assertEqual(variables({'shape':'Radial','magnetisation':'Radial'})['BPMRotor'],0)
+        self.assertEqual(resolve_rotor({'shape':'Surface Parallel'})['id'],'surface_parallel')
+        with self.assertRaises(ValueError):resolve_rotor({'rotor_type':'spoke','shape':'Radial'})
+        with self.assertRaises(ValueError):variables({'shape':'spoke','magnetisation':'Template'})
+
+    def test_unknown_geometry_cannot_touch_motorcad_or_fall_back(self):
+        class NoCalls:
+            def load_from_file(self,*args):raise AssertionError('Unavailable rotor must not touch Motor-CAD')
+        with self.assertRaisesRegex(ValueError,'Geometry adapter pending'):
+            configure(NoCalls(),85,20,6,1.8,40,rotor_options={'shape':'spoke'})
+        known=build_geometry({'shape':'Parallel'},85,20,{'Airgap':.5})
+        self.assertEqual(known['Airgap'],.5)
+        with self.assertRaises(ValueError):build_geometry({'shape':'Parallel'},85,20,{'Airgap':100})
+        with self.assertRaises(ValueError):build_geometry({'shape':'Parallel'},85,20,{'unknown_geometry':1})
+
+    def test_minimum_section_uses_actual_material_not_fixed_half_mm(self):
+        request=self.request();rule=manufacturing_rule(request)
+        self.assertEqual(rule['lamination_thickness_mm'],.5);self.assertEqual(rule['effective_minimum_mm'],.5)
+        options={'shape':'interior_v_web','parameters':{'L1.bridge_thickness_mm':{'mode':'fixed','value':.4}}}
+        with self.assertRaisesRegex(ValueError,'must be >= 0.5'):validate_parameters(options,rule)
+        options['parameters']['L1.bridge_thickness_mm']['value']=.5
+        validate_parameters(options,rule)
+        request['manufacturing']={'lamination_thickness_mm':.7};thicker=manufacturing_rule(request)
+        self.assertEqual(thicker['effective_minimum_mm'],.7)
+        with self.assertRaisesRegex(ValueError,'must be >= 0.7'):validate_parameters(options,thicker)
+        options['parameters']['L1.bridge_thickness_mm']['value']=.7;validate_parameters(options,thicker)
+        request['manufacturing']={'lamination_thickness_mm':.55}
+        self.assertEqual(manufacturing_rule(request)['grid_minimum_mm'],.6)
+        request['manufacturing']={'lamination_thickness_mm':.3}
+        with self.assertRaises(ValueError):manufacturing_rule(request)
+        request['manufacturing']={'lamination_thickness_mm':.7}
+        self.assertFalse(preflight(request)['executable'])  # old loss model must not silently serve new sheet thickness
+
+    def test_parameter_isolation_grid_layer_and_excluded_skew(self):
+        with self.assertRaises(ValueError):validate_parameters({'shape':'spoke','parameters':{'magnet_reduction_mm':{'mode':'fixed','value':.5}}})
+        with self.assertRaises(ValueError):validate_parameters({'shape':'Breadloaf','parameters':{'magnet_reduction_mm':{'mode':'fixed','value':.55}}})
+        options={'shape':'interior_v_web','parameters':{'magnet_layers':{'mode':'fixed','value':1},'L2.pole_v_angle_md':{'mode':'fixed','value':120.25}}}
+        with self.assertRaisesRegex(ValueError,'Layer index exceeds'):validate_parameters(options)
+        options['parameters']['magnet_layers']['value']=2
+        validate_parameters(options)  # angles are not rounded as lengths
+        with self.assertRaises(ValueError):validate_parameters({'shape':'Breadloaf','parameters':{'skew_deg':{'mode':'fixed','value':0}}})
+
+    def test_pole_slot_combos_are_recorded_but_not_claimed_valid(self):
+        request=self.request();request['pole_slot_candidates']=[{'poles':4,'slots':12},{'poles':10,'slots':12}]
+        review=preflight(request)
+        self.assertEqual(len(review['pole_slot_review']),2)
+        self.assertFalse(review['executable']);self.assertFalse(any(r['winding_qualified'] for r in review['pole_slot_review']))
+        with self.assertRaises(ValueError):require_execution(request)
+        request['pole_slot_candidates']=[{'poles':18,'slots':12}]
+        self.assertFalse(preflight(request)['pole_slot_review'][0]['pwm_check']['passes'])
+        for pairs in ([],[{'poles':3,'slots':12}],[{'poles':4,'slots':12}]*2):
+            with self.assertRaises(ValueError):pole_slot_pairs({'pole_slot_candidates':pairs})
+
+    def test_registered_detailed_value_is_never_silently_ignored(self):
+        request=self.request()
+        self.assertTrue(require_execution(request)['executable'])
+        request['spm']['parameters']={'pole_arc_ed':{'mode':'fixed','value':120}}
+        with self.assertRaisesRegex(ValueError,'not optimized'):require_execution(request)
+        request=self.request();request['skew_deg']=0
+        with self.assertRaisesRegex(ValueError,'Skew is excluded'):preflight(request)
+        request['spm']={'shape':'spoke','magnetisation':'Template'};request.pop('skew_deg')
+        review=preflight(request)
+        self.assertFalse(review['executable'])
+        self.assertTrue(all(check['state']=='not_evaluated' for check in review['constraint_states']))
+
+
+if __name__=='__main__':unittest.main()
+
+END_CONTENT
+END_SOURCE S215
+
+
+END_REVIEW_PART_029

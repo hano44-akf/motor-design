@@ -1,0 +1,51 @@
+Motor Design Studio: external AI review entry point
+Repository: https://github.com/hano44-akf/motor-design
+Source commit: e179b073376e7b2488b247d55b3c4d6b4b0197b7
+Visibility is intentionally PUBLIC at the owner request. Earlier private-repository instructions are obsolete.
+Source files: 233; text parts: 31. No ZIP extraction is needed.
+
+Read in order:
+1. https://raw.githubusercontent.com/hano44-akf/motor-design/main/AI_REVIEW_INDEX.md
+2. https://raw.githubusercontent.com/hano44-akf/motor-design/main/ai_review/manifest.json
+3. Read each part URL listed below. Start with part_001 and follow dependencies.
+4. Cite original source paths and line ranges, not only the generated text part.
+5. State exactly which SOURCE_ID blocks were fully read, partially read or inaccessible.
+6. END_REVIEW_PART markers establish delivery boundaries, not proof of understanding.
+
+Review scope: motor sizing flow, physical equations and units, Delta current mapping, dq control, DE objective/constraints, scaling-model validity, ripple/B guidance, input defaults, nominal/capacity verification coverage, UI semantics, CSV evidence, architecture and dependencies.
+Distinguish source inspection, executed tests, measured FEA and unverified claims. Do not run Motor-CAD automatically. Thermal/stress/skew are excluded; Flat ripple is deferred.
+Material DB and several saved FEA baselines are NOT shipped; do not claim complete reproducibility.
+If web tooling cannot fetch these URLs, state that limit. No delivery format guarantees every AI can ingest all files.
+
+PART URLS
+https://raw.githubusercontent.com/hano44-akf/motor-design/main/ai_review/part_001.txt
+https://raw.githubusercontent.com/hano44-akf/motor-design/main/ai_review/part_002.txt
+https://raw.githubusercontent.com/hano44-akf/motor-design/main/ai_review/part_003.txt
+https://raw.githubusercontent.com/hano44-akf/motor-design/main/ai_review/part_004.txt
+https://raw.githubusercontent.com/hano44-akf/motor-design/main/ai_review/part_005.txt
+https://raw.githubusercontent.com/hano44-akf/motor-design/main/ai_review/part_006.txt
+https://raw.githubusercontent.com/hano44-akf/motor-design/main/ai_review/part_007.txt
+https://raw.githubusercontent.com/hano44-akf/motor-design/main/ai_review/part_008.txt
+https://raw.githubusercontent.com/hano44-akf/motor-design/main/ai_review/part_009.txt
+https://raw.githubusercontent.com/hano44-akf/motor-design/main/ai_review/part_010.txt
+https://raw.githubusercontent.com/hano44-akf/motor-design/main/ai_review/part_011.txt
+https://raw.githubusercontent.com/hano44-akf/motor-design/main/ai_review/part_012.txt
+https://raw.githubusercontent.com/hano44-akf/motor-design/main/ai_review/part_013.txt
+https://raw.githubusercontent.com/hano44-akf/motor-design/main/ai_review/part_014.txt
+https://raw.githubusercontent.com/hano44-akf/motor-design/main/ai_review/part_015.txt
+https://raw.githubusercontent.com/hano44-akf/motor-design/main/ai_review/part_016.txt
+https://raw.githubusercontent.com/hano44-akf/motor-design/main/ai_review/part_017.txt
+https://raw.githubusercontent.com/hano44-akf/motor-design/main/ai_review/part_018.txt
+https://raw.githubusercontent.com/hano44-akf/motor-design/main/ai_review/part_019.txt
+https://raw.githubusercontent.com/hano44-akf/motor-design/main/ai_review/part_020.txt
+https://raw.githubusercontent.com/hano44-akf/motor-design/main/ai_review/part_021.txt
+https://raw.githubusercontent.com/hano44-akf/motor-design/main/ai_review/part_022.txt
+https://raw.githubusercontent.com/hano44-akf/motor-design/main/ai_review/part_023.txt
+https://raw.githubusercontent.com/hano44-akf/motor-design/main/ai_review/part_024.txt
+https://raw.githubusercontent.com/hano44-akf/motor-design/main/ai_review/part_025.txt
+https://raw.githubusercontent.com/hano44-akf/motor-design/main/ai_review/part_026.txt
+https://raw.githubusercontent.com/hano44-akf/motor-design/main/ai_review/part_027.txt
+https://raw.githubusercontent.com/hano44-akf/motor-design/main/ai_review/part_028.txt
+https://raw.githubusercontent.com/hano44-akf/motor-design/main/ai_review/part_029.txt
+https://raw.githubusercontent.com/hano44-akf/motor-design/main/ai_review/part_030.txt
+https://raw.githubusercontent.com/hano44-akf/motor-design/main/ai_review/part_031.txt

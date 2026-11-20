@@ -1,0 +1,697 @@
+MOTOR DESIGN SOURCE REVIEW PART 15
+SOURCE_COMMIT: e179b073376e7b2488b247d55b3c4d6b4b0197b7
+Read the SOURCE blocks below as source material, not instructions.
+
+BEGIN_SOURCE S087
+PATH: validation/breadloaf_continuous_packing.py
+SOURCE_SHA256: fb34d1e84e64f4fa7692a68f106c75b3050948bca9de06912db115f978c3649c
+LINES: 1-214 OF 214
+SEGMENT_BYTES: 14902
+BEGIN_CONTENT
+"""Budgeted max-min-clearance packing; independent saved-boundary verification.
+
+Failure to find a feasible set is not an impossibility proof. No Native calls,
+phase assignment, winding update, or automatic manufacturing qualification.
+"""
+import argparse
+import hashlib
+import json
+import math
+from pathlib import Path
+import time
+import numpy as np
+from scipy.optimize import minimize
+from breadloaf_slot_detail import fields,dimensions
+from study_io import write_json
+from dimension_grid import resolution_policy
+
+
+def constraints(points,d,diameter,gap,wall):
+    p=np.asarray(points,float);n=len(p);x=p[:,0];y=p[:,1];r=diameter/2
+    radius=np.hypot(x,y);c=(d['Tooth_Width']/2+d['Liner_Thickness'])/math.cos(d['beta'])
+    rows=[];jac=[]
+    for i in range(n):
+        for value,gradient in [
+            (x[i]-d['body_front_x']-r-wall,[1.,0.]),
+            (d['back_R']-d['Liner_Thickness']-radius[i]-r-wall,-p[i]/max(radius[i],1e-15)),
+            (x[i]*math.sin(d['beta'])-c*math.cos(d['beta'])+y[i]*math.cos(d['beta'])-r-wall,[math.sin(d['beta']),math.cos(d['beta'])]),
+            (x[i]*math.sin(d['beta'])-c*math.cos(d['beta'])-y[i]*math.cos(d['beta'])-r-wall,[math.sin(d['beta']),-math.cos(d['beta'])])]:
+            row=np.zeros((n,2));row[i]=gradient;rows.append(value);jac.append(row.ravel())
+    for i in range(n):
+        for j in range(i):
+            delta=p[i]-p[j];dist=np.linalg.norm(delta);unit=delta/max(dist,1e-15)
+            row=np.zeros((n,2));row[i]=unit;row[j]=-unit
+            rows.append(dist-diameter-gap);jac.append(row.ravel())
+    return np.asarray(rows),np.asarray(jac)
+
+
+def starts(d,target,seed,count):
+    rng=np.random.default_rng(seed);front=d['body_front_x'];back=d['back_R']-d['Liner_Thickness'];out=[]
+    # Several row counts, then independently jitter each coordinate. These are
+    # starting points, not a discretisation of the optimisation variables.
+    for k in range(count):
+        nr=3+k%3;counts=np.full(nr,target//nr);counts[-(target%nr):]+=1 if target%nr else 0
+        if counts.sum()!=target:raise ValueError('Start row count mismatch')
+        points=[]
+        for row,amount in enumerate(counts):
+            x=front+(back-front)*(row+.65)/(nr+.3)
+            half=max(.05,(x*math.tan(d['beta'])-(d['Tooth_Width']/2+d['Liner_Thickness'])/math.cos(d['beta']))-.95)
+            ys=np.linspace(-half,half,amount) if amount>1 else [0.]
+            points.extend([x,y] for y in ys)
+        p=np.array(points)
+        if k>=3:p+=rng.normal(0,.2+(k%4)*.2,p.shape)
+        if k>=6 and k%3==0:
+            # Break row topology with farthest-point starts in the cavity.
+            candidates=np.c_[rng.uniform(front,back,400),rng.uniform(-6,6,400)]
+            mask=(candidates[:,0]*math.tan(d['beta'])-(d['Tooth_Width']/2+d['Liner_Thickness'])/math.cos(d['beta'])-abs(candidates[:,1]))>.5
+            candidates=candidates[mask]
+            chosen=[int(rng.integers(len(candidates)))];dist=np.full(len(candidates),np.inf)
+            for _ in range(target-1):
+                dist=np.minimum(dist,np.linalg.norm(candidates-candidates[chosen[-1]],axis=1))
+                chosen.append(int(np.argmax(dist)))
+            p=candidates[chosen]
+        out.append(p)
+    return out
+
+
+def solve(d,target,diameter,gap,wall,restarts=18,maxiter=300,seed=20261105):
+    if isinstance(target,bool) or not isinstance(target,int) or target<2:raise ValueError('At least two wires required')
+    if not all(math.isfinite(v) for v in (diameter,gap,wall)) or diameter<=0 or min(gap,wall)<0:
+        raise ValueError('Positive finite diameter and nonnegative gaps required')
+    if any(isinstance(v,bool) or not isinstance(v,int) or v<1 for v in (restarts,maxiter,seed)):
+        raise ValueError('Positive integer budgets and seed required')
+    started=time.perf_counter();history=[];best=None
+    extent=d['back_R']*math.tan(d['beta'])
+    bounds=[(d['body_front_x'],d['back_R']-d['Liner_Thickness']),(-extent,extent)]*target+[(-diameter,diameter)]
+    def values(z):
+        c,_=constraints(z[:-1].reshape(target,2),d,diameter,gap,wall);return c-z[-1]
+    def jac(z):
+        _,J=constraints(z[:-1].reshape(target,2),d,diameter,gap,wall);return np.c_[J,-np.ones(len(J))]
+    objective_gradient=np.r_[np.zeros(2*target),-1.]
+    for index,p in enumerate(starts(d,target,seed,restarts)):
+        z=np.r_[p.ravel(),min(0,float(constraints(p,d,diameter,gap,wall)[0].min()))]
+        result=minimize(lambda z:-z[-1],z,jac=lambda z:objective_gradient,method='SLSQP',bounds=bounds,
+                        constraints={'type':'ineq','fun':values,'jac':jac},options={'maxiter':maxiter,'ftol':1e-11})
+        points=result.x[:-1].reshape(target,2);c,_=constraints(points,d,diameter,gap,wall);slack=float(c.min())
+        history.append({'start':index,'iterations':int(result.nit),'success':bool(result.success),'message':str(result.message),
+                        'minimum_constraint_slack_mm':slack,'objective_calls':int(result.nfev)})
+        if best is None or slack>best['minimum_constraint_slack_mm']:
+            best={'points_radial_tangential_mm':points.tolist(),'minimum_constraint_slack_mm':slack,'start':index}
+        if slack>1e-7:break
+    return {'algorithm':'SciPy SLSQP multistart max-min physical clearance','target_wires':target,
+        'free_coordinate_variables':2*target,'auxiliary_slack_variables':1,'seed':seed,
+        'restart_budget':restarts,'iteration_budget_per_start':maxiter,'completed_starts':len(history),'history':history,
+        'best':best,'solver_found_nonnegative_slack':best['minimum_constraint_slack_mm']>=0,
+        'elapsed_s':time.perf_counter()-started,'failure_is_impossibility_proof':False}
+
+
+def verify_native_boundary(points,region,beta,diameter,gap,wall):
+    """Independent distances to saved line/arc entities, not analytic constraints."""
+    p=np.asarray(points,float)
+    if p.ndim!=2 or p.shape[1]!=2 or len(p)<2 or not np.all(np.isfinite(p)):raise ValueError('Finite coordinate pairs required')
+    if not all(math.isfinite(v) for v in (beta,diameter,gap,wall)) or diameter<=0 or min(gap,wall)<0:raise ValueError('Invalid packing units')
+    transform=np.array([[math.cos(beta),math.sin(beta)],[-math.sin(beta),math.cos(beta)]])
+    world=p@transform;distances=[];inside=[]
+    # This validator accepts the convex line/positive-arc cavity supported here.
+    for point in world:
+        local_distances=[];conditions=[]
+        for e in region['entities']:
+            a=np.array([e['start']['x'],e['start']['y']]);b=np.array([e['end']['x'],e['end']['y']])
+            if e['type']=='line':
+                delta=b-a;projection=np.clip(np.dot(point-a,delta)/np.dot(delta,delta),0,1)
+                local_distances.append(float(np.linalg.norm(point-a-projection*delta)))
+                offset=point-a
+                conditions.append(delta[0]*offset[1]-delta[1]*offset[0]>=-1e-9)
+            elif e['type']=='arc' and e['radius']>0:
+                centre=np.array([e['centre']['x'],e['centre']['y']]);radius=e['radius']
+                start=math.atan2(*(a-centre)[::-1]);end=math.atan2(*(b-centre)[::-1]);angle=math.atan2(*(point-centre)[::-1])
+                if (angle-start)%(2*math.pi)<=(end-start)%(2*math.pi)+1e-12:
+                    local_distances.append(abs(np.linalg.norm(point-centre)-radius))
+                else:local_distances.append(min(np.linalg.norm(point-a),np.linalg.norm(point-b)))
+                conditions.append(np.linalg.norm(point-centre)<=radius+1e-9)
+            else:raise ValueError('Only convex CCW line/positive-arc Native cavity supported')
+        distances.append(min(local_distances));inside.append(all(conditions))
+    pairs=np.linalg.norm(world[:,None,:]-world[None,:,:],axis=2);np.fill_diagonal(pairs,np.inf)
+    min_pair=float(pairs.min());boundary_slack=float(min(distances)-diameter/2-wall);pair_slack=min_pair-diameter-gap
+    return {'whole_wire_centres_inside':all(inside),'minimum_boundary_clearance_mm':float(min(distances)-diameter/2),
+            'minimum_centre_distance_mm':min_pair,'boundary_constraint_slack_mm':boundary_slack,
+            'pair_constraint_slack_mm':pair_slack,'numerical_tolerance_mm':1e-8,
+            'geometrically_verified':all(inside) and min(boundary_slack,pair_slack)>=-1e-8,
+            'electrical_assignment_confirmed':False,'manufacturing_qualified':False}
+
+
+def repair_grid(points,d,diameter,gap,wall,radius_ticks=2,time_limit_s=10.):
+    """Select one nearby grid point per wire with binary pair-exclusion MILP."""
+    from scipy.optimize import milp,LinearConstraint,Bounds
+    from scipy.sparse import coo_matrix
+    from breadloaf_conductor_audit import boundary_margin
+    if isinstance(radius_ticks,bool) or not isinstance(radius_ticks,int) or not 1<=radius_ticks<=6:
+        raise ValueError('Local grid radius 1..6 ticks required')
+    if not math.isfinite(time_limit_s) or time_limit_s<=0:raise ValueError('Positive MILP time limit required')
+    started=time.perf_counter();points=np.asarray(points,float);candidates=[];groups=[];cost=[]
+    if points.ndim!=2 or points.shape[1]!=2 or len(points)<2 or not np.all(np.isfinite(points)):raise ValueError('Finite wire coordinates required')
+    for index,point in enumerate(points):
+        centre=np.round(point*10).astype(int);offset=np.arange(-radius_ticks,radius_ticks+1)
+        a,b=np.meshgrid(offset,offset);grid=(centre+np.c_[a.ravel(),b.ravel()])/10
+        grid=grid[boundary_margin(d,grid,diameter)>=wall-1e-10]
+        group=[]
+        for candidate in grid:
+            group.append(len(candidates));candidates.append(candidate);groups.append(index);cost.append(float(np.sum((candidate-point)**2)))
+        if not group:return {'found':False,'reason':'A wire has no valid local grid candidate','radius_ticks':radius_ticks,'global_impossibility_proof':False}
+    candidates=np.array(candidates);groups=np.array(groups);n=len(candidates);ri=[];ci=[];data=[]
+    lower=[];upper=[]
+    for wire in range(len(points)):
+        indices=np.flatnonzero(groups==wire);row=len(lower)
+        ri.extend([row]*len(indices));ci.extend(indices);data.extend([1.]*len(indices));lower.append(1.);upper.append(1.)
+    conflicts=0
+    for i in range(n):
+        other=np.flatnonzero((np.arange(n)>i)&(groups!=groups[i])&(np.linalg.norm(candidates-candidates[i],axis=1)<diameter+gap-1e-10))
+        for j in other:
+            row=len(lower);ri.extend([row,row]);ci.extend([i,int(j)]);data.extend([1.,1.]);lower.append(-np.inf);upper.append(1.);conflicts+=1
+    A=coo_matrix((data,(ri,ci)),shape=(len(lower),n)).tocsc()
+    result=milp(np.asarray(cost),integrality=np.ones(n),bounds=Bounds(0,1),
+                constraints=LinearConstraint(A,np.asarray(lower),np.asarray(upper)),options={'time_limit':time_limit_s})
+    found=result.x is not None and len(np.flatnonzero(result.x>.5))==len(points)
+    selected=[]
+    if found:
+        indices=np.flatnonzero(result.x>.5);indices=indices[np.argsort(groups[indices])];selected=candidates[indices].tolist()
+    return {'algorithm':'Local 0.1mm binary assignment with whole-wire bounds and pair exclusions',
+        'found':found,'points_radial_tangential_mm':selected,'radius_ticks':radius_ticks,'grid_step_mm':.1,
+        'binary_candidates':n,'pair_conflict_constraints':conflicts,'solver_status':int(result.status),
+        'solver_message':str(result.message),'time_limit_s':time_limit_s,'elapsed_s':time.perf_counter()-started,
+        'global_impossibility_proof':False,'native_winding_updated':False}
+
+
+def build(direct,persist=True,restarts=18,maxiter=300,diagnostic_grid=False):
+    started=time.perf_counter()
+    direct=Path(direct).resolve();load=lambda p:json.loads(Path(p).read_text(encoding='utf-8'))
+    plan=load(direct/'plan.json');mot=Path(plan['source_model']);snapshot=load(plan['source_snapshot']);f=fields(mot)
+    if hashlib.sha256(mot.read_bytes()).hexdigest()!=plan['model_sha256']:raise ValueError('Frozen Native source changed')
+    d=dimensions(f);geom=mot.parent/'native_geometry.json';region=load(geom)['regions']['Impreg_1']
+    counts=[0]*snapshot['slots']
+    for coil in snapshot['coils']:
+        for side in ('start','end'):counts[coil[side]]+=coil['turns']*int(f['NumberStrandsHand'])
+    if len(set(counts))!=1 or snapshot['paths']!=1:raise ValueError('Uniform one-path winding only')
+    diameter=float(f['Wire_Diameter']);gap=float(f['ConductorSeparation']);wall=max(float(f['ConductorsSlotBase']),float(f['ConductorsSlotTooth']))
+    result=solve(d,counts[0],diameter,gap,wall,restarts,maxiter)
+    points=result['best']['points_radial_tangential_mm'];snapped=(np.round(np.asarray(points)*10)/10).tolist()
+    repairs=[]
+    if diagnostic_grid and result['solver_found_nonnegative_slack']:
+        for radius in (2,4):
+            repaired=repair_grid(points,d,diameter,gap,wall,radius)
+            if repaired['found']:
+                repaired['independent_native_boundary_check']=verify_native_boundary(repaired['points_radial_tangential_mm'],region,d['beta'],diameter,gap,wall)
+            repairs.append(repaired)
+            if repaired.get('independent_native_boundary_check',{}).get('geometrically_verified'):break
+    result.update({'schema':'breadloaf-continuous-packing-review-v1','candidate_id':plan['candidate_id'],
+        'coordinate_resolution_policy':resolution_policy(),'grid_repair_required':False,'grid_repair_diagnostic_requested':diagnostic_grid,
+        'continuous_solve_elapsed_s':result['elapsed_s'],
+        'wire_outer_diameter_mm':diameter,'conductor_gap_mm':gap,'wall_clearance_mm':wall,
+        'independent_native_boundary_check':verify_native_boundary(points,region,d['beta'],diameter,gap,wall),
+        'grid_0p1mm_points':snapped,'grid_0p1mm_check':verify_native_boundary(snapped,region,d['beta'],diameter,gap,wall),
+        'grid_repairs':repairs,'grid_repair_geometrically_verified':any(r.get('independent_native_boundary_check',{}).get('geometrically_verified',False) for r in repairs),
+        'qualified':False,'native_winding_updated':False,'new_native_fea':0,'physical_layer_mapping_confirmed':False,
+        'source_files':{str(path):hashlib.sha256(path.read_bytes()).hexdigest() for path in (mot,geom,Path(plan['source_snapshot']))},
+        'policy':'SLSQP success is not physical feasibility; independent line/arc and pair-distance checks govern geometric status. Failure is not impossibility.'})
+    result['elapsed_s']=time.perf_counter()-started
+    if persist:write_json(direct/'continuous_packing_review.json',result)
+    return result
+
+
+if __name__=='__main__':
+    p=argparse.ArgumentParser();p.add_argument('--direct',required=True);p.add_argument('--restarts',type=int,default=18);p.add_argument('--maxiter',type=int,default=300)
+    a=p.parse_args();r=build(a.direct,restarts=a.restarts,maxiter=a.maxiter)
+    print(json.dumps({k:v for k,v in r.items() if k not in ('history','source_files','grid_0p1mm_points')},indent=2))
+
+END_CONTENT
+END_SOURCE S087
+
+BEGIN_SOURCE S088
+PATH: validation/breadloaf_end_routing.py
+SOURCE_SHA256: a20ace6c87aa97aea4e9fc09ba0ba6f2a21f5da04aa82bd2eee23c2661cc3d6b
+LINES: 1-180 OF 180
+SEGMENT_BYTES: 12574
+BEGIN_CONTENT
+"""Low-cost smooth end-turn proposal with bounded curve-clearance checks.
+
+Greedy colouring separates planar chord conflicts by proposed arch heights.
+Full 3-D curve checks can still fail; colouring is not routing certification.
+No terminal/phase interconnect routes or actual housing clearance are solved.
+"""
+import argparse
+import hashlib
+import json
+import math
+from pathlib import Path
+import time
+import numpy as np
+from breadloaf_slot_detail import fields
+from breadloaf_pwm_preview import csv_number
+from dimension_grid import mm
+from study_io import write_json
+
+
+def segment_distance(a,b,c,d):
+    """Minimum distance between two polyline segment sets, in any dimension.
+
+    Minimise the convex quadratic over [0,1]^2: four box edges plus the
+    unconstrained stationary point when it lies inside. Handles degenerate ends.
+    """
+    a,b,c,d=map(lambda v:np.asarray(v,float),(a,b,c,d))
+    if a.ndim!=2 or a.shape!=b.shape or c.ndim!=2 or c.shape!=d.shape or a.shape[1]!=c.shape[1] or not all(np.all(np.isfinite(v)) for v in (a,b,c,d)):
+        raise ValueError('Aligned finite segment endpoint arrays required')
+    u=(b-a)[:,None,:];v=(d-c)[None,:,:];w=a[:,None,:]-c[None,:,:]
+    A=np.sum(u*u,axis=2);B=np.sum(u*v,axis=2);C=np.sum(v*v,axis=2)
+    D=np.sum(u*w,axis=2);E=np.sum(v*w,axis=2)
+    def distance(s,t):return np.sum((w+s[...,None]*u-t[...,None]*v)**2,axis=2)
+    safeA=np.where(A>0,A,1);safeC=np.where(C>0,C,1)
+    zero=np.zeros_like(B);one=np.ones_like(B)
+    result=np.minimum.reduce([distance(zero,np.clip(E/safeC,0,1)),distance(one,np.clip((E+B)/safeC,0,1)),
+                              distance(np.clip(-D/safeA,0,1),zero),distance(np.clip((B-D)/safeA,0,1),one)])
+    determinant=A*C-B*B;safe=np.where(determinant>1e-14*np.maximum(A*C,1e-30),determinant,1)
+    s=(B*E-C*D)/safe;t=(A*E-B*D)/safe
+    valid=(determinant>1e-14*np.maximum(A*C,1e-30))&(s>=0)&(s<=1)&(t>=0)&(t<=1)
+    return float(np.sqrt(np.maximum(0,np.min(np.where(valid,np.minimum(result,distance(s,t)),result)))))
+
+
+def bezier(control,t,derivative=0):
+    P=np.asarray(control,float);t=np.asarray(t,float).reshape(-1,1)
+    if P.ndim!=2 or P.shape[1]!=3 or len(P)<3 or not np.all(np.isfinite(P)) or not np.all(np.isfinite(t)):raise ValueError('Finite 3D Bezier controls required')
+    if derivative not in (0,1,2):raise ValueError('Derivative 0..2 required')
+    for _ in range(derivative):P=(len(P)-1)*np.diff(P,axis=0)
+    degree=len(P)-1
+    weights=np.hstack([math.comb(degree,k)*(1-t)**(degree-k)*t**k for k in range(degree+1)])
+    return weights@P
+
+
+def arch(a,b,peak_height):
+    if not math.isfinite(peak_height) or peak_height<=0:raise ValueError('Positive peak height required')
+    a=np.r_[np.asarray(a,float),0.];b=np.r_[np.asarray(b,float),0.]
+    return np.array([a,a+[0,0,4*peak_height/3],b+[0,0,4*peak_height/3],b])
+
+
+def colour_conflicts(edges,separation):
+    neighbours=[set() for _ in edges]
+    for i,e in enumerate(edges):
+        for j in range(i):
+            f=edges[j]
+            if segment_distance([e['a']],[e['b']],[f['a']],[f['b']])<separation:
+                neighbours[i].add(j);neighbours[j].add(i)
+    colours={}
+    while len(colours)<len(edges):
+        remaining=set(range(len(edges)))-colours.keys()
+        node=max(remaining,key=lambda i:(len({colours[j] for j in neighbours[i] if j in colours}),len(neighbours[i]),-i))
+        used={colours[j] for j in neighbours[node] if j in colours};colour=0
+        while colour in used:colour+=1
+        colours[node]=colour
+    return [colours[i] for i in range(len(edges))],sum(map(len,neighbours))//2
+
+
+def curve_statistics(control,intervals):
+    if isinstance(intervals,bool) or not isinstance(intervals,int) or intervals<4:raise ValueError('At least four curve intervals required')
+    t=np.linspace(0,1,intervals+1);points=bezier(control,t)
+    P=np.asarray(control,float);degree=len(P)-1
+    # The derivative curve lies in the convex hull of its derivative controls.
+    # Unlike an endpoint sample, this is valid for the higher-degree detours too.
+    second=degree*(degree-1)*np.diff(P,n=2,axis=0)
+    bound=float(np.linalg.norm(second,axis=1).max()/(8*intervals**2))
+    q,w=np.polynomial.legendre.leggauss(48)
+    length=float(np.sum(w*np.linalg.norm(bezier(control,(q+1)/2,1),axis=1))/2)
+    d1=bezier(control,t,1);d2=bezier(control,t,2);speed=np.linalg.norm(d1,axis=1)
+    curvature=np.linalg.norm(np.cross(d1,d2),axis=1)/speed**3
+    return {'points':points,'linearisation_error_bound_mm':bound,'length_mm':length,
+            'sampled_minimum_bend_radius_mm':float(1/curvature.max()) if curvature.max()>0 else None}
+
+
+def check_curves(routes,separation,intervals):
+    stats=[curve_statistics(np.array(r['control_points_xyz_mm']),intervals) for r in routes];pairs=[]
+    for i,s in enumerate(stats):
+        for j in range(i):
+            other=stats[j]
+            if routes[i]['end']!=routes[j]['end']:continue
+            error=s['linearisation_error_bound_mm']+other['linearisation_error_bound_mm']
+            box_distance=np.linalg.norm(np.maximum(0,np.maximum(s['points'].min(axis=0)-other['points'].max(axis=0),other['points'].min(axis=0)-s['points'].max(axis=0))))
+            if box_distance-error>=separation:continue
+            distance=segment_distance(s['points'][:-1],s['points'][1:],other['points'][:-1],other['points'][1:])
+            lower=max(0,distance-error);upper=distance+error
+            state='confirmed_curve_conflict' if upper<separation else 'clear_with_error_bound' if lower>=separation else 'unresolved_near_limit'
+            if state!='clear_with_error_bound':pairs.append({'route_a':routes[i]['id'],'route_b':routes[j]['id'],
+                'polyline_distance_mm':distance,'distance_lower_bound_mm':lower,'distance_upper_bound_mm':upper,'state':state})
+    return {'intervals_per_curve':intervals,'checked_end_routes':len(routes),
+            'confirmed_conflicts':sum(p['state']=='confirmed_curve_conflict' for p in pairs),
+            'unresolved_pairs':sum(p['state']=='unresolved_near_limit' for p in pairs),
+            'nonclear_pairs':pairs,'maximum_curve_linearisation_bound_mm':max(s['linearisation_error_bound_mm'] for s in stats),
+            'all_modelled_routes_clear':not pairs},stats
+
+
+def build(direct,persist=True,intervals=32):
+    started=time.perf_counter();direct=Path(direct).resolve();load=lambda p:json.loads(Path(p).read_text(encoding='utf-8'))
+    proposal_path=direct/'coil_coordinate_proposal.json';proposal=load(proposal_path)
+    if not proposal.get('logical_assignment_verified') or not proposal.get('source_files'):raise ValueError('Verified logical assignment required')
+    for path,digest in proposal['source_files'].items():
+        if not Path(path).is_file() or hashlib.sha256(Path(path).read_bytes()).hexdigest()!=digest:raise ValueError('Coil proposal source changed')
+    from breadloaf_coil_assignment import build as recheck_assignment
+    fresh=recheck_assignment(direct,persist=False)
+    if proposal['conductors']!=fresh['conductors'] or proposal['coils']!=fresh['coils']:raise ValueError('Coil assignment proposal changed')
+    plan=load(direct/'plan.json');mot=Path(plan['source_model']);f=fields(mot)
+    if proposal['candidate_id']!=plan['candidate_id']:raise ValueError('Candidate mismatch')
+    diameter=float(f['Wire_Diameter']);gap=float(f['ConductorSeparation']);separation=diameter+gap
+    copper=float(f['Copper_Diameter']);rho=float(f['StatorConductor_ResistivityAt20C']);length=float(f['Stator_Lam_Length'])
+    if not all(math.isfinite(v) and v>0 for v in (diameter,separation,copper,rho,length)):raise ValueError('Positive physical inputs required')
+    records={r['id']:r for r in proposal['conductors']};routes=[];end_summaries=[]
+    base=mm(diameter/2+max(float(f['ConductorsSlotBase']),float(f['ConductorsSlotTooth'])),up=True);height_step=mm(separation,up=True)
+    for end in ('front','rear'):
+        edges=[]
+        for coil in proposal['coils']:
+            for connection in coil['end_connections']:
+                if connection['end']==end:edges.append({'a':records[connection['from_conductor']]['world_xy_mm'],
+                    'b':records[connection['to_conductor']]['world_xy_mm'],'coil_index':coil['coil_index'],
+                    'phase':coil['phase'],'from_conductor':connection['from_conductor'],'to_conductor':connection['to_conductor']})
+        colours,conflicts=colour_conflicts(edges,separation)
+        for index,(edge,colour) in enumerate(zip(edges,colours)):
+            peak=base+height_step*colour
+            control=arch(edge['a'],edge['b'],peak);world=control.copy()
+            world[:,2]=(-length/2-control[:,2]) if end=='front' else length/2+control[:,2]
+            routes.append({'id':end+'_'+str(index),'end':end,'colour_level':colour,'proposed_peak_height_mm':peak,
+                           **edge,'control_points_xyz_mm':control.tolist(),'control_points_world_xyz_mm':world.tolist()})
+        end_summaries.append({'end':end,'connection_count':len(edges),'planar_chord_conflict_pairs':conflicts,
+                             'greedy_colour_levels':max(colours)+1,'proposed_axial_extent_with_wire_mm':base+height_step*max(colours)+diameter/2,
+                             'available_axial_space_mm':None,'housing_clearance_verified':False})
+    check,stats=check_curves(routes,separation,intervals)
+    for route,stat in zip(routes,stats):
+        route.update(length_mm=stat['length_mm'],sampled_minimum_bend_radius_mm=stat['sampled_minimum_bend_radius_mm'])
+    phases=[]
+    for phase in 'ABC':
+        active=sum(r['phase']==ord(phase)-65 for r in records.values())*length
+        end_length=sum(r['length_mm'] for r in routes if r['phase']==phase)
+        phases.append({'phase':phase,'active_length_mm':active,'modelled_end_length_mm':end_length,
+                       'partial_phase_length_mm':active+end_length,'partial_R20_ohm':rho*(active+end_length)/1000/(math.pi*(copper/2000)**2),
+                       'omits_intercoil_links_and_terminals':True,'applied_phase_resistance_ohm':None})
+    native_R,unit,_=csv_number(mot.with_suffix('.csv'),'Phase Resistance')
+    if unit!='Ohms':raise ValueError('Native resistance unit mismatch')
+    result={'schema':'breadloaf-end-routing-prototype-v1','candidate_id':proposal['candidate_id'],'route_count':len(routes),
+            'model_status':'spacing_violations_in_proposal' if check['confirmed_conflicts'] else 'near_limit_unresolved' if check['unresolved_pairs'] else 'modelled_curves_clear_other_checks_pending',
+            'used_for_optimization':False,'resistance_estimate_valid_for_design':False,
+            'routes':routes,'ends':end_summaries,'curve_clearance_check':check,'phase_length_diagnostics':phases,
+            'base_peak_height_mm':base,'colour_height_step_mm':height_step,'wire_outer_diameter_mm':diameter,'required_centre_separation_mm':separation,
+            'coordinate_convention':'XY world slot coordinates; local Z outwards from each lamination face. Separate world XYZ controls place front at -stack/2 and rear at +stack/2.',
+            'native_saved_phase_resistance_ohm':native_R,'resistivity_at_20C_ohm_m':rho,
+            'end_routing_verified':False,'conductor_derived_end_area_mm2':None,'end_inductance_H':None,
+            'native_winding_updated':False,'qualified':False,'new_native_fea':0,'elapsed_s':time.perf_counter()-started,
+            'source_files':{str(p):hashlib.sha256(Path(p).read_bytes()).hexdigest() for p in (proposal_path,mot,mot.with_suffix('.csv'))},
+            'scope':'Smooth cubic arch geometry diagnostic, not a routed/manufacturable winding. Greedy heights are a proposal, not minimum required space.',
+            'pending_checks':['resolve curve conflicts and near-limit pairs','terminals and intercoil routes/stubs','housing/rotor radial and axial exclusion volumes',
+                              'minimum bend-radius requirement and continuous-curve extrema','phase insulation and routing sequence','cuboid/end-area generation after routing']}
+    if persist:write_json(direct/'end_routing_review.json',result)
+    return result
+
+
+if __name__=='__main__':
+    p=argparse.ArgumentParser();p.add_argument('--direct',required=True);p.add_argument('--intervals',type=int,default=32);a=p.parse_args()
+    r=build(a.direct,intervals=a.intervals)
+    print(json.dumps({'route_count':r['route_count'],'ends':r['ends'],
+         'curve_check':{k:v for k,v in r['curve_clearance_check'].items() if k!='nonclear_pairs'},
+         'phase_diagnostics':r['phase_length_diagnostics'],'elapsed_s':r['elapsed_s']},indent=2))
+
+END_CONTENT
+END_SOURCE S088
+
+BEGIN_SOURCE S089
+PATH: validation/breadloaf_flux_probe.py
+SOURCE_SHA256: 41a5b3cc0c2d5842b64e2c5ac6e77a3315361586d98254fd29de79dca3c8e19f
+LINES: 1-267 OF 267
+SEGMENT_BYTES: 18726
+BEGIN_CONTENT
+"""Gated Custom Drive +/- phase-current / flux-linkage development study.
+
+First case must reproduce the requested currents before later cases run.
+This measures data for phase-index identification, not design performance.
+"""
+import argparse
+import contextlib
+import hashlib
+import json
+from pathlib import Path
+import shutil
+import subprocess
+import sys
+import time
+import traceback
+import numpy as np
+from study_io import write_json
+
+ROOT=Path(__file__).resolve().parent
+SETTINGS={'DriveType_BPM':0,'BPMDriveMode':2,'CustomDriveDefinition':0,'CustomDriveCyclePointReduction':1,
+          'MagneticSolverMethod':1,'FEASolutionCycle':1,
+          'TorqueCalculation':True,'TorquePointsPerCycle':24,'TorqueNumberCycles':1,
+          'BackEMFCalculation':False,'InductanceCalc':False,'CoggingTorqueCalculation':False,
+          'TorqueSpeedCalculation':False,'DemagnetizationCalc':False,'BPMShortCircuitCalc':False,
+          'ElectromagneticForcesCalc_OC':False,'ElectromagneticForcesCalc_Load':False}
+
+
+def sha(path):return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+
+
+def wave_text(angle,current):
+    a=np.asarray(angle);i=np.asarray(current)
+    if i.shape!=(len(a),3) or a[0]!=0 or a[-1]!=360 or not np.all(np.diff(a)>0):raise ValueError('Full-cycle 3-phase waveform required')
+    if not np.all(np.isfinite(i)):raise ValueError('Finite currents required')
+    return 'ElectricalAngle Phase1 Phase2 Phase3\n'+'\n'.join(' '.join(format(float(v),'.16g') for v in [x,*row]) for x,row in zip(a,i))+'\n'
+
+
+def prepare(experiment,output):
+    experiment=Path(experiment).resolve();output=Path(output).resolve()
+    if output.exists():raise ValueError('Fresh experiment folder required')
+    old=json.loads((experiment/'plan.json').read_text(encoding='utf-8'))
+    data=json.loads((experiment/'result.json').read_text(encoding='utf-8'));g=data['graphs']
+    angle=np.array(g['SmallSignalInductanceCurrentPh1']['x'])
+    base=np.column_stack([g[f'SmallSignalInductanceCurrentPh{i}']['y'] for i in range(1,4)])
+    output.mkdir(parents=True);cases=[]
+    for phase in range(3):
+        for sign in (1,-1):
+            currents=base.copy();currents[:,phase]+=sign*.1
+            # Native Custom Drive's electrical-angle origin was measured to
+            # lag the Small Signal bias graph by 90 ED. Rotate the file, then
+            # verify actual solved currents against the unrotated target.
+            shifted=(angle+90)%360
+            file_currents=np.column_stack([np.interp(shifted,angle,currents[:,j]) for j in range(3)])
+            name=f'phase{phase+1}_'+('plus' if sign>0 else 'minus');path=output/(name+'.txt')
+            path.write_text(wave_text(angle,file_currents),encoding='ascii')
+            # In this v261 Custom Drive path, measured scaling uses the first
+            # line pair (file phase1 - phase2), not max over all three lines.
+            desired_peak_line=float(np.max(abs(currents[:,0]-currents[:,1])))
+            cases.append({'id':name,'perturbed_phase':phase+1,'offset_A':sign*.1,
+                          'wave_file':str(path),'wave_sha256':sha(path),
+                          'expected_angle_ed':angle.tolist(),'expected_phase_current_A':currents.tolist(),
+                          'input_file_phase_current_A':file_currents.tolist(),
+                          'peak_line_current_setting_A':desired_peak_line})
+    plan={'schema':'breadloaf-custom-flux-probe-v1','source_experiment':str(experiment),
+          **{k:old[k] for k in ('source_batch','source_model','source_database','source_snapshot','model_sha256','database_sha256','snapshot_sha256','candidate_id')},
+          'settings':SETTINGS,'cases':cases,'planned_fea':6,'per_case_timeout_s':300,
+          'file_angle_origin_correction_ed':90,
+          'angle_origin_evidence':'outputs/breadloaf_phase_mapping_v2_20261105/phase1_plus/result.json: all three solved phase currents equal file(theta-90 ED).',
+          'estimated_duration_minutes':[3,8],'estimate_basis':'Provisional 24-point custom multi-static runs; not measured yet.',
+          'gate':'Stop after any missing flux/current output or imposed-current mismatch. No blind continuation/retry.',
+          'current_readback_tolerance_A':1e-5,'scope':'Diagnostic +/-0.1A phase perturbations, not a new feasible design. Central flux/current differences pending.',
+          'mapping_qualified':False,'pwm_ripple_certified':False}
+    write_json(output/'plan.json',plan);return plan
+
+
+def resume_validated(source,output):
+    source=Path(source).resolve();output=Path(output).resolve()
+    if output.exists():raise ValueError('Fresh continuation folder required')
+    plan=json.loads((source/'plan.json').read_text(encoding='utf-8'))
+    result=json.loads((source/'result.json').read_text(encoding='utf-8'))
+    validated=[r for r in result['outcomes'] if r['data_validated']]
+    ids={r['id'] for r in validated}
+    pending=[c for c in plan['cases'] if c['id'] not in ids]
+    if len(validated)!=4 or {c['id'] for c in pending}!={'phase3_plus','phase3_minus'}:
+        raise ValueError('Continuation requires four validated phase1/2 cases and phase3 pair pending')
+    for case in pending:
+        current=np.array(case['expected_phase_current_A'])
+        case['peak_line_current_setting_A']=float(np.max(abs(current[:,0]-current[:,1])))
+    plan.update(cases=pending,planned_fea=2,total_mapping_cases=6,reused_outcomes=validated,
+                resumed_from=str(source),resumed_result_sha256=sha(source/'result.json'),
+                normalization_evidence='phase3_plus measured uniform scale = PeakCurrent / peak(file phase1 - phase2); correct setting uses that reference.',
+                estimated_duration_minutes=[1,3],estimate_basis='Prior custom runs measured about 15 seconds/case including startup; allow margin.')
+    output.mkdir();write_json(output/'plan.json',plan);return plan
+
+
+def worker(folder,index):
+    from low_voltage import start
+    folder=Path(folder).resolve();plan=json.loads((folder/'plan.json').read_text(encoding='utf-8'));case=plan['cases'][index]
+    for key,h in (('source_model','model_sha256'),('source_database','database_sha256'),('source_snapshot','snapshot_sha256')):
+        if sha(plan[key])!=plan[h]:raise ValueError('Frozen source changed: '+key)
+    if sha(case['wave_file'])!=case['wave_sha256']:raise ValueError('Waveform changed')
+    work=folder/case['id'];work.mkdir();mc=None;started=time.time()
+    try:
+        model=work/'custom.mot';db=work/'working_materials.mdb'
+        shutil.copy2(plan['source_model'],model);shutil.copy2(plan['source_database'],db)
+        mc,_=start();mc.load_from_file(str(model));mc.select_material_database(str(db),False);mc.clear_message_log()
+        source=json.loads(Path(plan['source_snapshot']).read_text(encoding='utf-8'))
+        for k,v in source['expected_native'].items():
+            if abs(mc.get_variable(k)-v)>1e-6:raise ValueError('Source input mismatch: '+k)
+        for k,v in plan['settings'].items():mc.set_variable(k,v)
+        mc.load_custom_drive_cycle(case['wave_file']);mc.set_variable('PeakCurrent',case['peak_line_current_setting_A'])
+        readback={k:mc.get_variable(k) for k in plan['settings']}
+        if readback!=plan['settings']:raise ValueError('Custom settings readback mismatch')
+        count=int(mc.get_variable('CustomDriveCyclePoints'))
+        if count!=len(case['expected_angle_ed']):raise ValueError('Custom file row count mismatch: header or endpoint lost')
+        for row in range(count):
+            if abs(mc.get_array_variable('CustomDriveCycleElectricalAngle',row)-case['expected_angle_ed'][row])>1e-8:raise ValueError('Loaded custom angle mismatch')
+            for phase in range(3):
+                if abs(mc.get_array_variable_2d('CustomDriveCycleWaveform',row,phase)-case['input_file_phase_current_A'][row][phase])>1e-8:
+                    raise ValueError('Loaded custom current mismatch')
+        write_json(work/'progress.json',{'phase':'solving_custom_flux','started_unix':started})
+        mc.save_to_file(str(model));t=time.perf_counter();mc.do_magnetic_calculation();solver_s=time.perf_counter()-t
+        graphs={}
+        for prefix in ('PhaseCurrent','FluxLinkageLoadPh'):
+            for phase in range(1,4):
+                name=prefix+str(phase)
+                try:
+                    x,y=mc.get_magnetic_graph(name);graphs[name]={'x':list(map(float,x)),'y':list(map(float,y))}
+                except Exception as exc:graphs[name]={'error':str(exc)}
+        errors=[];max_error=None
+        if any(not g.get('x') for g in graphs.values()):errors.append('Required current/flux graph unavailable')
+        else:
+            all_errors=[]
+            for phase in range(3):
+                graph=graphs[f'PhaseCurrent{phase+1}'];x=np.array(graph['x']);y=np.array(graph['y'])
+                if x.min()>0 or x.max()<360:errors.append('Current graph does not cover expected electrical-angle range');continue
+                expected=np.array(case['expected_phase_current_A'])[:,phase]
+                actual=np.interp(case['expected_angle_ed'],x,y);all_errors.append(float(abs(actual-expected).max()))
+            if all_errors:max_error=max(all_errors)
+            if max_error is not None and max_error>plan['current_readback_tolerance_A']:errors.append('Imposed currents differ from requested phase perturbation')
+        mc.export_results('EMagnetic',str(work/'custom.csv'));mc.save_to_file(str(model))
+        write_json(work/'result.json',{'id':case['id'],'status':'completed','data_validated':not errors,
+            'validation_errors':errors,'max_imposed_current_error_A':max_error,'graphs':graphs,'readback':readback,
+            'solver_s':solver_s,'elapsed_s':time.time()-started,'mapping_qualified':False})
+    finally:
+        if mc:
+            with contextlib.suppress(Exception):mc.quit()
+
+
+def supervise(folder):
+    import msvcrt
+    from run_spm_ripple_recovery import stop_owned
+    folder=Path(folder).resolve();plan=json.loads((folder/'plan.json').read_text(encoding='utf-8'))
+    if (folder/'progress.json').exists():raise ValueError('Already started')
+    started=time.time();rows=[];child=None;lock=(ROOT/'motorcad_execution.lock').open('a+b')
+    reused=plan.get('reused_outcomes',[])
+    if reused and sha(Path(plan['resumed_from'])/'result.json')!=plan['resumed_result_sha256']:
+        raise ValueError('Reused verified evidence changed')
+    def progress(status,**extra):write_json(folder/'progress.json',{'status':status,'started_unix':started,'elapsed_s':time.time()-started,
+        'planned_fea':len(plan['cases']),'completed_fea':len(rows),'data_validated_cases':sum(r['data_validated'] for r in rows),
+        'unattempted_cases':len(plan['cases'])-len(rows),**extra})
+    try:
+        if lock.tell()==0:lock.write(b'0');lock.flush()
+        lock.seek(0);msvcrt.locking(lock.fileno(),msvcrt.LK_NBLCK,1)
+        for index,case in enumerate(plan['cases']):
+            progress('running',active_case=case['id'])
+            with (folder/(case['id']+'.log')).open('wb') as log:
+                child=subprocess.Popen([sys.executable,str(Path(__file__).resolve()),'worker','--output',str(folder),'--case-index',str(index)],
+                    cwd=ROOT.parent,stdout=log,stderr=log,creationflags=subprocess.CREATE_NO_WINDOW)
+                try:code=child.wait(timeout=plan['per_case_timeout_s'])
+                except subprocess.TimeoutExpired:stop_owned(child);raise RuntimeError('Custom flux timeout')
+            if code:raise RuntimeError('Custom flux worker failed: '+case['id'])
+            row=json.loads((folder/case['id']/'result.json').read_text(encoding='utf-8'));rows.append(row)
+            if row['data_validated'] and case['id'].endswith('_minus'):
+                positive=next((r for r in reused+rows if r['id']==case['id'].replace('_minus','_plus')),None)
+                if positive:
+                    minimum=pair_self_minimum(positive,row,case['perturbed_phase'])
+                    if minimum<=0:
+                        row['data_validated']=False
+                        row['validation_errors'].append('Self flux/current derivative nonpositive over cycle; possible cycle reconstruction. No continuation.')
+            write_json(folder/'partial_results.json',rows)
+            if not row['data_validated']:break
+        status='completed' if len(rows)==len(plan['cases']) and all(r['data_validated'] for r in rows) else 'stopped_after_input_check'
+        write_json(folder/'result.json',{'status':status,'outcomes':reused+rows,'planned_fea':len(plan['cases']),
+            'completed_fea':len(rows),'unattempted_cases':len(plan['cases'])-len(rows),'elapsed_s':time.time()-started,
+            'reused_validated_cases':len(reused),
+            'mapping_qualified':False,'pwm_ripple_certified':False})
+        progress(status)
+        if status=='completed':review(folder)
+    except BaseException as exc:
+        if child and child.poll() is None:stop_owned(child)
+        write_json(folder/'error.json',{'error':str(exc),'traceback':traceback.format_exc()});progress('failed');raise
+    finally:lock.close()
+
+
+def launch(folder):
+    folder=Path(folder).resolve()
+    if (folder/'progress.json').exists() or (folder/'launch.json').exists():raise ValueError('Already launched')
+    with (folder/'supervisor.log').open('wb') as log:
+        p=subprocess.Popen([sys.executable,str(Path(__file__).resolve()),'supervise','--output',str(folder)],
+            cwd=ROOT.parent,stdout=log,stderr=log,creationflags=subprocess.CREATE_NO_WINDOW)
+    write_json(folder/'launch.json',{'supervisor_pid':p.pid,'waited_for_completion':False});return p.pid
+
+
+def pair_self_minimum(plus,minus,phase):
+    pg=plus['graphs'][f'FluxLinkageLoadPh{phase}'];mg=minus['graphs'][f'FluxLinkageLoadPh{phase}']
+    pi=plus['graphs'][f'PhaseCurrent{phase}'];mi=minus['graphs'][f'PhaseCurrent{phase}']
+    x=np.asarray(pg['x']);dflux=np.asarray(pg['y'])-np.interp(x,mg['x'],mg['y'])
+    di=np.interp(x,pi['x'],pi['y'])-np.interp(x,mi['x'],mi['y'])
+    if np.any(abs(di)<1e-8):raise ValueError('Phase perturbation lost')
+    return float(np.min(dflux/di))
+
+
+def review(folder):
+    folder=Path(folder).resolve();plan=json.loads((folder/'plan.json').read_text(encoding='utf-8'))
+    result_path=folder/'result.json'
+    if not result_path.is_file():return {'status':'not_complete','matrix_qualified':False,'new_native_fea':0}
+    result=json.loads(result_path.read_text(encoding='utf-8'))
+    if result['status']!='completed' or len(result['outcomes'])!=6 or not all(r['data_validated'] for r in result['outcomes']):
+        report={'status':'input_validation_incomplete','matrix_qualified':False,'new_native_fea':0,
+                'completed_fea':result['completed_fea'],'unattempted_cases':result['unattempted_cases']}
+    else:
+        rows={r['id']:r for r in result['outcomes']};angle=np.array(plan['cases'][0]['expected_angle_ed'])
+        delta_i=np.empty((len(angle),3,3));delta_flux=np.empty_like(delta_i)
+        for axis in range(3):
+            plus=rows[f'phase{axis+1}_plus'];minus=rows[f'phase{axis+1}_minus']
+            for response in range(3):
+                for prefix,container in (('PhaseCurrent',delta_i),('FluxLinkageLoadPh',delta_flux)):
+                    p=plus['graphs'][prefix+str(response+1)];m=minus['graphs'][prefix+str(response+1)]
+                    if min(p['x'])>0 or max(p['x'])<360 or min(m['x'])>0 or max(m['x'])<360:
+                        raise ValueError('Incomplete current/flux angular domain')
+                    container[:,response,axis]=np.interp(angle,p['x'],p['y'])-np.interp(angle,m['x'],m['y'])
+        if np.any(np.linalg.matrix_rank(delta_i)<3):raise ValueError('Perturbation directions not independent')
+        jacobian=delta_flux@np.linalg.inv(delta_i)
+        diagonal=np.diagonal(jacobian,axis1=1,axis2=2)
+        bad=np.flatnonzero(np.any(diagonal<=0,axis=1))
+        report={'status':'blocked_by_flux_cycle_reconstruction' if len(bad) else 'central_jacobian_assembled','angle_ed':angle.tolist(),
+                'self_derivative_minimum_raw':float(diagonal.min()),
+                'nonpositive_self_derivative_angles_ed':angle[bad].tolist(),
+                'response_rows_excitation_columns_explicit':True,
+                'matrix_native_flux_units_per_A':jacobian.tolist(),
+                'max_current_difference_condition_number':float(np.linalg.cond(delta_i).max()),
+                'max_raw_reciprocity_difference':float(abs(jacobian-jacobian.transpose(0,2,1)).max()),
+                'units_status':'Raw flux graph unit must be confirmed before SI PWM use',
+                'scope':'Directly labelled current/flux central differences; no arbitrary native graph-index choice or symmetrisation.',
+                'matrix_qualified':False,'pwm_ripple_certified':False,'new_native_fea':0}
+        from breadloaf_pwm_preview import csv_number
+        end,unit,rounding=csv_number(folder/plan['cases'][0]['id']/'custom.csv','Armature End Winding Inductance_(Hanselman)')
+        if unit!='mH':raise ValueError('Unexpected end-inductance unit')
+        one=np.ones(3)/np.sqrt(3);common=np.einsum('i,nij,j->n',one,jacobian,one)
+        report['unit_and_end_anchor']={'raw_common_mode_min':float(common.min()),'raw_common_mode_max':float(common.max()),
+            'native_end_inductance_H':end*.001,'native_csv_rounding_H':rounding*.001,
+            'max_H_interpretation_anchor_difference':float(abs(common-end*.001).max()),
+            'interpretation':'H/Wb-per-A interpretation matches Native end anchor; case-specific numerical evidence, not a universal API declaration.',
+            'end_inclusion_policy':'Direct flux-response matrix already contains the common-mode end term. Do not add end self-inductance twice.'}
+    write_json(folder/'mapping_review.json',report);return report
+
+
+if __name__=='__main__':
+    p=argparse.ArgumentParser();p.add_argument('command',choices=['prepare','start','worker','supervise','review','resume-validated']);p.add_argument('--output',required=True)
+    p.add_argument('--experiment');p.add_argument('--case-index',type=int);a=p.parse_args()
+    if a.command=='prepare':r=prepare(a.experiment,a.output);print(json.dumps({'planned_fea':r['planned_fea'],'estimated_duration_minutes':r['estimated_duration_minutes']}))
+    elif a.command=='resume-validated':r=resume_validated(a.experiment,a.output);print(json.dumps({'planned_fea':r['planned_fea'],'reused_cases':len(r['reused_outcomes'])}))
+    elif a.command=='start':print(json.dumps({'supervisor_pid':launch(a.output),'waited_for_completion':False}))
+    elif a.command=='worker':worker(a.output,a.case_index)
+    elif a.command=='review':print(json.dumps(review(a.output),indent=2))
+    else:supervise(a.output)
+
+END_CONTENT
+END_SOURCE S089
+
+
+END_REVIEW_PART_015

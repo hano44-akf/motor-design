@@ -1,0 +1,4429 @@
+{
+  "schema": "motor-design-ai-review-v1",
+  "source_commit": "e179b073376e7b2488b247d55b3c4d6b4b0197b7",
+  "source_file_count": 233,
+  "part_count": 31,
+  "parts": [
+    {
+      "file": "part_001.txt",
+      "bytes": 41179,
+      "sha256": "9e455f57b29f7691214720ac2abbe529d8b2de26e5da13b82816c9428e4c1364",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/main/ai_review/part_001.txt",
+      "blocks": 6
+    },
+    {
+      "file": "part_002.txt",
+      "bytes": 41753,
+      "sha256": "84d07bff3f15766584981fb29b8917d496745ecc6605f50f6a718726ac8df1fb",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/main/ai_review/part_002.txt",
+      "blocks": 8
+    },
+    {
+      "file": "part_003.txt",
+      "bytes": 41490,
+      "sha256": "e5b7b8c190360f14c054bc402ea02b96f86ab4e35ccb09252e0270334d6802f3",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/main/ai_review/part_003.txt",
+      "blocks": 6
+    },
+    {
+      "file": "part_004.txt",
+      "bytes": 28665,
+      "sha256": "c94cf1379981e937e8176cd96920210cc78f99d675b7ca6529c418f4bc10c11e",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/main/ai_review/part_004.txt",
+      "blocks": 2
+    },
+    {
+      "file": "part_005.txt",
+      "bytes": 43842,
+      "sha256": "ad24753e3bbe853becd307b762ee35144f8d19533689a90dc2b20c165ae54e98",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/main/ai_review/part_005.txt",
+      "blocks": 3
+    },
+    {
+      "file": "part_006.txt",
+      "bytes": 26163,
+      "sha256": "4468ed2c2f45f397d4c4930bd33d93dbc6570e42bcb78e436e277efa0034f5f1",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/main/ai_review/part_006.txt",
+      "blocks": 5
+    },
+    {
+      "file": "part_007.txt",
+      "bytes": 47436,
+      "sha256": "da5902b0656b77fae557fe0f7799ff18d676e2999b58710ae6fb98891f3e7403",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/main/ai_review/part_007.txt",
+      "blocks": 1
+    },
+    {
+      "file": "part_008.txt",
+      "bytes": 47549,
+      "sha256": "f4c0c75713ff333120800969ccc68c881f1ecafe340cb09373345034d5dadc5e",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/main/ai_review/part_008.txt",
+      "blocks": 11
+    },
+    {
+      "file": "part_009.txt",
+      "bytes": 49252,
+      "sha256": "28d3063f7ed9a0399673ed7e83f60f7fc1abc76267c9c05e84d4cf18eb6f38d1",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/main/ai_review/part_009.txt",
+      "blocks": 13
+    },
+    {
+      "file": "part_010.txt",
+      "bytes": 45230,
+      "sha256": "441bfbb47ec8c7cdede5b14d009176c35b5eebe646d4204354583f0ad473d3c2",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/main/ai_review/part_010.txt",
+      "blocks": 3
+    },
+    {
+      "file": "part_011.txt",
+      "bytes": 49252,
+      "sha256": "f36d789b30b6817ff1565a0636ea48f594aa89ad7f1305939546fc5a0ca1475c",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/main/ai_review/part_011.txt",
+      "blocks": 7
+    },
+    {
+      "file": "part_012.txt",
+      "bytes": 45049,
+      "sha256": "8673991b67420b97daf10e9dcca5a6481b5ff094c37ed5342622a753feda4a6d",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/main/ai_review/part_012.txt",
+      "blocks": 10
+    },
+    {
+      "file": "part_013.txt",
+      "bytes": 45585,
+      "sha256": "670edf9b5258459afcc9905c3366ada8f1febdf205f5cd2a722c4e92dce74697",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/main/ai_review/part_013.txt",
+      "blocks": 8
+    },
+    {
+      "file": "part_014.txt",
+      "bytes": 38325,
+      "sha256": "72d710071ed10cfea8d57caf4eb4f1c2dc45e184a80298bc82546ad568349d6a",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/main/ai_review/part_014.txt",
+      "blocks": 4
+    },
+    {
+      "file": "part_015.txt",
+      "bytes": 47063,
+      "sha256": "c5aaf0a791c79da9a265cf1152694f8bdc9cc97e847bb3e26bfdeb72e743ab99",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/main/ai_review/part_015.txt",
+      "blocks": 3
+    },
+    {
+      "file": "part_016.txt",
+      "bytes": 45371,
+      "sha256": "9acf1934f4d9ea93f928db56deb278c1ab8bf864d8ea8a00c4dc60ff72d8e85b",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/main/ai_review/part_016.txt",
+      "blocks": 4
+    },
+    {
+      "file": "part_017.txt",
+      "bytes": 42098,
+      "sha256": "28057e29ccd765db37501c04be7730e7f5f8ee72d7e5cab001ff13f8fa073e27",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/main/ai_review/part_017.txt",
+      "blocks": 6
+    },
+    {
+      "file": "part_018.txt",
+      "bytes": 44733,
+      "sha256": "50168c4ec99f53cfe14d3d8b637b98c3d6782008ed288c003d9f1ebd6bc96243",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/main/ai_review/part_018.txt",
+      "blocks": 5
+    },
+    {
+      "file": "part_019.txt",
+      "bytes": 48573,
+      "sha256": "be73f1af17fc4c8363b26ef30615447ae4b6493135bd0a2999d658394539a6ea",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/main/ai_review/part_019.txt",
+      "blocks": 6
+    },
+    {
+      "file": "part_020.txt",
+      "bytes": 39009,
+      "sha256": "2329269d979de90cce85d7b4bbcddccd017dae5d3148915ad3ebd9b3639272f9",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/main/ai_review/part_020.txt",
+      "blocks": 7
+    },
+    {
+      "file": "part_021.txt",
+      "bytes": 48176,
+      "sha256": "1de385f8a85fc8683bb735068ccf4be166c345a9c487000465257a379ff544d3",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/main/ai_review/part_021.txt",
+      "blocks": 10
+    },
+    {
+      "file": "part_022.txt",
+      "bytes": 48855,
+      "sha256": "66a609b6b53773cb358b56fd2d92cbaac3e4d00358ff2fefa931389bc7158db2",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/main/ai_review/part_022.txt",
+      "blocks": 12
+    },
+    {
+      "file": "part_023.txt",
+      "bytes": 49119,
+      "sha256": "2f9e1a03d0d9423a0de74e561a69a6c681ac15bca87ee3af25448cc6bf88b02c",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/main/ai_review/part_023.txt",
+      "blocks": 10
+    },
+    {
+      "file": "part_024.txt",
+      "bytes": 47045,
+      "sha256": "b350fe7e8710bca2ce187dc25fda1dd88cfbb7cefd89e69935801fe2b5786723",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/main/ai_review/part_024.txt",
+      "blocks": 8
+    },
+    {
+      "file": "part_025.txt",
+      "bytes": 46262,
+      "sha256": "9e3bde476831c0c7018ecd391708663f3cb7f066388447af01ea6a1db537c257",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/main/ai_review/part_025.txt",
+      "blocks": 7
+    },
+    {
+      "file": "part_026.txt",
+      "bytes": 46255,
+      "sha256": "9d4cda1067f467919340992a005da79c7b8e2f6e5afcc82371056295245a2511",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/main/ai_review/part_026.txt",
+      "blocks": 10
+    },
+    {
+      "file": "part_027.txt",
+      "bytes": 48642,
+      "sha256": "491a57c2fbafafabfa21f4640a86e6c42a53cbbd3372aba0d6f620960dd2a712",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/main/ai_review/part_027.txt",
+      "blocks": 15
+    },
+    {
+      "file": "part_028.txt",
+      "bytes": 47849,
+      "sha256": "7962387379c0af41aa52053fd3164709aa852cc51153558d2c1eecafed106cbc",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/main/ai_review/part_028.txt",
+      "blocks": 13
+    },
+    {
+      "file": "part_029.txt",
+      "bytes": 46083,
+      "sha256": "84f92ad1390cc286f1b6c7d901a2e1ae821521d9a2e27e4d0ab70433caf19f97",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/main/ai_review/part_029.txt",
+      "blocks": 13
+    },
+    {
+      "file": "part_030.txt",
+      "bytes": 49140,
+      "sha256": "04939c9207fe09a3191e666bc81c40c75fca9aa3f558bbf21f9a12940769bbd2",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/main/ai_review/part_030.txt",
+      "blocks": 14
+    },
+    {
+      "file": "part_031.txt",
+      "bytes": 20440,
+      "sha256": "b83fe234ff24e2c81481c3bdff5c644074486ddb95986e15855ea812f6a030e3",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/main/ai_review/part_031.txt",
+      "blocks": 4
+    }
+  ],
+  "sources": [
+    {
+      "source_id": "S001",
+      "path": "validation/formula_job.py",
+      "bytes": 7857,
+      "lines": 116,
+      "sha256": "95c96b55864af403c2b167ba32628161d9139ef453de6b9cd096d92c24df4431",
+      "git_blob": "23fb98f0e427148ba56acadc6cdf2c1e5cbe4919",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/formula_job.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 116,
+          "bytes": 7857,
+          "sha256": "95c96b55864af403c2b167ba32628161d9139ef453de6b9cd096d92c24df4431",
+          "part": "part_001.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S002",
+      "path": "validation/optimize_low_voltage.py",
+      "bytes": 12398,
+      "lines": 150,
+      "sha256": "139750f5f88efd27382f84e8b15d065abffa81f66642c425b0792c88521e7718",
+      "git_blob": "3c311f190a5eb66cadf8183f26fb3dd3d039cbf8",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/optimize_low_voltage.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 150,
+          "bytes": 12398,
+          "sha256": "139750f5f88efd27382f84e8b15d065abffa81f66642c425b0792c88521e7718",
+          "part": "part_001.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S003",
+      "path": "validation/operating_control.py",
+      "bytes": 6817,
+      "lines": 110,
+      "sha256": "359167e31f057558e1a1d47bb5a5aaa913a01066a8739c8a559a05bb99b96407",
+      "git_blob": "895891e2b9c0b54d2076b01c1e2c5bd8d83089aa",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/operating_control.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 110,
+          "bytes": 6817,
+          "sha256": "359167e31f057558e1a1d47bb5a5aaa913a01066a8739c8a559a05bb99b96407",
+          "part": "part_001.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S004",
+      "path": "validation/formula_assessment.py",
+      "bytes": 3057,
+      "lines": 41,
+      "sha256": "aa87d9582c36b323050aa77224edc14768174fd3016f7418dfdec3b81b9b7da2",
+      "git_blob": "b0be97ba18dec8255ebe6d3eabbcb6237d78b8ff",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/formula_assessment.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 41,
+          "bytes": 3057,
+          "sha256": "aa87d9582c36b323050aa77224edc14768174fd3016f7418dfdec3b81b9b7da2",
+          "part": "part_001.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S005",
+      "path": "validation/run_assessment.py",
+      "bytes": 7049,
+      "lines": 94,
+      "sha256": "46aec4f7e678c3378f554e45c5cc9132ef3a77af752947ecebe86b15d48dbffd",
+      "git_blob": "c62d7b2e5726ef54e5d3ba9b8d897ed971d74fa2",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/run_assessment.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 94,
+          "bytes": 7049,
+          "sha256": "46aec4f7e678c3378f554e45c5cc9132ef3a77af752947ecebe86b15d48dbffd",
+          "part": "part_001.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S006",
+      "path": "validation/result_policy.py",
+      "bytes": 2516,
+      "lines": 43,
+      "sha256": "ef3752599ac4615c9d43c15f9e9bd8cc1cb315eaad5aafb7b65eebe87a3c3037",
+      "git_blob": "1280a2a3c31379aa3f163c7a63e075b2adae0348",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/result_policy.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 43,
+          "bytes": 2516,
+          "sha256": "ef3752599ac4615c9d43c15f9e9bd8cc1cb315eaad5aafb7b65eebe87a3c3037",
+          "part": "part_001.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S007",
+      "path": "validation/verify_formula_job.py",
+      "bytes": 11923,
+      "lines": 151,
+      "sha256": "64e82b6b36d31c48586701baad4ae41aaae05ff09e438839d098786cd93f4c3e",
+      "git_blob": "364453ae154bf2b2461b5c66582ce6bafdffbb01",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/verify_formula_job.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 151,
+          "bytes": 11923,
+          "sha256": "64e82b6b36d31c48586701baad4ae41aaae05ff09e438839d098786cd93f4c3e",
+          "part": "part_002.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S008",
+      "path": "validation/verification_conditions.py",
+      "bytes": 1762,
+      "lines": 35,
+      "sha256": "0dd4e148ade1016ad24e52375d926de5a96481388eff4c5a3632f2b211e5812a",
+      "git_blob": "2708a2cb84527652c59e3fa76d5d010af1126052",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/verification_conditions.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 35,
+          "bytes": 1762,
+          "sha256": "0dd4e148ade1016ad24e52375d926de5a96481388eff4c5a3632f2b211e5812a",
+          "part": "part_002.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S009",
+      "path": "validation/result_review.py",
+      "bytes": 6110,
+      "lines": 73,
+      "sha256": "019cd14b602408a7a76277f11ca003ea19d0ebb9630f2a932095a59d613bb0ed",
+      "git_blob": "674da4981426ea686b5685eae45891d739c8b1f9",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/result_review.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 73,
+          "bytes": 6110,
+          "sha256": "019cd14b602408a7a76277f11ca003ea19d0ebb9630f2a932095a59d613bb0ed",
+          "part": "part_002.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S010",
+      "path": "validation/request_schema.py",
+      "bytes": 8586,
+      "lines": 130,
+      "sha256": "508b84d92cdea3202bbf046f12330b98392cf16ba35c3ab81297480a06c31c18",
+      "git_blob": "f676a78f397b7976655a7f214a920c09f76692b7",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/request_schema.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 130,
+          "bytes": 8586,
+          "sha256": "508b84d92cdea3202bbf046f12330b98392cf16ba35c3ab81297480a06c31c18",
+          "part": "part_002.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S011",
+      "path": "validation/model_capabilities.py",
+      "bytes": 3150,
+      "lines": 43,
+      "sha256": "b2190cea00b3f0ce68cb10a3e3458f268a145690ab20a33e78b6fe9068b79366",
+      "git_blob": "c77b9d6b37d3e0e9eb4ad09b532ef3b68699c566",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/model_capabilities.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 43,
+          "bytes": 3150,
+          "sha256": "b2190cea00b3f0ce68cb10a3e3458f268a145690ab20a33e78b6fe9068b79366",
+          "part": "part_002.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S012",
+      "path": "validation/evaluation_policy.py",
+      "bytes": 1158,
+      "lines": 21,
+      "sha256": "c9559d4a139c6fa10feec8c6010bda9eca8c03f59733d39a99da4018dfdae9b3",
+      "git_blob": "536a98afe91502e0da847e531500178097da7120",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/evaluation_policy.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 21,
+          "bytes": 1158,
+          "sha256": "c9559d4a139c6fa10feec8c6010bda9eca8c03f59733d39a99da4018dfdae9b3",
+          "part": "part_002.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S013",
+      "path": "validation/controller_limits.py",
+      "bytes": 5485,
+      "lines": 80,
+      "sha256": "60e582df641303d33500b0b4d2ea0bd5ea826b17d33a194b4bc1b342afbdcf74",
+      "git_blob": "c4f54139924a36b52f98a64cbc4fb83426c65839",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/controller_limits.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 80,
+          "bytes": 5485,
+          "sha256": "60e582df641303d33500b0b4d2ea0bd5ea826b17d33a194b4bc1b342afbdcf74",
+          "part": "part_002.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S014",
+      "path": "validation/flux_limits.py",
+      "bytes": 1656,
+      "lines": 34,
+      "sha256": "fe69fde64e392caeb1e3928e0e9674f5dd9f1ef0bdf48cc79134254378a0e676",
+      "git_blob": "1a6f8b65cc58ca6362acec51bf98a6a24332a2cf",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/flux_limits.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 34,
+          "bytes": 1656,
+          "sha256": "fe69fde64e392caeb1e3928e0e9674f5dd9f1ef0bdf48cc79134254378a0e676",
+          "part": "part_002.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S015",
+      "path": "validation/rotor_catalog.py",
+      "bytes": 13201,
+      "lines": 210,
+      "sha256": "c18e730ea7783eb17170b0fbd82ab3bd5a5a037717e55a9bf056aec93fffc6ef",
+      "git_blob": "136da1d54aca5c6291a9abb37147d13704fec1ca",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/rotor_catalog.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 210,
+          "bytes": 13201,
+          "sha256": "c18e730ea7783eb17170b0fbd82ab3bd5a5a037717e55a9bf056aec93fffc6ef",
+          "part": "part_003.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S016",
+      "path": "validation/geometry_adapters.py",
+      "bytes": 1938,
+      "lines": 34,
+      "sha256": "d86a03d5ecf17fc9b341a3f8b97ace3773781a8ad5de3f00fcb80ca9179c30cb",
+      "git_blob": "da5f83924af6362bb82071fc03d5c5b0cf751e7d",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/geometry_adapters.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 34,
+          "bytes": 1938,
+          "sha256": "d86a03d5ecf17fc9b341a3f8b97ace3773781a8ad5de3f00fcb80ca9179c30cb",
+          "part": "part_003.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S017",
+      "path": "validation/spm_geometry.py",
+      "bytes": 7931,
+      "lines": 110,
+      "sha256": "aeb8e9c295bcadb194e8547014e536cd051122cfc5690a11a2523ac12b928805",
+      "git_blob": "c0563640c186a640c6769b8d8ff63206222961ca",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/spm_geometry.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 110,
+          "bytes": 7931,
+          "sha256": "aeb8e9c295bcadb194e8547014e536cd051122cfc5690a11a2523ac12b928805",
+          "part": "part_003.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S018",
+      "path": "validation/detailed_spm_recipe.py",
+      "bytes": 4531,
+      "lines": 75,
+      "sha256": "c319d6fdc210ab08d264f64edd9b5c6596da21341b27850838b120415c1914e1",
+      "git_blob": "751a0b00400d89ac845ca34b78fe125552315a26",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/detailed_spm_recipe.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 75,
+          "bytes": 4531,
+          "sha256": "c319d6fdc210ab08d264f64edd9b5c6596da21341b27850838b120415c1914e1",
+          "part": "part_003.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S019",
+      "path": "validation/winding_layout.py",
+      "bytes": 3756,
+      "lines": 65,
+      "sha256": "0a6ff94771fe3f9f435557124941a124187020a0fcf9a9930c29f780c8904362",
+      "git_blob": "5b99fd37ebc1890f03e11ca6c84ab2705d10a8d2",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/winding_layout.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 65,
+          "bytes": 3756,
+          "sha256": "0a6ff94771fe3f9f435557124941a124187020a0fcf9a9930c29f780c8904362",
+          "part": "part_003.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S020",
+      "path": "validation/low_voltage.py",
+      "bytes": 8655,
+      "lines": 118,
+      "sha256": "36a44ca44508d1694681295c6b154fad6351982004f36ede17be0350455ef81c",
+      "git_blob": "00c3570b786d0c3381d1ed5dafefa5f7cd1a23ef",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/low_voltage.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 118,
+          "bytes": 8655,
+          "sha256": "36a44ca44508d1694681295c6b154fad6351982004f36ede17be0350455ef81c",
+          "part": "part_003.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S021",
+      "path": "interface/server.py",
+      "bytes": 14695,
+      "lines": 204,
+      "sha256": "0226a741c254a3a8fb1d80b18af096c6b67146b109be2790b4910fe4b2ada589",
+      "git_blob": "32102f9b1c931272f0da13c1a77276def3966e39",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/interface/server.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 204,
+          "bytes": 14695,
+          "sha256": "0226a741c254a3a8fb1d80b18af096c6b67146b109be2790b4910fe4b2ada589",
+          "part": "part_004.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S022",
+      "path": "interface/backend.js",
+      "bytes": 13374,
+      "lines": 78,
+      "sha256": "581f13e78ee8be6de2f6ad109c76d022dc3eda3993127dd095807dd930568c39",
+      "git_blob": "f5e1c3936938c9c193870d6d4f212fcbea90627a",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/interface/backend.js",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 78,
+          "bytes": 13374,
+          "sha256": "581f13e78ee8be6de2f6ad109c76d022dc3eda3993127dd095807dd930568c39",
+          "part": "part_004.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S023",
+      "path": "interface/studio-v2.js",
+      "bytes": 22059,
+      "lines": 48,
+      "sha256": "076ce1b3fd14d037b9ba727d7aefe9e4c309c8bcea44a1eaa863ddcef4775508",
+      "git_blob": "47ff04dcb8212dc2aaedc1637090f9daeb08ac24",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/interface/studio-v2.js",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 48,
+          "bytes": 22059,
+          "sha256": "076ce1b3fd14d037b9ba727d7aefe9e4c309c8bcea44a1eaa863ddcef4775508",
+          "part": "part_005.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S024",
+      "path": "interface/design-workflow.js",
+      "bytes": 14376,
+      "lines": 107,
+      "sha256": "560c67513a508db9a854d0de384801c41ce58736bc877a225aaf7cf59a10c292",
+      "git_blob": "917d4ee83397a7fc9527e8dd27cca2f28e02f6a8",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/interface/design-workflow.js",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 107,
+          "bytes": 14376,
+          "sha256": "560c67513a508db9a854d0de384801c41ce58736bc877a225aaf7cf59a10c292",
+          "part": "part_005.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S025",
+      "path": "interface/result-review.js",
+      "bytes": 6587,
+      "lines": 39,
+      "sha256": "c8c821ef41d124cdadb5b42424ec40fe0b28c53e151cbbad20ade22c27e269f6",
+      "git_blob": "0a409bd42f4e4bc038a4df27907e7ec2cd3cb543",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/interface/result-review.js",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 39,
+          "bytes": 6587,
+          "sha256": "c8c821ef41d124cdadb5b42424ec40fe0b28c53e151cbbad20ade22c27e269f6",
+          "part": "part_005.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S026",
+      "path": "collect_materials.py",
+      "bytes": 11083,
+      "lines": 200,
+      "sha256": "b89a776ad57a61da227b32d72a129ae7553cf47ed09cfc86d043a5f3b2e5c24b",
+      "git_blob": "3e142d3532a1d016975e142d541856fb12c5f50a",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/collect_materials.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 200,
+          "bytes": 11083,
+          "sha256": "b89a776ad57a61da227b32d72a129ae7553cf47ed09cfc86d043a5f3b2e5c24b",
+          "part": "part_006.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S027",
+      "path": "convert_magnet.py",
+      "bytes": 3233,
+      "lines": 66,
+      "sha256": "194b803ce8c26cc63376686f88525a502d2762d7851e650cb528de6dab4fdbb5",
+      "git_blob": "9a88996f3b0b0d3d2cb202b651270e583e563618",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/convert_magnet.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 66,
+          "bytes": 3233,
+          "sha256": "194b803ce8c26cc63376686f88525a502d2762d7851e650cb528de6dab4fdbb5",
+          "part": "part_006.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S028",
+      "path": "export_granta.py",
+      "bytes": 5758,
+      "lines": 114,
+      "sha256": "7a16cd8a2c90d7ed65301b3e76449f391c05b45df9ae2ff106de75c3e22c13c2",
+      "git_blob": "dc4e7103e2596972b05c501e66164435cde463a0",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/export_granta.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 114,
+          "bytes": 5758,
+          "sha256": "7a16cd8a2c90d7ed65301b3e76449f391c05b45df9ae2ff106de75c3e22c13c2",
+          "part": "part_006.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S029",
+      "path": "finish_granta.py",
+      "bytes": 3366,
+      "lines": 63,
+      "sha256": "c0317c25979752df93e9a9417c6e748c6d80bff31222313e3c9642d06910a061",
+      "git_blob": "efba5f7c19db686dace07a03eb7e8b09259b7c70",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/finish_granta.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 63,
+          "bytes": 3366,
+          "sha256": "c0317c25979752df93e9a9417c6e748c6d80bff31222313e3c9642d06910a061",
+          "part": "part_006.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S030",
+      "path": "interface/breadloaf-workflow.css",
+      "bytes": 1505,
+      "lines": 1,
+      "sha256": "3d74782df3042e56331e30e83f8ce3d5c4bf6de2b3baa3c8bb238db9a8376768",
+      "git_blob": "bb332de43f144391c426c6782bf466bb826dba82",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/interface/breadloaf-workflow.css",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 1,
+          "bytes": 1505,
+          "sha256": "3d74782df3042e56331e30e83f8ce3d5c4bf6de2b3baa3c8bb238db9a8376768",
+          "part": "part_006.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S031",
+      "path": "interface/breadloaf-workflow.js",
+      "bytes": 50680,
+      "lines": 144,
+      "sha256": "5ea0023ae1abb3e1232e5f4f30459806365ae73de8cc5d2acdd570f6f204bb04",
+      "git_blob": "ade92c2dc588b0ebbd80d8075078bfc32e821af5",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/interface/breadloaf-workflow.js",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 121,
+          "bytes": 47036,
+          "sha256": "af82783a11eb4b5b79702bb08d0c5664921b81fbd8a1d100d16057daafc6cd71",
+          "part": "part_007.txt"
+        },
+        {
+          "first_line": 122,
+          "last_line": 144,
+          "bytes": 3644,
+          "sha256": "a735a1523afe5ad5ed03c520ae312ef98e3023ed258f71d9ae0cc37e53deefce",
+          "part": "part_008.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S032",
+      "path": "interface/check-backend.cjs",
+      "bytes": 1765,
+      "lines": 15,
+      "sha256": "90dc55d748601e4592d2de61add7a31e1c8ec9dc31e8e2405ea88b6f459fbe52",
+      "git_blob": "99c7831f51567b0cbdb144ee71a6479516a4a16b",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/interface/check-backend.cjs",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 15,
+          "bytes": 1765,
+          "sha256": "90dc55d748601e4592d2de61add7a31e1c8ec9dc31e8e2405ea88b6f459fbe52",
+          "part": "part_008.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S033",
+      "path": "interface/check-breadloaf-comparison.cjs",
+      "bytes": 14397,
+      "lines": 199,
+      "sha256": "02d4b88d23e67a1c47ae8908aeeafe9f91f5d1bf82d49c48ea66c01311e6b4da",
+      "git_blob": "1d220d5c83c41473b92e3db2aae5fe0936ca565a",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/interface/check-breadloaf-comparison.cjs",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 199,
+          "bytes": 14397,
+          "sha256": "02d4b88d23e67a1c47ae8908aeeafe9f91f5d1bf82d49c48ea66c01311e6b4da",
+          "part": "part_008.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S034",
+      "path": "interface/check-breadloaf-input.cjs",
+      "bytes": 4390,
+      "lines": 38,
+      "sha256": "e136f4b4ffd41ee04c8fa04f2d96427b803de5fd4c7c9d4f4335fc5208912a8c",
+      "git_blob": "4f63b68aadadd7a7a9fb34592d8957f21426d80d",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/interface/check-breadloaf-input.cjs",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 38,
+          "bytes": 4390,
+          "sha256": "e136f4b4ffd41ee04c8fa04f2d96427b803de5fd4c7c9d4f4335fc5208912a8c",
+          "part": "part_008.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S035",
+      "path": "interface/check-breadloaf-local.cjs",
+      "bytes": 3279,
+      "lines": 33,
+      "sha256": "f045344a26b5f8352198cbef9adf863706eb05589c58971bcac6d424b3359086",
+      "git_blob": "c5edca50e6c51fbef59707683571bd4bd4ac302a",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/interface/check-breadloaf-local.cjs",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 33,
+          "bytes": 3279,
+          "sha256": "f045344a26b5f8352198cbef9adf863706eb05589c58971bcac6d424b3359086",
+          "part": "part_008.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S036",
+      "path": "interface/check-breadloaf-workflow.cjs",
+      "bytes": 4023,
+      "lines": 48,
+      "sha256": "7ea51499948c251dbd9afd2049be6cdbc7ff1736c79d784d3e9961487adb1ce2",
+      "git_blob": "dc26eee3fa2bc9b87653827e880c1626537ebbb3",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/interface/check-breadloaf-workflow.cjs",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 48,
+          "bytes": 4023,
+          "sha256": "7ea51499948c251dbd9afd2049be6cdbc7ff1736c79d784d3e9961487adb1ce2",
+          "part": "part_008.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S037",
+      "path": "interface/check-controller.cjs",
+      "bytes": 2822,
+      "lines": 23,
+      "sha256": "645fbebfa3619c46185188e481b2d046453bb088e6bd14088da738e4a0af354e",
+      "git_blob": "39841efae1c02eeb5bae5105b710eda35f4773f7",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/interface/check-controller.cjs",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 23,
+          "bytes": 2822,
+          "sha256": "645fbebfa3619c46185188e481b2d046453bb088e6bd14088da738e4a0af354e",
+          "part": "part_008.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S038",
+      "path": "interface/check-csv.cjs",
+      "bytes": 1739,
+      "lines": 24,
+      "sha256": "832c46346532863a017d7674aadbd1f1e78648e7abc5a9a35e9fd6a640e0f85b",
+      "git_blob": "7daf2542abf8563570e2723c576d762ae981cdef",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/interface/check-csv.cjs",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 24,
+          "bytes": 1739,
+          "sha256": "832c46346532863a017d7674aadbd1f1e78648e7abc5a9a35e9fd6a640e0f85b",
+          "part": "part_008.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S039",
+      "path": "interface/check-design-workflow.cjs",
+      "bytes": 5810,
+      "lines": 53,
+      "sha256": "d025cbbd1da734ee23db51d72cd8c1d1091ac52a06467a3b2e9e3c74aca6a8c5",
+      "git_blob": "b3d436cb574e22f8e61f92726f43da90c6c4ff74",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/interface/check-design-workflow.cjs",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 53,
+          "bytes": 5810,
+          "sha256": "d025cbbd1da734ee23db51d72cd8c1d1091ac52a06467a3b2e9e3c74aca6a8c5",
+          "part": "part_008.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S040",
+      "path": "interface/check-flux.cjs",
+      "bytes": 1635,
+      "lines": 19,
+      "sha256": "9b50b24f3090ed9514ab8ff34bd5182c92b6400462a26a6a2111fb9330a9742c",
+      "git_blob": "d97ecbcc7517a60cc4c4a2171df598bd2a35302e",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/interface/check-flux.cjs",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 19,
+          "bytes": 1635,
+          "sha256": "9b50b24f3090ed9514ab8ff34bd5182c92b6400462a26a6a2111fb9330a9742c",
+          "part": "part_008.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S041",
+      "path": "interface/check-real-results.cjs",
+      "bytes": 1452,
+      "lines": 14,
+      "sha256": "520d5b391f9338cb87a91f0b2bafff94d21436c5be11313bd900265e772b4014",
+      "git_blob": "9ad20e52e31c19326ae505a5d2813991a716493f",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/interface/check-real-results.cjs",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 14,
+          "bytes": 1452,
+          "sha256": "520d5b391f9338cb87a91f0b2bafff94d21436c5be11313bd900265e772b4014",
+          "part": "part_008.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S042",
+      "path": "interface/check-result-review.cjs",
+      "bytes": 2970,
+      "lines": 34,
+      "sha256": "e338201f424a89a3b17d5f61d32e576be0affb9e1e9d19b58bd72b635f8e14e3",
+      "git_blob": "5ae20755934b3e4793e72b8b156f482c4956d733",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/interface/check-result-review.cjs",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 34,
+          "bytes": 2970,
+          "sha256": "e338201f424a89a3b17d5f61d32e576be0affb9e1e9d19b58bd72b635f8e14e3",
+          "part": "part_009.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S043",
+      "path": "interface/check-rotor-catalog.cjs",
+      "bytes": 4986,
+      "lines": 53,
+      "sha256": "46246b1831e34c5d77720a6a74dd9b2e6d138dd1b70f267a305ada310ed64f87",
+      "git_blob": "c737997431117c50cfc44ca347156db9c5634b8a",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/interface/check-rotor-catalog.cjs",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 53,
+          "bytes": 4986,
+          "sha256": "46246b1831e34c5d77720a6a74dd9b2e6d138dd1b70f267a305ada310ed64f87",
+          "part": "part_009.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S044",
+      "path": "interface/check-spm-geometry.cjs",
+      "bytes": 3939,
+      "lines": 47,
+      "sha256": "e1774980400ca4a6313bd036060566df547344117154f2d61c6e47d81ff541df",
+      "git_blob": "5750b5d0a0f8c1dd8857abead08fb5074228e3f4",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/interface/check-spm-geometry.cjs",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 47,
+          "bytes": 3939,
+          "sha256": "e1774980400ca4a6313bd036060566df547344117154f2d61c6e47d81ff541df",
+          "part": "part_009.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S045",
+      "path": "interface/check-surface-shapes.cjs",
+      "bytes": 2710,
+      "lines": 26,
+      "sha256": "ae574f05f3fd7c8da1537af20e823ef1fb86d8013343dcc16c5d71ae6bc25029",
+      "git_blob": "9786a754ed7f43fa36934dc456c5a69146b97073",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/interface/check-surface-shapes.cjs",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 26,
+          "bytes": 2710,
+          "sha256": "ae574f05f3fd7c8da1537af20e823ef1fb86d8013343dcc16c5d71ae6bc25029",
+          "part": "part_009.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S046",
+      "path": "interface/check-task-manager.cjs",
+      "bytes": 6447,
+      "lines": 93,
+      "sha256": "1b4052223613cc0e6b3c38614cf6c99a27d802ff06355c42ea3c721b5a959775",
+      "git_blob": "8b80688262e72fbcf66105ddbb69f51d609f87a2",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/interface/check-task-manager.cjs",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 93,
+          "bytes": 6447,
+          "sha256": "1b4052223613cc0e6b3c38614cf6c99a27d802ff06355c42ea3c721b5a959775",
+          "part": "part_009.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S047",
+      "path": "interface/check-v2.cjs",
+      "bytes": 3887,
+      "lines": 9,
+      "sha256": "bc8287ddc1784a2edcb9a39bd7f965565bbb677c0b18c953ace185da35adf0b4",
+      "git_blob": "5f78f2a71dbea0b292d24db5feffa1b9277d6a9e",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/interface/check-v2.cjs",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 9,
+          "bytes": 3887,
+          "sha256": "bc8287ddc1784a2edcb9a39bd7f965565bbb677c0b18c953ace185da35adf0b4",
+          "part": "part_009.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S048",
+      "path": "interface/check-winding.cjs",
+      "bytes": 1893,
+      "lines": 25,
+      "sha256": "9a7bf5cbec0c099c94097326d1444530bbd4a0f241f0967b94dad97e17c726ee",
+      "git_blob": "893c2992177dbfa4a9f03fba9aa2686b3a25083d",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/interface/check-winding.cjs",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 25,
+          "bytes": 1893,
+          "sha256": "9a7bf5cbec0c099c94097326d1444530bbd4a0f241f0967b94dad97e17c726ee",
+          "part": "part_009.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S049",
+      "path": "interface/check.cjs",
+      "bytes": 1590,
+      "lines": 3,
+      "sha256": "91df17f06899a04cf748713323e59f46c38175af6e1ce0ef3a9400f8116c3642",
+      "git_blob": "bc60694de81b0685743b07371a998c0238596546",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/interface/check.cjs",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 3,
+          "bytes": 1590,
+          "sha256": "91df17f06899a04cf748713323e59f46c38175af6e1ce0ef3a9400f8116c3642",
+          "part": "part_009.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S050",
+      "path": "interface/control-airgap-options.js",
+      "bytes": 8701,
+      "lines": 97,
+      "sha256": "b1eb58ffca42be3f1c23b7981b27f3a92f14276b7e4ab6482be9427f2b38a0c0",
+      "git_blob": "326e7f30bf252c0310a8fc87837bedf21d473f46",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/interface/control-airgap-options.js",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 97,
+          "bytes": 8701,
+          "sha256": "b1eb58ffca42be3f1c23b7981b27f3a92f14276b7e4ab6482be9427f2b38a0c0",
+          "part": "part_009.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S051",
+      "path": "interface/csv-export.js",
+      "bytes": 4201,
+      "lines": 46,
+      "sha256": "fc6454d77eb34eec2b132b51cf914c0758207e9e956d0b77d22a10244a510f00",
+      "git_blob": "5190b1d9d1907d282fa4df0ef08acc29c8ffdec2",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/interface/csv-export.js",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 46,
+          "bytes": 4201,
+          "sha256": "fc6454d77eb34eec2b132b51cf914c0758207e9e956d0b77d22a10244a510f00",
+          "part": "part_009.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S052",
+      "path": "interface/dimension-options.js",
+      "bytes": 1119,
+      "lines": 14,
+      "sha256": "8e5e21411b6eb6550d56656ad93b6f8c83108959fdf136c6344acd6353eee807",
+      "git_blob": "4a4e47758eeee85471065a6c23cbd5e9fa293221",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/interface/dimension-options.js",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 14,
+          "bytes": 1119,
+          "sha256": "8e5e21411b6eb6550d56656ad93b6f8c83108959fdf136c6344acd6353eee807",
+          "part": "part_009.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S053",
+      "path": "interface/export_catalog.py",
+      "bytes": 617,
+      "lines": 9,
+      "sha256": "95def05cf37bfdbf2987fdbb0ac55b06045c4f3ab59ac2b6646d51e11849d02a",
+      "git_blob": "a75e3de8aec4c0d9b7f12c0f53b10483de3e7f8a",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/interface/export_catalog.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 9,
+          "bytes": 617,
+          "sha256": "95def05cf37bfdbf2987fdbb0ac55b06045c4f3ab59ac2b6646d51e11849d02a",
+          "part": "part_009.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S054",
+      "path": "interface/flux-options.js",
+      "bytes": 3217,
+      "lines": 33,
+      "sha256": "43ad75fecec6571eb0f02f9ec1a910949e450a79b852eb87d69128ef94a0802c",
+      "git_blob": "2114a5240b1c3e40becb9a133076db8637799488",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/interface/flux-options.js",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 33,
+          "bytes": 3217,
+          "sha256": "43ad75fecec6571eb0f02f9ec1a910949e450a79b852eb87d69128ef94a0802c",
+          "part": "part_009.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S055",
+      "path": "interface/index.html",
+      "bytes": 24211,
+      "lines": 39,
+      "sha256": "11a22b99fbbcab154a00fb19559d381765f3728ea176d2e0c4d5e1b07741d0d6",
+      "git_blob": "e1b6d10daf6922ce6ea74dec5cf6468a991f5c55",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/interface/index.html",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 39,
+          "bytes": 24211,
+          "sha256": "11a22b99fbbcab154a00fb19559d381765f3728ea176d2e0c4d5e1b07741d0d6",
+          "part": "part_010.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S056",
+      "path": "interface/launch.ps1",
+      "bytes": 176,
+      "lines": 3,
+      "sha256": "e52fed87e1bf70b8757a80e11af3e7f4a9728cc4d746ae2c8ab33253085204c3",
+      "git_blob": "fda9885c222368bac2860e10659e7a3bdae9452a",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/interface/launch.ps1",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 3,
+          "bytes": 176,
+          "sha256": "e52fed87e1bf70b8757a80e11af3e7f4a9728cc4d746ae2c8ab33253085204c3",
+          "part": "part_010.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S057",
+      "path": "interface/rotor-options.js",
+      "bytes": 20035,
+      "lines": 172,
+      "sha256": "08d8eaa370602d80f754223bbae5e33a1d2b9fe0945e9bfb795d7652f7532d44",
+      "git_blob": "b5f4cd2884bb7fe444cc5af4e7da16a132b8829a",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/interface/rotor-options.js",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 172,
+          "bytes": 20035,
+          "sha256": "08d8eaa370602d80f754223bbae5e33a1d2b9fe0945e9bfb795d7652f7532d44",
+          "part": "part_010.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S058",
+      "path": "interface/spm-options.js",
+      "bytes": 3946,
+      "lines": 46,
+      "sha256": "58c1d6a1680a6f982c1ce50c31721fb701214c5c99041a1f049bbb70fafbc5dd",
+      "git_blob": "bfdfa474b7f2479653000458759336c8c7947a1b",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/interface/spm-options.js",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 46,
+          "bytes": 3946,
+          "sha256": "58c1d6a1680a6f982c1ce50c31721fb701214c5c99041a1f049bbb70fafbc5dd",
+          "part": "part_011.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S059",
+      "path": "interface/steel-catalog.js",
+      "bytes": 2698,
+      "lines": 1,
+      "sha256": "b4192fb392e87e267969afa3a7cf8864502db8eef88251c484b626c77a64da74",
+      "git_blob": "6879ac1dd9002fa87e26ef6b4a1790f488970e32",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/interface/steel-catalog.js",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 1,
+          "bytes": 2698,
+          "sha256": "b4192fb392e87e267969afa3a7cf8864502db8eef88251c484b626c77a64da74",
+          "part": "part_011.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S060",
+      "path": "interface/switching-options.js",
+      "bytes": 8383,
+      "lines": 84,
+      "sha256": "60bcc01559496b92caaf4e3df4ad2125d39a01c73ccbae16de299469de547a8b",
+      "git_blob": "9b4e3cac90f48f14c990d6fec324767b0927ffe0",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/interface/switching-options.js",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 84,
+          "bytes": 8383,
+          "sha256": "60bcc01559496b92caaf4e3df4ad2125d39a01c73ccbae16de299469de547a8b",
+          "part": "part_011.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S061",
+      "path": "interface/task-manager.css",
+      "bytes": 4589,
+      "lines": 1,
+      "sha256": "0584dff9d2e9bf54f987f05973f2f9fb1f5be953fa6ee8d7b0ddc67c77124bac",
+      "git_blob": "22defc408e33d6b5bcd421b5d6b6030ae29518a9",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/interface/task-manager.css",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 1,
+          "bytes": 4589,
+          "sha256": "0584dff9d2e9bf54f987f05973f2f9fb1f5be953fa6ee8d7b0ddc67c77124bac",
+          "part": "part_011.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S062",
+      "path": "interface/task-manager.js",
+      "bytes": 18241,
+      "lines": 167,
+      "sha256": "f9349c61c2006e4e4349d87b212c52a7a9caaa6f66f3d85a043bf3134b5bc30e",
+      "git_blob": "a8c2a4c6f3d3ae1ca00ffd46d0892b007f410589",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/interface/task-manager.js",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 167,
+          "bytes": 18241,
+          "sha256": "f9349c61c2006e4e4349d87b212c52a7a9caaa6f66f3d85a043bf3134b5bc30e",
+          "part": "part_011.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S063",
+      "path": "interface/upgrade.py",
+      "bytes": 381,
+      "lines": 6,
+      "sha256": "c1426ef83d9cea81a18a7bdf79d07cdafed6694c5303569d638f9ab3e69b42de",
+      "git_blob": "cb5b6471d308a4f27dabcf120af9a5ee37c05b3f",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/interface/upgrade.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 6,
+          "bytes": 381,
+          "sha256": "c1426ef83d9cea81a18a7bdf79d07cdafed6694c5303569d638f9ab3e69b42de",
+          "part": "part_011.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S064",
+      "path": "material_coverage.py",
+      "bytes": 9356,
+      "lines": 113,
+      "sha256": "c26ad70789ec8631cb92b005ce8ccd56d0ffcc94ce1b49565e2936869c441ab6",
+      "git_blob": "110f4c75951a3bd1b2385deb5f033275f2e3dd9d",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/material_coverage.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 113,
+          "bytes": 9356,
+          "sha256": "c26ad70789ec8631cb92b005ce8ccd56d0ffcc94ce1b49565e2936869c441ab6",
+          "part": "part_011.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S065",
+      "path": "material_probe.py",
+      "bytes": 2649,
+      "lines": 62,
+      "sha256": "e67eb6900d2919ee1a09ab61de7bc5c126e54730536df5f567bb7633f451f493",
+      "git_blob": "4e760a83adaeb0f0209acb265c38820a424a4b80",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/material_probe.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 62,
+          "bytes": 2649,
+          "sha256": "e67eb6900d2919ee1a09ab61de7bc5c126e54730536df5f567bb7633f451f493",
+          "part": "part_012.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S066",
+      "path": "normalize_materials.py",
+      "bytes": 11514,
+      "lines": 178,
+      "sha256": "07026f75b57de68c8b695fb82d2ff01a3ca1918dd6ceadc5cdf651c29f03cab0",
+      "git_blob": "4bdce76d0b1cface279ae9062ba5a0c663c504a1",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/normalize_materials.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 178,
+          "bytes": 11514,
+          "sha256": "07026f75b57de68c8b695fb82d2ff01a3ca1918dd6ceadc5cdf651c29f03cab0",
+          "part": "part_012.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S067",
+      "path": "package_materials.py",
+      "bytes": 877,
+      "lines": 17,
+      "sha256": "adc44685158df18cbc4f3e8bd9eb557c28df00706786b90074b2ed43e2742698",
+      "git_blob": "d9407f4910dd92247bfaa45f653978ece53d920d",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/package_materials.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 17,
+          "bytes": 877,
+          "sha256": "adc44685158df18cbc4f3e8bd9eb557c28df00706786b90074b2ed43e2742698",
+          "part": "part_012.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S068",
+      "path": "prepare_granta_batch.py",
+      "bytes": 1993,
+      "lines": 40,
+      "sha256": "aea13fe23c18fe66e76a0e3c777fdeece804227f9793391504ff5261e3186e6f",
+      "git_blob": "933eae087c68499f3098ea0cd083bb168f8915d0",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/prepare_granta_batch.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 40,
+          "bytes": 1993,
+          "sha256": "aea13fe23c18fe66e76a0e3c777fdeece804227f9793391504ff5261e3186e6f",
+          "part": "part_012.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S069",
+      "path": "review_representative_materials.py",
+      "bytes": 4215,
+      "lines": 64,
+      "sha256": "70af2e9e8676825d0691043700a5d9e617a856b091a6f7e4c5ff52eea8679835",
+      "git_blob": "1a736dda1a8f0b149464bb4e7ab3da861270484b",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/review_representative_materials.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 64,
+          "bytes": 4215,
+          "sha256": "70af2e9e8676825d0691043700a5d9e617a856b091a6f7e4c5ff52eea8679835",
+          "part": "part_012.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S070",
+      "path": "run_granta_batch.py",
+      "bytes": 4277,
+      "lines": 75,
+      "sha256": "a6dbd394b063a8f3e8a6ced19f1a49965713805cb2501b11340264a9395c1afc",
+      "git_blob": "803f0a08c854b98d837cee6cc35d9d0a3cd1c257",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/run_granta_batch.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 75,
+          "bytes": 4277,
+          "sha256": "a6dbd394b063a8f3e8a6ced19f1a49965713805cb2501b11340264a9395c1afc",
+          "part": "part_012.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S071",
+      "path": "test_collection.py",
+      "bytes": 1388,
+      "lines": 28,
+      "sha256": "07924de58db6263222bb97ba95801cc5dca52f99b45af9b4b65b24a6cec83047",
+      "git_blob": "8d93a521762a809450a1290c9e412afb88cbffd1",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/test_collection.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 28,
+          "bytes": 1388,
+          "sha256": "07924de58db6263222bb97ba95801cc5dca52f99b45af9b4b65b24a6cec83047",
+          "part": "part_012.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S072",
+      "path": "test_normalization.py",
+      "bytes": 1383,
+      "lines": 25,
+      "sha256": "4ca0731e97d1d0da1b38a0f937e72b32849c358ec2ef1ebccc85fd10d99cae50",
+      "git_blob": "6f042dc9fc9ea6b8e0736cd1579262ca24778ad6",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/test_normalization.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 25,
+          "bytes": 1383,
+          "sha256": "4ca0731e97d1d0da1b38a0f937e72b32849c358ec2ef1ebccc85fd10d99cae50",
+          "part": "part_012.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S073",
+      "path": "validation/acceptance.py",
+      "bytes": 2193,
+      "lines": 34,
+      "sha256": "08a148e96275336d3ca2e6f4ac11c5b3e83069a71716e1b7e1e7c83d8d12f86f",
+      "git_blob": "bd01df3c79537074d3ee4aa180cb9dc66f90f487",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/acceptance.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 34,
+          "bytes": 2193,
+          "sha256": "08a148e96275336d3ca2e6f4ac11c5b3e83069a71716e1b7e1e7c83d8d12f86f",
+          "part": "part_012.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S074",
+      "path": "validation/analyze_detailed_spm.py",
+      "bytes": 12273,
+      "lines": 136,
+      "sha256": "1def49386c0ea1e55f5226dd23e78fbfe24e438b2089974bca62e31569d2b726",
+      "git_blob": "e83d13cc4a63e3189c855296b10ae928955dd942",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/analyze_detailed_spm.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 136,
+          "bytes": 12273,
+          "sha256": "1def49386c0ea1e55f5226dd23e78fbfe24e438b2089974bca62e31569d2b726",
+          "part": "part_012.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S075",
+      "path": "validation/analyze_spm_interaction.py",
+      "bytes": 8803,
+      "lines": 118,
+      "sha256": "f2f774e2ae6d38657fdbe85eb362efbb072aa5ad2e51e25ec9680fa309f85e15",
+      "git_blob": "1feeee11eb880c8ef6d9a081705097cbb337af80",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/analyze_spm_interaction.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 118,
+          "bytes": 8803,
+          "sha256": "f2f774e2ae6d38657fdbe85eb362efbb072aa5ad2e51e25ec9680fa309f85e15",
+          "part": "part_013.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S076",
+      "path": "validation/analyze_steel_limits.py",
+      "bytes": 4997,
+      "lines": 77,
+      "sha256": "e3fa6fba0e390b91ac19eef002bc0b42c07874e23d513168f7132227ce2cafee",
+      "git_blob": "9552e03709540ad8c45f811b6555586b533b6258",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/analyze_steel_limits.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 77,
+          "bytes": 4997,
+          "sha256": "e3fa6fba0e390b91ac19eef002bc0b42c07874e23d513168f7132227ce2cafee",
+          "part": "part_013.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S077",
+      "path": "validation/audit_breadloaf_screens.py",
+      "bytes": 2630,
+      "lines": 37,
+      "sha256": "ed7f892ab440f8b57ec64fc3cd1cc5c37fa1b9d747df3cc34f1e07bbbef2cfb3",
+      "git_blob": "bb01e98faf62680fa172c6600245124c95515385",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/audit_breadloaf_screens.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 37,
+          "bytes": 2630,
+          "sha256": "ed7f892ab440f8b57ec64fc3cd1cc5c37fa1b9d747df3cc34f1e07bbbef2cfb3",
+          "part": "part_013.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S078",
+      "path": "validation/audit_progress.py",
+      "bytes": 1166,
+      "lines": 11,
+      "sha256": "0e9c7f55e465d70ced60d949a9b369744b3164d5861f6c0912de32404e6fd605",
+      "git_blob": "90d94bb2c6839d68c50cec8eb1e4bdbaa4851de0",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/audit_progress.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 11,
+          "bytes": 1166,
+          "sha256": "0e9c7f55e465d70ced60d949a9b369744b3164d5861f6c0912de32404e6fd605",
+          "part": "part_013.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S079",
+      "path": "validation/audit_spm_ripple.py",
+      "bytes": 6749,
+      "lines": 114,
+      "sha256": "f313c0980391cfa6e39df6d4ecd42f3b8cd4165cbc954065dd627068080c6b33",
+      "git_blob": "c7050c777f55834b744d206ddc1bba042a5532fb",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/audit_spm_ripple.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 114,
+          "bytes": 6749,
+          "sha256": "f313c0980391cfa6e39df6d4ecd42f3b8cd4165cbc954065dd627068080c6b33",
+          "part": "part_013.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S080",
+      "path": "validation/background_validation.py",
+      "bytes": 12262,
+      "lines": 182,
+      "sha256": "7237452b1d6fdbbf6e6d99c095ce1184d3e09742d60f8e009d39b5dbd5052649",
+      "git_blob": "ee8a49d38ec8e216031d8f377172882d4026a7a5",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/background_validation.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 182,
+          "bytes": 12262,
+          "sha256": "7237452b1d6fdbbf6e6d99c095ce1184d3e09742d60f8e009d39b5dbd5052649",
+          "part": "part_013.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S081",
+      "path": "validation/benchmark_control_airgap.py",
+      "bytes": 4790,
+      "lines": 84,
+      "sha256": "046987a4509295115bdc09ead4beb16f4140383539110e4246d61f413067d40a",
+      "git_blob": "873b6f99a878fce7025c197ba1dedbf0fe5bd067",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/benchmark_control_airgap.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 84,
+          "bytes": 4790,
+          "sha256": "046987a4509295115bdc09ead4beb16f4140383539110e4246d61f413067d40a",
+          "part": "part_013.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S082",
+      "path": "validation/breadloaf_boundary.py",
+      "bytes": 2234,
+      "lines": 39,
+      "sha256": "5a0a9bcb25021b07ba2dc186f94139cfed3884cb2a26ce0c922dec9d44b58d2a",
+      "git_blob": "e08f54e629443495fccd25fd0a988a3511764fd1",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/breadloaf_boundary.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 39,
+          "bytes": 2234,
+          "sha256": "5a0a9bcb25021b07ba2dc186f94139cfed3884cb2a26ce0c922dec9d44b58d2a",
+          "part": "part_013.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S083",
+      "path": "validation/breadloaf_bundle_routing.py",
+      "bytes": 7666,
+      "lines": 115,
+      "sha256": "aee0327d15c0ba9271e7b66f2fe77237aa39cb691306f4760af2ff8ca53fa7b7",
+      "git_blob": "1671f4a8def4f4ac0c27c5def40c3062207def2c",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/breadloaf_bundle_routing.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 115,
+          "bytes": 7666,
+          "sha256": "aee0327d15c0ba9271e7b66f2fe77237aa39cb691306f4760af2ff8ca53fa7b7",
+          "part": "part_014.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S084",
+      "path": "validation/breadloaf_clearance_refinement.py",
+      "bytes": 7681,
+      "lines": 100,
+      "sha256": "4e1f66c482d0bf8d01112ca8124e4a8876fa7eb8c4e8732fea5cebbce32098ea",
+      "git_blob": "f3d5eeddd0d9210665b7d38ece4d65310b070d6a",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/breadloaf_clearance_refinement.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 100,
+          "bytes": 7681,
+          "sha256": "4e1f66c482d0bf8d01112ca8124e4a8876fa7eb8c4e8732fea5cebbce32098ea",
+          "part": "part_014.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S085",
+      "path": "validation/breadloaf_coil_assignment.py",
+      "bytes": 11668,
+      "lines": 158,
+      "sha256": "a59433bf13ad48fc07507c956bd55da244123b392b73b45021fe8056d27903ae",
+      "git_blob": "eca0fa3ef2eae9d4eded546cdb0a746d6d7c0097",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/breadloaf_coil_assignment.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 158,
+          "bytes": 11668,
+          "sha256": "a59433bf13ad48fc07507c956bd55da244123b392b73b45021fe8056d27903ae",
+          "part": "part_014.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S086",
+      "path": "validation/breadloaf_conductor_audit.py",
+      "bytes": 10212,
+      "lines": 145,
+      "sha256": "3379425d507d8b80113dd30d45374aa254dda14eccd9e7f8f2c7fe8808a0b3d1",
+      "git_blob": "fb475f960d8ed2c76ca3c25b9524b27a978a4158",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/breadloaf_conductor_audit.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 145,
+          "bytes": 10212,
+          "sha256": "3379425d507d8b80113dd30d45374aa254dda14eccd9e7f8f2c7fe8808a0b3d1",
+          "part": "part_014.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S087",
+      "path": "validation/breadloaf_continuous_packing.py",
+      "bytes": 14902,
+      "lines": 214,
+      "sha256": "fb34d1e84e64f4fa7692a68f106c75b3050948bca9de06912db115f978c3649c",
+      "git_blob": "31d154360a38fe86119142c11a826767b8442580",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/breadloaf_continuous_packing.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 214,
+          "bytes": 14902,
+          "sha256": "fb34d1e84e64f4fa7692a68f106c75b3050948bca9de06912db115f978c3649c",
+          "part": "part_015.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S088",
+      "path": "validation/breadloaf_end_routing.py",
+      "bytes": 12574,
+      "lines": 180,
+      "sha256": "a20ace6c87aa97aea4e9fc09ba0ba6f2a21f5da04aa82bd2eee23c2661cc3d6b",
+      "git_blob": "35433a81949d292f21a228bf849d81cb7da7cdc2",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/breadloaf_end_routing.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 180,
+          "bytes": 12574,
+          "sha256": "a20ace6c87aa97aea4e9fc09ba0ba6f2a21f5da04aa82bd2eee23c2661cc3d6b",
+          "part": "part_015.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S089",
+      "path": "validation/breadloaf_flux_probe.py",
+      "bytes": 18726,
+      "lines": 267,
+      "sha256": "41a5b3cc0c2d5842b64e2c5ac6e77a3315361586d98254fd29de79dca3c8e19f",
+      "git_blob": "2f0241ae33843abad2f0b92f2e7e71601599e78b",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/breadloaf_flux_probe.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 267,
+          "bytes": 18726,
+          "sha256": "41a5b3cc0c2d5842b64e2c5ac6e77a3315361586d98254fd29de79dca3c8e19f",
+          "part": "part_015.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S090",
+      "path": "validation/breadloaf_frequency_loss.py",
+      "bytes": 2507,
+      "lines": 37,
+      "sha256": "0ada1da63698dd7b57639c004d0a4e8edaf8cebb95c981f855563d5b246ffef8",
+      "git_blob": "b56eee00f2571eecdd9b9163faac0f051461893b",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/breadloaf_frequency_loss.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 37,
+          "bytes": 2507,
+          "sha256": "0ada1da63698dd7b57639c004d0a4e8edaf8cebb95c981f855563d5b246ffef8",
+          "part": "part_016.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S091",
+      "path": "validation/breadloaf_grid_packing.py",
+      "bytes": 9291,
+      "lines": 131,
+      "sha256": "ae9c411ccd44a7e9c2f528255db56f3519a92b7a51981593e0d9e943a9cbd4a7",
+      "git_blob": "9d22249132947c884a58e0916fe55c91a3bcc43e",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/breadloaf_grid_packing.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 131,
+          "bytes": 9291,
+          "sha256": "ae9c411ccd44a7e9c2f528255db56f3519a92b7a51981593e0d9e943a9cbd4a7",
+          "part": "part_016.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S092",
+      "path": "validation/breadloaf_gui.py",
+      "bytes": 22920,
+      "lines": 315,
+      "sha256": "4830cb03819dd22502243dc9e2f073364077fec4545a5b7f80abbcd379227908",
+      "git_blob": "f86eb56aba270b1359502e4b7d586830a684c65a",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/breadloaf_gui.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 315,
+          "bytes": 22920,
+          "sha256": "4830cb03819dd22502243dc9e2f073364077fec4545a5b7f80abbcd379227908",
+          "part": "part_016.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S093",
+      "path": "validation/breadloaf_inductance.py",
+      "bytes": 9583,
+      "lines": 155,
+      "sha256": "0b9254756fc7beb435a4cc11e777b852ca7156fa3ac94781869225e61aa4cdfb",
+      "git_blob": "d38009896a799dbdaac7173a59ab6867117de7bb",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/breadloaf_inductance.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 155,
+          "bytes": 9583,
+          "sha256": "0b9254756fc7beb435a4cc11e777b852ca7156fa3ac94781869225e61aa4cdfb",
+          "part": "part_016.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S094",
+      "path": "validation/breadloaf_inductance_comparison.py",
+      "bytes": 10738,
+      "lines": 152,
+      "sha256": "375253ab2c86d21dc6585448b0d65bdf8e0c25175e2dfc9034fc5011f9e662da",
+      "git_blob": "037cc62b981541bd01216a09488398ca70fc8d8b",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/breadloaf_inductance_comparison.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 152,
+          "bytes": 10738,
+          "sha256": "375253ab2c86d21dc6585448b0d65bdf8e0c25175e2dfc9034fc5011f9e662da",
+          "part": "part_017.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S095",
+      "path": "validation/breadloaf_leakage_geometry.py",
+      "bytes": 11757,
+      "lines": 170,
+      "sha256": "b300f437e3b9ea187681c29b4d3ce9b0714dc2647e4ad83bc523846d5cab02c0",
+      "git_blob": "1492b57ff5fe2103c7ca7660fcd5c04f8cac565c",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/breadloaf_leakage_geometry.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 170,
+          "bytes": 11757,
+          "sha256": "b300f437e3b9ea187681c29b4d3ce9b0714dc2647e4ad83bc523846d5cab02c0",
+          "part": "part_017.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S096",
+      "path": "validation/breadloaf_local_model.py",
+      "bytes": 7521,
+      "lines": 122,
+      "sha256": "c3381ddb8d0b6123d7ba5bf18097eed7166f9aeced5eb787671ffdd6acad4a88",
+      "git_blob": "563c9ab608d314b88fe58d4e1298fe35a5816a79",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/breadloaf_local_model.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 122,
+          "bytes": 7521,
+          "sha256": "c3381ddb8d0b6123d7ba5bf18097eed7166f9aeced5eb787671ffdd6acad4a88",
+          "part": "part_017.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S097",
+      "path": "validation/breadloaf_loss_dataset.py",
+      "bytes": 3871,
+      "lines": 57,
+      "sha256": "c735ec189c1252ea0540fa82f9fcd207964785668255a2118cfd4c1fb13efbde",
+      "git_blob": "2e44a52323bef936c015c13a33b9e71e7972e826",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/breadloaf_loss_dataset.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 57,
+          "bytes": 3871,
+          "sha256": "c735ec189c1252ea0540fa82f9fcd207964785668255a2118cfd4c1fb13efbde",
+          "part": "part_017.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S098",
+      "path": "validation/breadloaf_operating_comparison.py",
+      "bytes": 3454,
+      "lines": 56,
+      "sha256": "2eb6f15c4d27e4babc2010ecfb5480d32c2ebdd1197b46b9362cbe5977c75785",
+      "git_blob": "c4ac5b75be5d7480ccf9ea6cd1fdcc4c3bc87c7e",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/breadloaf_operating_comparison.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 56,
+          "bytes": 3454,
+          "sha256": "2eb6f15c4d27e4babc2010ecfb5480d32c2ebdd1197b46b9362cbe5977c75785",
+          "part": "part_017.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S099",
+      "path": "validation/breadloaf_packing_selection.py",
+      "bytes": 3206,
+      "lines": 44,
+      "sha256": "f233b9784717a0c1ae9d8b857b4b1ac767cd8b607c0a7794bab582542a35a816",
+      "git_blob": "b77f90e5b72d6dd8648bc3c870f5482867f3504d",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/breadloaf_packing_selection.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 44,
+          "bytes": 3206,
+          "sha256": "f233b9784717a0c1ae9d8b857b4b1ac767cd8b607c0a7794bab582542a35a816",
+          "part": "part_017.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S100",
+      "path": "validation/breadloaf_pwm_preview.py",
+      "bytes": 16348,
+      "lines": 232,
+      "sha256": "94ea9fd7c9ec94524be42455bc0ea1853214cb3f286cc002968b29eb716cc624",
+      "git_blob": "074db29aa62a52fc2b174ab9405b54d9603ab262",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/breadloaf_pwm_preview.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 232,
+          "bytes": 16348,
+          "sha256": "94ea9fd7c9ec94524be42455bc0ea1853214cb3f286cc002968b29eb716cc624",
+          "part": "part_018.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S101",
+      "path": "validation/breadloaf_pwm_reference.py",
+      "bytes": 4923,
+      "lines": 77,
+      "sha256": "2419f6c427daa70ea3bd17ca8791b203998dab2687ec9fe9b8f7263b56350dd2",
+      "git_blob": "b54fee78761787d9ca5bb0ce8bf45c0275d1c6b3",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/breadloaf_pwm_reference.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 77,
+          "bytes": 4923,
+          "sha256": "2419f6c427daa70ea3bd17ca8791b203998dab2687ec9fe9b8f7263b56350dd2",
+          "part": "part_018.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S102",
+      "path": "validation/breadloaf_pwm_screen.py",
+      "bytes": 7474,
+      "lines": 118,
+      "sha256": "98cf018f3339bf2ea28b5b1c9685e7c35e42c48afc509d4a3babf191ec46e21f",
+      "git_blob": "0a871bbd04ff248c902b0e6eabe107f7385088eb",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/breadloaf_pwm_screen.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 118,
+          "bytes": 7474,
+          "sha256": "98cf018f3339bf2ea28b5b1c9685e7c35e42c48afc509d4a3babf191ec46e21f",
+          "part": "part_018.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S103",
+      "path": "validation/breadloaf_remaining_review.py",
+      "bytes": 6184,
+      "lines": 89,
+      "sha256": "d6fea9685d05ec223192ef3fbfe77d80a7f90b80ccb786b667de3bf0e92cb31d",
+      "git_blob": "a9c8b357dd26296c94cc99324e3c0a33f9bdaac3",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/breadloaf_remaining_review.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 89,
+          "bytes": 6184,
+          "sha256": "d6fea9685d05ec223192ef3fbfe77d80a7f90b80ccb786b667de3bf0e92cb31d",
+          "part": "part_018.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S104",
+      "path": "validation/breadloaf_request.py",
+      "bytes": 8505,
+      "lines": 101,
+      "sha256": "765df1dd306783eb08b86b292aa05f354d57821c500e8b2182ceae96e43dfcf3",
+      "git_blob": "1e155cf1bfa8b5dafaa658f8336be3f2406ba162",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/breadloaf_request.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 101,
+          "bytes": 8505,
+          "sha256": "765df1dd306783eb08b86b292aa05f354d57821c500e8b2182ceae96e43dfcf3",
+          "part": "part_018.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S105",
+      "path": "validation/breadloaf_route_adjustment.py",
+      "bytes": 10381,
+      "lines": 144,
+      "sha256": "cb023684009a7e47334cf83526f9f5928b95761025bf41f45a9329d4e6d71b21",
+      "git_blob": "fca3b13375c8208c510d42d10d5214c260997243",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/breadloaf_route_adjustment.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 144,
+          "bytes": 10381,
+          "sha256": "cb023684009a7e47334cf83526f9f5928b95761025bf41f45a9329d4e6d71b21",
+          "part": "part_019.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S106",
+      "path": "validation/breadloaf_route_conflicts.py",
+      "bytes": 6733,
+      "lines": 98,
+      "sha256": "1d1723104fde2662336ae6300e1642990ae68e517f5b3d3a531cef74aca956f7",
+      "git_blob": "fdfccf859a0a87ad8bd4dbe4775ae8f99a9e3eed",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/breadloaf_route_conflicts.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 98,
+          "bytes": 6733,
+          "sha256": "1d1723104fde2662336ae6300e1642990ae68e517f5b3d3a531cef74aca956f7",
+          "part": "part_019.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S107",
+      "path": "validation/breadloaf_screens.py",
+      "bytes": 8653,
+      "lines": 114,
+      "sha256": "32691480ccaad49ab5c6758bf2b5b3b72b99985e75532134c3e8c44c58ffda65",
+      "git_blob": "f0413ca1eb8c5ba51e3eb780a47bcbf25759c8c3",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/breadloaf_screens.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 114,
+          "bytes": 8653,
+          "sha256": "32691480ccaad49ab5c6758bf2b5b3b72b99985e75532134c3e8c44c58ffda65",
+          "part": "part_019.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S108",
+      "path": "validation/breadloaf_search_space.py",
+      "bytes": 3582,
+      "lines": 50,
+      "sha256": "cad7fbce84e31e119c63035ef184104c048c7e9118614c35197fce8be1f514fd",
+      "git_blob": "1f901612c4c588bf7d7963c117318e77e1d54d71",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/breadloaf_search_space.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 50,
+          "bytes": 3582,
+          "sha256": "cad7fbce84e31e119c63035ef184104c048c7e9118614c35197fce8be1f514fd",
+          "part": "part_019.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S109",
+      "path": "validation/breadloaf_shaft_control.py",
+      "bytes": 4632,
+      "lines": 75,
+      "sha256": "c2c939904a180a0772e3ba28b26d170c7ba00ffde74fb7d8a0c7719d7bc7b814",
+      "git_blob": "290e0347b6d07e7c7b49e0d8c46a7747832efe24",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/breadloaf_shaft_control.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 75,
+          "bytes": 4632,
+          "sha256": "c2c939904a180a0772e3ba28b26d170c7ba00ffde74fb7d8a0c7719d7bc7b814",
+          "part": "part_019.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S110",
+      "path": "validation/breadloaf_slot_detail.py",
+      "bytes": 13064,
+      "lines": 205,
+      "sha256": "2448651383804697f614c52e05bd28307899017466178c4b53d2a4536daca890",
+      "git_blob": "affac022183cbf4e77ec17eff6e0c126430d0a86",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/breadloaf_slot_detail.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 205,
+          "bytes": 13064,
+          "sha256": "2448651383804697f614c52e05bd28307899017466178c4b53d2a4536daca890",
+          "part": "part_019.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S111",
+      "path": "validation/breadloaf_transition_routing.py",
+      "bytes": 9629,
+      "lines": 147,
+      "sha256": "ec1787013b348a0c6bc2f0dff40836939b5584221e60792800919f6fd105f12a",
+      "git_blob": "d1d136de1ef4a61d7d5b5f4cd0f11ffda2d5bb21",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/breadloaf_transition_routing.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 147,
+          "bytes": 9629,
+          "sha256": "ec1787013b348a0c6bc2f0dff40836939b5584221e60792800919f6fd105f12a",
+          "part": "part_020.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S112",
+      "path": "validation/breadloaf_workflow.py",
+      "bytes": 6812,
+      "lines": 114,
+      "sha256": "4c0f5119db24e81476c50b1b5b7b31076fedffaeebc941230a124030e91bfb2d",
+      "git_blob": "a15d48fdc07093a388f229d78f8f288b83bdb699",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/breadloaf_workflow.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 114,
+          "bytes": 6812,
+          "sha256": "4c0f5119db24e81476c50b1b5b7b31076fedffaeebc941230a124030e91bfb2d",
+          "part": "part_020.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S113",
+      "path": "validation/build_rotor_catalog.py",
+      "bytes": 9828,
+      "lines": 129,
+      "sha256": "aa2ba6b28f298295669f039d6cce9a04460a6efe221c133cfa51d401846960cc",
+      "git_blob": "0dc2268a73c8e8451f58dec22f95a688135e58dc",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/build_rotor_catalog.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 129,
+          "bytes": 9828,
+          "sha256": "aa2ba6b28f298295669f039d6cce9a04460a6efe221c133cfa51d401846960cc",
+          "part": "part_020.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S114",
+      "path": "validation/calibrate_surface_parallel.py",
+      "bytes": 2861,
+      "lines": 53,
+      "sha256": "6653b4c133aa0f69ab7c22d10829d2790b255bc8f506775b34afdb95f419c763",
+      "git_blob": "0e2c8c94d873f701816bd8f444148b3e2aad984e",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/calibrate_surface_parallel.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 53,
+          "bytes": 2861,
+          "sha256": "6653b4c133aa0f69ab7c22d10829d2790b255bc8f506775b34afdb95f419c763",
+          "part": "part_020.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S115",
+      "path": "validation/capture_error.py",
+      "bytes": 2074,
+      "lines": 38,
+      "sha256": "e3e29789223042901a21f305206f5268fff29dd285c4c8019a4e760c2e681d23",
+      "git_blob": "f68f3453e6a1ef0fb1cc98045becb3149430c5fc",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/capture_error.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 38,
+          "bytes": 2074,
+          "sha256": "e3e29789223042901a21f305206f5268fff29dd285c4c8019a4e760c2e681d23",
+          "part": "part_020.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S116",
+      "path": "validation/compare_surface_shapes.py",
+      "bytes": 2452,
+      "lines": 46,
+      "sha256": "43859897dda03004a71bd2ba8b7493c65ae366cc7a04a9df854dbe03e40b6def",
+      "git_blob": "3fa318f3a8c4db778dffc28088fe1c5ba876f653",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/compare_surface_shapes.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 46,
+          "bytes": 2452,
+          "sha256": "43859897dda03004a71bd2ba8b7493c65ae366cc7a04a9df854dbe03e40b6def",
+          "part": "part_020.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S117",
+      "path": "validation/csv_metadata.py",
+      "bytes": 3622,
+      "lines": 62,
+      "sha256": "59a1b706e351d9173d64112bde7103667ba295e1e3f46e3afb3a94143aa1e26e",
+      "git_blob": "b8fba2e6678d72eea23faba0a48b28feae8af0fe",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/csv_metadata.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 62,
+          "bytes": 3622,
+          "sha256": "59a1b706e351d9173d64112bde7103667ba295e1e3f46e3afb3a94143aa1e26e",
+          "part": "part_020.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S118",
+      "path": "validation/design_job.py",
+      "bytes": 19402,
+      "lines": 242,
+      "sha256": "4d006cb834a037616cd3b5e19cc5b8e4db584363452f5c7419b473e95eae8647",
+      "git_blob": "673fc4c3b84a902f18e8ed118fdcf20aa79e3648",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/design_job.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 242,
+          "bytes": 19402,
+          "sha256": "4d006cb834a037616cd3b5e19cc5b8e4db584363452f5c7419b473e95eae8647",
+          "part": "part_021.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S119",
+      "path": "validation/detailed_review.py",
+      "bytes": 3087,
+      "lines": 41,
+      "sha256": "7f1fe509154d71080c13906ff39d54337be3346bed83043025133e1f606e1419",
+      "git_blob": "f1e6803211c74485908dddc737acf40d98b0236d",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/detailed_review.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 41,
+          "bytes": 3087,
+          "sha256": "7f1fe509154d71080c13906ff39d54337be3346bed83043025133e1f606e1419",
+          "part": "part_021.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S120",
+      "path": "validation/detailed_spm_plan.py",
+      "bytes": 4426,
+      "lines": 63,
+      "sha256": "f58b92af687ca8ee366d69049d51b15563c023dac850253f87a373a474f499e9",
+      "git_blob": "80b65f14c8508b399abfc042e6f68d4018b5ab68",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/detailed_spm_plan.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 63,
+          "bytes": 4426,
+          "sha256": "f58b92af687ca8ee366d69049d51b15563c023dac850253f87a373a474f499e9",
+          "part": "part_021.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S121",
+      "path": "validation/dimension_grid.py",
+      "bytes": 1463,
+      "lines": 34,
+      "sha256": "a1ce60afbf142e61242af7b2dd86a84520c9ae9f3a7b01455004ed873286a67d",
+      "git_blob": "9be2a4504e0c2b271e1edb70ed78a7f2a8dddaed",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/dimension_grid.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 34,
+          "bytes": 1463,
+          "sha256": "a1ce60afbf142e61242af7b2dd86a84520c9ae9f3a7b01455004ed873286a67d",
+          "part": "part_021.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S122",
+      "path": "validation/dismiss_owned_error.py",
+      "bytes": 640,
+      "lines": 14,
+      "sha256": "2fca8acd2d59f7d01f02546256ad935b861cfea3fba6fe1261dff3e05e41da58",
+      "git_blob": "0f794a43b728395faa679b2045e69e9307e215c4",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/dismiss_owned_error.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 14,
+          "bytes": 640,
+          "sha256": "2fca8acd2d59f7d01f02546256ad935b861cfea3fba6fe1261dff3e05e41da58",
+          "part": "part_021.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S123",
+      "path": "validation/export_csv.py",
+      "bytes": 3168,
+      "lines": 67,
+      "sha256": "09c5aae884c763615d61990bae87fadbf646cf14cb40404e523362f4158c2960",
+      "git_blob": "890946866130a1d347d468de47be94d57d6a9958",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/export_csv.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 67,
+          "bytes": 3168,
+          "sha256": "09c5aae884c763615d61990bae87fadbf646cf14cb40404e523362f4158c2960",
+          "part": "part_021.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S124",
+      "path": "validation/export_pole_slot_review.py",
+      "bytes": 903,
+      "lines": 17,
+      "sha256": "1a358b0d5c4828f673ab5b1cdce3564f09b25403d6d97d2c7534faf91d177155",
+      "git_blob": "300177b1e7c330d86418927737a10bca4b81bdb3",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/export_pole_slot_review.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 17,
+          "bytes": 903,
+          "sha256": "1a358b0d5c4828f673ab5b1cdce3564f09b25403d6d97d2c7534faf91d177155",
+          "part": "part_021.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S125",
+      "path": "validation/final_validation.py",
+      "bytes": 1235,
+      "lines": 19,
+      "sha256": "bbfd0afcb8d245b08455fb7b15ecfae91a4bc8b49e4c6312fd1ada738b22910f",
+      "git_blob": "8a4599d72994a2c310a1fcfbd065d27e46ca3ce6",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/final_validation.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 19,
+          "bytes": 1235,
+          "sha256": "bbfd0afcb8d245b08455fb7b15ecfae91a4bc8b49e4c6312fd1ada738b22910f",
+          "part": "part_021.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S126",
+      "path": "validation/magnet_boundary_check.py",
+      "bytes": 4355,
+      "lines": 79,
+      "sha256": "8d1300871c2d31ab93969a4becfca6ba3edfb14ba665bcd567d443da65e10b73",
+      "git_blob": "14ad9b97009d756768dcf173516c1484d3484ddf",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/magnet_boundary_check.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 79,
+          "bytes": 4355,
+          "sha256": "8d1300871c2d31ab93969a4becfca6ba3edfb14ba665bcd567d443da65e10b73",
+          "part": "part_021.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S127",
+      "path": "validation/mesh_review.py",
+      "bytes": 7148,
+      "lines": 114,
+      "sha256": "7d75bfdba1e780affd827344f3c4b7719ddd2782ab7db95ea63293c0c2d9977d",
+      "git_blob": "b4e20330304114e2907051c00a5f9094927d87b4",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/mesh_review.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 114,
+          "bytes": 7148,
+          "sha256": "7d75bfdba1e780affd827344f3c4b7719ddd2782ab7db95ea63293c0c2d9977d",
+          "part": "part_021.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S128",
+      "path": "validation/motorcad_adapter.py",
+      "bytes": 2713,
+      "lines": 45,
+      "sha256": "fe145dc052cd237ee474ccf2d21e190c25b4325d0a5fda05e8c8bbc2c2d679ce",
+      "git_blob": "6674bee6e3372e233711acf54f3081062706dcd3",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/motorcad_adapter.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 45,
+          "bytes": 2713,
+          "sha256": "fe145dc052cd237ee474ccf2d21e190c25b4325d0a5fda05e8c8bbc2c2d679ce",
+          "part": "part_022.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S129",
+      "path": "validation/motorcad_open.py",
+      "bytes": 4604,
+      "lines": 87,
+      "sha256": "da490ff8d41b17913dd2c9c0d6c51dbb0091b3fef66effbf3c1a375bece6b14e",
+      "git_blob": "e37305ad9e4e5929b7bc066ce39444f300d5bc71",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/motorcad_open.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 87,
+          "bytes": 4604,
+          "sha256": "da490ff8d41b17913dd2c9c0d6c51dbb0091b3fef66effbf3c1a375bece6b14e",
+          "part": "part_022.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S130",
+      "path": "validation/native_torque_feedback.py",
+      "bytes": 2288,
+      "lines": 35,
+      "sha256": "2a61d1a52c9b6544252bccb93206cab8fcf0bb16d9e54874403dd07462fa432d",
+      "git_blob": "d570f37564ec3bb7a52afebd8d1ae71bf120110a",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/native_torque_feedback.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 35,
+          "bytes": 2288,
+          "sha256": "2a61d1a52c9b6544252bccb93206cab8fcf0bb16d9e54874403dd07462fa432d",
+          "part": "part_022.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S131",
+      "path": "validation/native_winding_review.py",
+      "bytes": 4358,
+      "lines": 68,
+      "sha256": "a3c3cdb2a94563f911bd9c423273f218c65c72c3b8cb1b66ffa35e769e6f2c2d",
+      "git_blob": "b9570b635bc4d2634d003d437d5dc46cbeb9cb33",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/native_winding_review.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 68,
+          "bytes": 4358,
+          "sha256": "a3c3cdb2a94563f911bd9c423273f218c65c72c3b8cb1b66ffa35e769e6f2c2d",
+          "part": "part_022.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S132",
+      "path": "validation/optimize_breadloaf_ripple.py",
+      "bytes": 14613,
+      "lines": 202,
+      "sha256": "3b65103393ff57e4d03f86dee30f1f739f51d5e2eb6832caa3264d4ec0d4c46e",
+      "git_blob": "294f7643c9aaa1ab3f58f405aa39d0aebf1b49bf",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/optimize_breadloaf_ripple.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 202,
+          "bytes": 14613,
+          "sha256": "3b65103393ff57e4d03f86dee30f1f739f51d5e2eb6832caa3264d4ec0d4c46e",
+          "part": "part_022.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S133",
+      "path": "validation/pilot_4p.py",
+      "bytes": 179,
+      "lines": 8,
+      "sha256": "c1d646353936a75a5564f985b4cfcf8dbb725173aa5ae7b2f56cadf3a3f74015",
+      "git_blob": "7485421a9dbdd194708ebeaf05e990e9979c30ed",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/pilot_4p.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 8,
+          "bytes": 179,
+          "sha256": "c1d646353936a75a5564f985b4cfcf8dbb725173aa5ae7b2f56cadf3a3f74015",
+          "part": "part_022.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S134",
+      "path": "validation/pilot_arc120.py",
+      "bytes": 183,
+      "lines": 8,
+      "sha256": "afcf95e731599ca9643b909008361503df6d8bb3ddc7a05d71999e108a882fa9",
+      "git_blob": "5236d68a78403d811bf142c757aa753a4fa06d80",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/pilot_arc120.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 8,
+          "bytes": 183,
+          "sha256": "afcf95e731599ca9643b909008361503df6d8bb3ddc7a05d71999e108a882fa9",
+          "part": "part_022.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S135",
+      "path": "validation/pilot_corrected.py",
+      "bytes": 186,
+      "lines": 8,
+      "sha256": "3991452ff6a601e12a416f961b1c4fd980c6f90f252cde7b8f0356b500cac667",
+      "git_blob": "37aaa281e7091f1017b0af7e3543cb556a4e9e53",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/pilot_corrected.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 8,
+          "bytes": 186,
+          "sha256": "3991452ff6a601e12a416f961b1c4fd980c6f90f252cde7b8f0356b500cac667",
+          "part": "part_022.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S136",
+      "path": "validation/plan_spm_interaction.py",
+      "bytes": 4439,
+      "lines": 65,
+      "sha256": "0696e7414db38dbbc019982c6818e962e342a66d15e5bd873dc4ea7418e3fdb6",
+      "git_blob": "c67a3a9b47d919e1c974dcbc5d5a8799884b4c7d",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/plan_spm_interaction.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 65,
+          "bytes": 4439,
+          "sha256": "0696e7414db38dbbc019982c6818e962e342a66d15e5bd873dc4ea7418e3fdb6",
+          "part": "part_022.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S137",
+      "path": "validation/plan_spm_range_probe.py",
+      "bytes": 2687,
+      "lines": 41,
+      "sha256": "4c0fa2ed317a34a7f670b1b1916e601ef8c7176eaae5418dc199ed1e249d0f83",
+      "git_blob": "4e9701018757db36bb2e855541ebbe0030424999",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/plan_spm_range_probe.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 41,
+          "bytes": 2687,
+          "sha256": "4c0fa2ed317a34a7f670b1b1916e601ef8c7176eaae5418dc199ed1e249d0f83",
+          "part": "part_022.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S138",
+      "path": "validation/prepare_breadloaf_current_feedback.py",
+      "bytes": 4505,
+      "lines": 65,
+      "sha256": "987dccc4cf6f691d6edb4d7d1eae4fe966d0b6e2e0bfe6ea73efcea1b56d0c34",
+      "git_blob": "c1cb7e2220cda99f18910b47bd169a0a8b3da966",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/prepare_breadloaf_current_feedback.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 65,
+          "bytes": 4505,
+          "sha256": "987dccc4cf6f691d6edb4d7d1eae4fe966d0b6e2e0bfe6ea73efcea1b56d0c34",
+          "part": "part_022.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S139",
+      "path": "validation/prepare_breadloaf_loss_B.py",
+      "bytes": 5284,
+      "lines": 79,
+      "sha256": "c0fb84dff1db8980d920afb423ee23597d30869312487f30d6c33ad146c660ab",
+      "git_blob": "5bb75aba86ef5eec7599fe875280fb2ddc008dd6",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/prepare_breadloaf_loss_B.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 79,
+          "bytes": 5284,
+          "sha256": "c0fb84dff1db8980d920afb423ee23597d30869312487f30d6c33ad146c660ab",
+          "part": "part_022.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S140",
+      "path": "validation/prepare_breadloaf_verification.py",
+      "bytes": 5390,
+      "lines": 71,
+      "sha256": "5579a3e81ec93e18e95cc339a16d39d809cba01cae411279636e2115c160923d",
+      "git_blob": "e3b0164fbc21f99fc37e7b32dfe31da4969ffae9",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/prepare_breadloaf_verification.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 71,
+          "bytes": 5390,
+          "sha256": "5579a3e81ec93e18e95cc339a16d39d809cba01cae411279636e2115c160923d",
+          "part": "part_023.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S141",
+      "path": "validation/prepare_spm_ripple_recovery.py",
+      "bytes": 4629,
+      "lines": 65,
+      "sha256": "a508076205a76c28ec953da099bc8476ab7be513134730e90c90fef891c84532",
+      "git_blob": "2a57f4718d13c1608b8f56cf4a7c3716330813ca",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/prepare_spm_ripple_recovery.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 65,
+          "bytes": 4629,
+          "sha256": "a508076205a76c28ec953da099bc8476ab7be513134730e90c90fef891c84532",
+          "part": "part_023.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S142",
+      "path": "validation/probe_breadloaf_geometry.py",
+      "bytes": 3016,
+      "lines": 57,
+      "sha256": "39b2551265380f34390acfe5debe5e5f5d01afd09ffe11b975f0137ddb0b852e",
+      "git_blob": "5068c8a41aa0f0b0196376c25105c1545fe5d4c7",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/probe_breadloaf_geometry.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 57,
+          "bytes": 3016,
+          "sha256": "39b2551265380f34390acfe5debe5e5f5d01afd09ffe11b975f0137ddb0b852e",
+          "part": "part_023.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S143",
+      "path": "validation/probe_model.py",
+      "bytes": 1200,
+      "lines": 20,
+      "sha256": "bd577fc6d2c52b56967292c2548d0f3aa3667467e445275b3de8a6d545a9c3c0",
+      "git_blob": "b1b5385111c479883bd908b7e1ae5aabd778d5b0",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/probe_model.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 20,
+          "bytes": 1200,
+          "sha256": "bd577fc6d2c52b56967292c2548d0f3aa3667467e445275b3de8a6d545a9c3c0",
+          "part": "part_023.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S144",
+      "path": "validation/probe_rotor_type_geometry.py",
+      "bytes": 2285,
+      "lines": 39,
+      "sha256": "c86813e0b3e3e4ee09898918d5c953f123336c79ed70bb828085fc9380960cec",
+      "git_blob": "7b8c7f03a340eb6341fd7032a1847c52660f9b73",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/probe_rotor_type_geometry.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 39,
+          "bytes": 2285,
+          "sha256": "c86813e0b3e3e4ee09898918d5c953f123336c79ed70bb828085fc9380960cec",
+          "part": "part_023.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S145",
+      "path": "validation/read_startup.py",
+      "bytes": 547,
+      "lines": 17,
+      "sha256": "6a7508a26f8dba64bc74dc9ab172a2efc5e10a4e1d5b1b6061f9da48428b8e63",
+      "git_blob": "262b0963672b30b110dcab0e03c345ec4b92ead9",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/read_startup.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 17,
+          "bytes": 547,
+          "sha256": "6a7508a26f8dba64bc74dc9ab172a2efc5e10a4e1d5b1b6061f9da48428b8e63",
+          "part": "part_023.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S146",
+      "path": "validation/refine_breadloaf_ripple.py",
+      "bytes": 6464,
+      "lines": 99,
+      "sha256": "58506dfdf9eb33261c308692df2cb84e07d808bacdbd9a5cfcc536d7cf4f0816",
+      "git_blob": "e5d85bbae3b2297863237d1c379283de7b1d4920",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/refine_breadloaf_ripple.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 99,
+          "bytes": 6464,
+          "sha256": "58506dfdf9eb33261c308692df2cb84e07d808bacdbd9a5cfcc536d7cf4f0816",
+          "part": "part_023.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S147",
+      "path": "validation/report_grid_review.py",
+      "bytes": 13676,
+      "lines": 138,
+      "sha256": "5b928a0125c87b84b4e20330a3ca22982452e978bf68ec3ae7af2e894e378923",
+      "git_blob": "8804315e2274a997cbf83433f53bace00e596510",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/report_grid_review.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 138,
+          "bytes": 13676,
+          "sha256": "5b928a0125c87b84b4e20330a3ca22982452e978bf68ec3ae7af2e894e378923",
+          "part": "part_023.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S148",
+      "path": "validation/review_breadloaf_verification.py",
+      "bytes": 5913,
+      "lines": 80,
+      "sha256": "8225ac90a7b9e6d7656a4ad1e6d138d4bef358cca09a54124b6b5e94b7936b93",
+      "git_blob": "2af81ea13501208496d72d7400c1182ac00f77e1",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/review_breadloaf_verification.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 80,
+          "bytes": 5913,
+          "sha256": "8225ac90a7b9e6d7656a4ad1e6d138d4bef358cca09a54124b6b5e94b7936b93",
+          "part": "part_023.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S149",
+      "path": "validation/review_saved_job.py",
+      "bytes": 3592,
+      "lines": 48,
+      "sha256": "5f950f220572244406adf839ad3dc8cf5c3c5670fd1878328b0293382d23f066",
+      "git_blob": "8d0a88673492b1f20a73656ca75de8a00323eeb5",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/review_saved_job.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 48,
+          "bytes": 3592,
+          "sha256": "5f950f220572244406adf839ad3dc8cf5c3c5670fd1878328b0293382d23f066",
+          "part": "part_023.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S150",
+      "path": "validation/review_spm_saturation.py",
+      "bytes": 6782,
+      "lines": 92,
+      "sha256": "62113c12d0e706ad7ac35b81eee039a517770f701896d430de24ff9003ab7ee2",
+      "git_blob": "e0ee5d5e9d66712cb0a2715cc5421fe319c5020d",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/review_spm_saturation.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 92,
+          "bytes": 6782,
+          "sha256": "62113c12d0e706ad7ac35b81eee039a517770f701896d430de24ff9003ab7ee2",
+          "part": "part_024.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S151",
+      "path": "validation/rotor_mapping_session.py",
+      "bytes": 1545,
+      "lines": 29,
+      "sha256": "081aeeb13710636d569983a49acdd7c5e363cf5a82d96eeec411aaeab50e25d4",
+      "git_blob": "d64f537dc9a95a2c463749cfff71dac58d8aba26",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/rotor_mapping_session.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 29,
+          "bytes": 1545,
+          "sha256": "081aeeb13710636d569983a49acdd7c5e363cf5a82d96eeec411aaeab50e25d4",
+          "part": "part_024.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S152",
+      "path": "validation/run_detailed_spm_batch.py",
+      "bytes": 7434,
+      "lines": 126,
+      "sha256": "dc1c1d0cc87aa4d56b4c18d420d8c8beb9dab3c653ef923a379d58d97f9f712b",
+      "git_blob": "2660096af1ec08dfcaaa9096b2f81e5523084835",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/run_detailed_spm_batch.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 126,
+          "bytes": 7434,
+          "sha256": "dc1c1d0cc87aa4d56b4c18d420d8c8beb9dab3c653ef923a379d58d97f9f712b",
+          "part": "part_024.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S153",
+      "path": "validation/run_spm_ripple_recovery.py",
+      "bytes": 9665,
+      "lines": 142,
+      "sha256": "fdfa6d331b8cac1bb409f8f925c9f52a6fdc5cce8061f37f57aa5813c27d718e",
+      "git_blob": "2576c5cf24a503819b0a7ac64a5a1c61adada807",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/run_spm_ripple_recovery.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 142,
+          "bytes": 9665,
+          "sha256": "fdfa6d331b8cac1bb409f8f925c9f52a6fdc5cce8061f37f57aa5813c27d718e",
+          "part": "part_024.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S154",
+      "path": "validation/run_validation.py",
+      "bytes": 3073,
+      "lines": 36,
+      "sha256": "587f6a1370d7717d0c2a1e39ae82d27642b82e4646589e5c74a2c0b43f949360",
+      "git_blob": "7f7f3f6ac0ceb0f0f4a09bc4c760646093d4e02f",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/run_validation.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 36,
+          "bytes": 3073,
+          "sha256": "587f6a1370d7717d0c2a1e39ae82d27642b82e4646589e5c74a2c0b43f949360",
+          "part": "part_024.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S155",
+      "path": "validation/run_validation_400v.py",
+      "bytes": 3079,
+      "lines": 37,
+      "sha256": "ce0493942323f4878d9ed7946e2496d1774a2724ed00e22531b027306743bb0f",
+      "git_blob": "2f9dfc598754ac45868807e2f265fa6c84bf094e",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/run_validation_400v.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 37,
+          "bytes": 3079,
+          "sha256": "ce0493942323f4878d9ed7946e2496d1774a2724ed00e22531b027306743bb0f",
+          "part": "part_024.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S156",
+      "path": "validation/spm_ripple.py",
+      "bytes": 9557,
+      "lines": 149,
+      "sha256": "1a878d4ac67c9ff4c01f12238a85e0148ece3d9c19ffe84e333a2ff594108402",
+      "git_blob": "a32de8d8b8fcac968975919d12b93c5a2e077a09",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/spm_ripple.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 149,
+          "bytes": 9557,
+          "sha256": "1a878d4ac67c9ff4c01f12238a85e0148ece3d9c19ffe84e333a2ff594108402",
+          "part": "part_024.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S157",
+      "path": "validation/spm_ripple_calibration.py",
+      "bytes": 3964,
+      "lines": 67,
+      "sha256": "0073ce44c082d8a9314a331d193501babfbdb0695f0a00e6aad83cbf15a96ee8",
+      "git_blob": "d575a73e90a092ec1b637c88e4fd51bdcf56d337",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/spm_ripple_calibration.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 67,
+          "bytes": 3964,
+          "sha256": "0073ce44c082d8a9314a331d193501babfbdb0695f0a00e6aad83cbf15a96ee8",
+          "part": "part_024.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S158",
+      "path": "validation/spm_ripple_operating_point.py",
+      "bytes": 3431,
+      "lines": 54,
+      "sha256": "183044256e3aacb86c52ca34eba3807aee7c3a89b1cfd8a5450246efb3a51ae0",
+      "git_blob": "b33849478d5b1ec069e50db19eeb3e657a51b21b",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/spm_ripple_operating_point.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 54,
+          "bytes": 3431,
+          "sha256": "183044256e3aacb86c52ca34eba3807aee7c3a89b1cfd8a5450246efb3a51ae0",
+          "part": "part_025.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S159",
+      "path": "validation/study_breadloaf_operating_point.py",
+      "bytes": 3747,
+      "lines": 61,
+      "sha256": "f69c7e24d9e405e69d5fafcb5b1fcd3a7132bc42838d2c0cffb9c7d275f7df9a",
+      "git_blob": "b828b744eb02fea1dd97d21deb4be74db96d3682",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/study_breadloaf_operating_point.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 61,
+          "bytes": 3747,
+          "sha256": "f69c7e24d9e405e69d5fafcb5b1fcd3a7132bc42838d2c0cffb9c7d275f7df9a",
+          "part": "part_025.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S160",
+      "path": "validation/study_io.py",
+      "bytes": 2972,
+      "lines": 36,
+      "sha256": "1d4ae47b46fff1d9e2791ca6a5878083434a487026f330d85c3817e93013fdcd",
+      "git_blob": "789bcaf561be71b7cdc032579c4785a67001758b",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/study_io.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 36,
+          "bytes": 2972,
+          "sha256": "1d4ae47b46fff1d9e2791ca6a5878083434a487026f330d85c3817e93013fdcd",
+          "part": "part_025.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S161",
+      "path": "validation/summarize_low_voltage.py",
+      "bytes": 13459,
+      "lines": 42,
+      "sha256": "fdc8a747a2601a6700694e00f7c63018e11eacd433a5d9e9ad033f594aea556c",
+      "git_blob": "93953de17b15803992299611440e2fb385905358",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/summarize_low_voltage.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 42,
+          "bytes": 13459,
+          "sha256": "fdc8a747a2601a6700694e00f7c63018e11eacd433a5d9e9ad033f594aea556c",
+          "part": "part_025.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S162",
+      "path": "validation/summarize_validation.py",
+      "bytes": 7336,
+      "lines": 45,
+      "sha256": "6055a54a4a899ce1270134f8d70cc908bf535e396540193dcf1e39299012283f",
+      "git_blob": "c3de130c07cfaddd8ae51ec8b1b25d321438a88e",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/summarize_validation.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 45,
+          "bytes": 7336,
+          "sha256": "6055a54a4a899ce1270134f8d70cc908bf535e396540193dcf1e39299012283f",
+          "part": "part_025.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S163",
+      "path": "validation/task_adapters.py",
+      "bytes": 6165,
+      "lines": 91,
+      "sha256": "730f79b89315534a1ae0081b3202b9ab793b73e65d2438ca3dd3bf72b7f4cab6",
+      "git_blob": "081b47b5ece636543e8776c974fb6975566bd198",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/task_adapters.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 91,
+          "bytes": 6165,
+          "sha256": "730f79b89315534a1ae0081b3202b9ab793b73e65d2438ca3dd3bf72b7f4cab6",
+          "part": "part_025.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S164",
+      "path": "validation/task_queue.py",
+      "bytes": 7433,
+      "lines": 138,
+      "sha256": "2bc579fc40b4c58428177bdb2c960dac7f182db5a8d5e8c45f6a235f884bc000",
+      "git_blob": "e897b2432ca82b4a988efd1598d97c2dcf1ee0d3",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/task_queue.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 138,
+          "bytes": 7433,
+          "sha256": "2bc579fc40b4c58428177bdb2c960dac7f182db5a8d5e8c45f6a235f884bc000",
+          "part": "part_025.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S165",
+      "path": "validation/task_store.py",
+      "bytes": 19486,
+      "lines": 291,
+      "sha256": "b2561cd61d32bf23ea46a7ad8abe995c55e32d627125376a94b1905e17b0f4ae",
+      "git_blob": "5690b25413c32239c6e3bebf643ea662cbb70065",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/task_store.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 291,
+          "bytes": 19486,
+          "sha256": "b2561cd61d32bf23ea46a7ad8abe995c55e32d627125376a94b1905e17b0f4ae",
+          "part": "part_026.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S166",
+      "path": "validation/test_audit_spm_ripple.py",
+      "bytes": 1004,
+      "lines": 26,
+      "sha256": "fb5bc53616c7f244a1031fd3cca906d87d59f982c7005e284cefd018b584b2b7",
+      "git_blob": "935aaa1ac2a6efce87eb605eb340bfa9e319e9c0",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/test_audit_spm_ripple.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 26,
+          "bytes": 1004,
+          "sha256": "fb5bc53616c7f244a1031fd3cca906d87d59f982c7005e284cefd018b584b2b7",
+          "part": "part_026.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S167",
+      "path": "validation/test_background_validation.py",
+      "bytes": 517,
+      "lines": 15,
+      "sha256": "2785b8a6f1049bdb4baffc90bece3f7eaab0665e2a2f59b9806907f954c3fa8b",
+      "git_blob": "d37f5f7699d2c441962a3009760f1c20dc940a5c",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/test_background_validation.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 15,
+          "bytes": 517,
+          "sha256": "2785b8a6f1049bdb4baffc90bece3f7eaab0665e2a2f59b9806907f954c3fa8b",
+          "part": "part_026.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S168",
+      "path": "validation/test_breadloaf_boundary.py",
+      "bytes": 1817,
+      "lines": 37,
+      "sha256": "d3dd0be8a07ee2ccb8b3b13c5f5524f509f086168e77e998b4118a3b52bfd4b1",
+      "git_blob": "48e80fe5a52b88cbd2a390dfdf6457f201176842",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/test_breadloaf_boundary.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 37,
+          "bytes": 1817,
+          "sha256": "d3dd0be8a07ee2ccb8b3b13c5f5524f509f086168e77e998b4118a3b52bfd4b1",
+          "part": "part_026.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S169",
+      "path": "validation/test_breadloaf_bundle_routing.py",
+      "bytes": 2332,
+      "lines": 49,
+      "sha256": "31e86c7cf8c06f37f1bff69293b388c9a4001095a7d92ecdfad94546564f6fad",
+      "git_blob": "0e2e408b7eaa2a2a08438dd2a289a0ddb3316b1d",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/test_breadloaf_bundle_routing.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 49,
+          "bytes": 2332,
+          "sha256": "31e86c7cf8c06f37f1bff69293b388c9a4001095a7d92ecdfad94546564f6fad",
+          "part": "part_026.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S170",
+      "path": "validation/test_breadloaf_clearance_refinement.py",
+      "bytes": 3244,
+      "lines": 59,
+      "sha256": "2c689498a81a100ad2ebbcbfb3746436379f6f0bab6108cae7cd4c0a4a2e0e05",
+      "git_blob": "fc9eae340082e1902f963d19ec3560aac4fd0191",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/test_breadloaf_clearance_refinement.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 59,
+          "bytes": 3244,
+          "sha256": "2c689498a81a100ad2ebbcbfb3746436379f6f0bab6108cae7cd4c0a4a2e0e05",
+          "part": "part_026.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S171",
+      "path": "validation/test_breadloaf_coil_assignment.py",
+      "bytes": 4508,
+      "lines": 75,
+      "sha256": "5313101819cde7aee5e3372b443a71de972d964ca895c69205288d263a0e492a",
+      "git_blob": "5d3cdee4ddb35051486f29f2554a9249fe432aee",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/test_breadloaf_coil_assignment.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 75,
+          "bytes": 4508,
+          "sha256": "5313101819cde7aee5e3372b443a71de972d964ca895c69205288d263a0e492a",
+          "part": "part_026.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S172",
+      "path": "validation/test_breadloaf_conductor_audit.py",
+      "bytes": 3509,
+      "lines": 66,
+      "sha256": "87a5e846f6189fb7b4bdff9ae5331f7b4103fd7a97578d9fbb532673cd00717d",
+      "git_blob": "5822795e11733582a5e85a9292bd563ab05fa26f",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/test_breadloaf_conductor_audit.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 66,
+          "bytes": 3509,
+          "sha256": "87a5e846f6189fb7b4bdff9ae5331f7b4103fd7a97578d9fbb532673cd00717d",
+          "part": "part_026.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S173",
+      "path": "validation/test_breadloaf_continuous_packing.py",
+      "bytes": 3695,
+      "lines": 62,
+      "sha256": "7e1e1434a5f3d17afb9b47971529940ad3a37a4f2bd29afbfa9b3953b6461c5d",
+      "git_blob": "b68205406214823027e93aef955ec243ea5c99d2",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/test_breadloaf_continuous_packing.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 62,
+          "bytes": 3695,
+          "sha256": "7e1e1434a5f3d17afb9b47971529940ad3a37a4f2bd29afbfa9b3953b6461c5d",
+          "part": "part_026.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S174",
+      "path": "validation/test_breadloaf_end_routing.py",
+      "bytes": 3688,
+      "lines": 62,
+      "sha256": "5d5e2944bcf9ea0eff1f3ac95d3ca9330274dc8e7778fbb972a6039cf4e4d7e6",
+      "git_blob": "46b20729f6eca65165f12acaf85b1cd0b6334c0c",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/test_breadloaf_end_routing.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 62,
+          "bytes": 3688,
+          "sha256": "5d5e2944bcf9ea0eff1f3ac95d3ca9330274dc8e7778fbb972a6039cf4e4d7e6",
+          "part": "part_026.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S175",
+      "path": "validation/test_breadloaf_flux_probe.py",
+      "bytes": 5132,
+      "lines": 86,
+      "sha256": "951e964732f194126a999aeee88171b8f152653461193bd2de88114e07a720f0",
+      "git_blob": "d053733011f42802445068cee53a7081fe832c45",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/test_breadloaf_flux_probe.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 86,
+          "bytes": 5132,
+          "sha256": "951e964732f194126a999aeee88171b8f152653461193bd2de88114e07a720f0",
+          "part": "part_027.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S176",
+      "path": "validation/test_breadloaf_grid_packing.py",
+      "bytes": 3185,
+      "lines": 58,
+      "sha256": "083ef0b833d1550f450748529526c96b48e590ef56b52ffd9e430b98d4d6a152",
+      "git_blob": "a362ea77affae50667511ab57fd7b40c3ade26f5",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/test_breadloaf_grid_packing.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 58,
+          "bytes": 3185,
+          "sha256": "083ef0b833d1550f450748529526c96b48e590ef56b52ffd9e430b98d4d6a152",
+          "part": "part_027.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S177",
+      "path": "validation/test_breadloaf_gui.py",
+      "bytes": 3160,
+      "lines": 57,
+      "sha256": "49777991a7559c66b6b3461edb02d2fcedf8584a2591e906b82ba9ad9fec3958",
+      "git_blob": "1518aac4066b1a3e2292f89992db2208d6861910",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/test_breadloaf_gui.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 57,
+          "bytes": 3160,
+          "sha256": "49777991a7559c66b6b3461edb02d2fcedf8584a2591e906b82ba9ad9fec3958",
+          "part": "part_027.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S178",
+      "path": "validation/test_breadloaf_inductance.py",
+      "bytes": 2214,
+      "lines": 44,
+      "sha256": "41a2096d94b3c27a35b9df0ad6452f76328b3d9ad7a581f047a0ff46ee82ebc0",
+      "git_blob": "561d1b93196a4573e744db8e95ae59486c6417a7",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/test_breadloaf_inductance.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 44,
+          "bytes": 2214,
+          "sha256": "41a2096d94b3c27a35b9df0ad6452f76328b3d9ad7a581f047a0ff46ee82ebc0",
+          "part": "part_027.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S179",
+      "path": "validation/test_breadloaf_inductance_comparison.py",
+      "bytes": 3612,
+      "lines": 62,
+      "sha256": "a5ddb3902945b2e8af5834f59c91d6d78143a072abb7928116a16720f48974c6",
+      "git_blob": "7ef2c4d19222a908acb69eaf384a51f63686cae3",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/test_breadloaf_inductance_comparison.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 62,
+          "bytes": 3612,
+          "sha256": "a5ddb3902945b2e8af5834f59c91d6d78143a072abb7928116a16720f48974c6",
+          "part": "part_027.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S180",
+      "path": "validation/test_breadloaf_leakage_geometry.py",
+      "bytes": 3787,
+      "lines": 72,
+      "sha256": "c108f6fae8bf32453da9941a14486dc8ee305b468dc59e090982a536344b5ef5",
+      "git_blob": "dc03ac338f69583dece5199cd241df0b6fce4fa7",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/test_breadloaf_leakage_geometry.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 72,
+          "bytes": 3787,
+          "sha256": "c108f6fae8bf32453da9941a14486dc8ee305b468dc59e090982a536344b5ef5",
+          "part": "part_027.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S181",
+      "path": "validation/test_breadloaf_local_model.py",
+      "bytes": 1835,
+      "lines": 42,
+      "sha256": "e469266f0cee60e508e739a061eab709dc59970dee7fd7b77fe02a76012548c8",
+      "git_blob": "b37d4b157c83c94cd00d49c674a665d457029130",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/test_breadloaf_local_model.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 42,
+          "bytes": 1835,
+          "sha256": "e469266f0cee60e508e739a061eab709dc59970dee7fd7b77fe02a76012548c8",
+          "part": "part_027.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S182",
+      "path": "validation/test_breadloaf_loss_B.py",
+      "bytes": 3125,
+      "lines": 55,
+      "sha256": "54650e7dccfba3f3655bbac365f45773f72e68c42ee9986d871b0d4ff77c07de",
+      "git_blob": "4b5fdd3ac83d8b9c4050e8601379991879295038",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/test_breadloaf_loss_B.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 55,
+          "bytes": 3125,
+          "sha256": "54650e7dccfba3f3655bbac365f45773f72e68c42ee9986d871b0d4ff77c07de",
+          "part": "part_027.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S183",
+      "path": "validation/test_breadloaf_operating_comparison.py",
+      "bytes": 3025,
+      "lines": 56,
+      "sha256": "b5e5fb72afa47619f1c8dfe66d71cdf789f99b83c773d6b0223378a74a4ba9bc",
+      "git_blob": "9802a219dbaaea6aa026b5925692ce61a2c3d43d",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/test_breadloaf_operating_comparison.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 56,
+          "bytes": 3025,
+          "sha256": "b5e5fb72afa47619f1c8dfe66d71cdf789f99b83c773d6b0223378a74a4ba9bc",
+          "part": "part_027.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S184",
+      "path": "validation/test_breadloaf_packing_selection.py",
+      "bytes": 2510,
+      "lines": 43,
+      "sha256": "9e213a9d0d413f2860205ad391dddc47db6a596bcb26151e3b2e60d2c1767a0a",
+      "git_blob": "e50a2bcfde6e30528e34fc8fe367acde4b962ee0",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/test_breadloaf_packing_selection.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 43,
+          "bytes": 2510,
+          "sha256": "9e213a9d0d413f2860205ad391dddc47db6a596bcb26151e3b2e60d2c1767a0a",
+          "part": "part_027.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S185",
+      "path": "validation/test_breadloaf_pwm_direct.py",
+      "bytes": 3290,
+      "lines": 59,
+      "sha256": "e9edd93183c622f92512c690f015e2a6acf1941369999da6528afb61b9351f2d",
+      "git_blob": "10d7936a57e10d58794d39f90ebd88c8dbec2678",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/test_breadloaf_pwm_direct.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 59,
+          "bytes": 3290,
+          "sha256": "e9edd93183c622f92512c690f015e2a6acf1941369999da6528afb61b9351f2d",
+          "part": "part_027.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S186",
+      "path": "validation/test_breadloaf_pwm_preview.py",
+      "bytes": 3135,
+      "lines": 55,
+      "sha256": "43e7f10b2f5e999158c752fa7fd09516ce9367df4e23a5a12657d6b31a213037",
+      "git_blob": "36aaf370a15a427426b706b28b7409c7ccbb3d1f",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/test_breadloaf_pwm_preview.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 55,
+          "bytes": 3135,
+          "sha256": "43e7f10b2f5e999158c752fa7fd09516ce9367df4e23a5a12657d6b31a213037",
+          "part": "part_027.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S187",
+      "path": "validation/test_breadloaf_pwm_reference.py",
+      "bytes": 2305,
+      "lines": 47,
+      "sha256": "1c7366986767c80ad5736115380217c097afec5e479a9083affa44332e6cb949",
+      "git_blob": "4a87c698078f43a7e7717764bde52b2548acd3b5",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/test_breadloaf_pwm_reference.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 47,
+          "bytes": 2305,
+          "sha256": "1c7366986767c80ad5736115380217c097afec5e479a9083affa44332e6cb949",
+          "part": "part_027.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S188",
+      "path": "validation/test_breadloaf_pwm_screen.py",
+      "bytes": 4050,
+      "lines": 75,
+      "sha256": "4a6962ae521f5b5505cef6922a319e740d8878ed18a54318751baccc63464192",
+      "git_blob": "c4dc851a9ef94c56ffb708faf7d455d86f3ce267",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/test_breadloaf_pwm_screen.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 75,
+          "bytes": 4050,
+          "sha256": "4a6962ae521f5b5505cef6922a319e740d8878ed18a54318751baccc63464192",
+          "part": "part_027.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S189",
+      "path": "validation/test_breadloaf_refinement.py",
+      "bytes": 678,
+      "lines": 18,
+      "sha256": "9a537c91d6e1332ebb8e950794c334866cf39b3dddc1abf10adca44612d3ec3a",
+      "git_blob": "09bd7695ea81ba471bfaf8aa7f4db5d80e719ba7",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/test_breadloaf_refinement.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 18,
+          "bytes": 678,
+          "sha256": "9a537c91d6e1332ebb8e950794c334866cf39b3dddc1abf10adca44612d3ec3a",
+          "part": "part_027.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S190",
+      "path": "validation/test_breadloaf_remaining_review.py",
+      "bytes": 2652,
+      "lines": 49,
+      "sha256": "c10d3559a839ffa145159c6c52ea8c34d84045bdcb72374c2f748e0eed1b9b6a",
+      "git_blob": "b65d0e24b0904f30ea0e23cce9499acb18fc07e6",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/test_breadloaf_remaining_review.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 49,
+          "bytes": 2652,
+          "sha256": "c10d3559a839ffa145159c6c52ea8c34d84045bdcb72374c2f748e0eed1b9b6a",
+          "part": "part_028.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S191",
+      "path": "validation/test_breadloaf_request.py",
+      "bytes": 3272,
+      "lines": 63,
+      "sha256": "e0f4df53d6b930ceb251071dfe5ca7d8350eb69e961c95f2d016f929eb5b37ff",
+      "git_blob": "3cb70683dfa0f9602a2afa0f80bef0e87570be3a",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/test_breadloaf_request.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 63,
+          "bytes": 3272,
+          "sha256": "e0f4df53d6b930ceb251071dfe5ca7d8350eb69e961c95f2d016f929eb5b37ff",
+          "part": "part_028.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S192",
+      "path": "validation/test_breadloaf_route_adjustment.py",
+      "bytes": 2166,
+      "lines": 43,
+      "sha256": "66006798f071ee0ac70fe648917f8d81182a46352cd8fc7a720f88c42a78f2b5",
+      "git_blob": "b5bf49107ab180abd1ab6ebc885930ea91ec6583",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/test_breadloaf_route_adjustment.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 43,
+          "bytes": 2166,
+          "sha256": "66006798f071ee0ac70fe648917f8d81182a46352cd8fc7a720f88c42a78f2b5",
+          "part": "part_028.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S193",
+      "path": "validation/test_breadloaf_route_conflicts.py",
+      "bytes": 2617,
+      "lines": 47,
+      "sha256": "1a215c8611467dad605495a9b4d3a206e653fd08a590f25fba452f7386f6c732",
+      "git_blob": "614aaaa8387fbad8ac14c49895a329e372a6e907",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/test_breadloaf_route_conflicts.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 47,
+          "bytes": 2617,
+          "sha256": "1a215c8611467dad605495a9b4d3a206e653fd08a590f25fba452f7386f6c732",
+          "part": "part_028.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S194",
+      "path": "validation/test_breadloaf_screens.py",
+      "bytes": 3100,
+      "lines": 52,
+      "sha256": "f29aa45787d670dcb769107ad92a44f9f846d4ad83601b7bb8b4c65d58b89811",
+      "git_blob": "fd46894fef37f1e94b4e91de78651281e93fe161",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/test_breadloaf_screens.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 52,
+          "bytes": 3100,
+          "sha256": "f29aa45787d670dcb769107ad92a44f9f846d4ad83601b7bb8b4c65d58b89811",
+          "part": "part_028.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S195",
+      "path": "validation/test_breadloaf_search.py",
+      "bytes": 3997,
+      "lines": 71,
+      "sha256": "145b2d6d3a74d8876ac734df514993f00640db2a6df8c6578cfb5aecf1bc70c4",
+      "git_blob": "6bc96a58aab74a0b32ed821a12a30923a0381cb1",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/test_breadloaf_search.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 71,
+          "bytes": 3997,
+          "sha256": "145b2d6d3a74d8876ac734df514993f00640db2a6df8c6578cfb5aecf1bc70c4",
+          "part": "part_028.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S196",
+      "path": "validation/test_breadloaf_search_space.py",
+      "bytes": 4623,
+      "lines": 69,
+      "sha256": "4d3d5b157ac1c1c65e7d5bd7a93f8b035e0933c94a8df4baf81ad10abfb25a57",
+      "git_blob": "d46eaaa33b16b6d9c8f2a10b88d96fa5a665b988",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/test_breadloaf_search_space.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 69,
+          "bytes": 4623,
+          "sha256": "4d3d5b157ac1c1c65e7d5bd7a93f8b035e0933c94a8df4baf81ad10abfb25a57",
+          "part": "part_028.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S197",
+      "path": "validation/test_breadloaf_shaft_control.py",
+      "bytes": 2674,
+      "lines": 54,
+      "sha256": "e3c047ab6d74d9c28e1734ade06e0eed255dec9719e52f7c7f845caf3541d320",
+      "git_blob": "ccfbea2e1fc25c1e2bd40b8e5b7c9b2ca5dc8074",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/test_breadloaf_shaft_control.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 54,
+          "bytes": 2674,
+          "sha256": "e3c047ab6d74d9c28e1734ade06e0eed255dec9719e52f7c7f845caf3541d320",
+          "part": "part_028.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S198",
+      "path": "validation/test_breadloaf_slot_detail.py",
+      "bytes": 4045,
+      "lines": 69,
+      "sha256": "cff5224cb8bf0b5a7b3f940e8048cdc60367f537122574a4ff4c468155387a49",
+      "git_blob": "ffe52f5cf372f702800753226c019460d9d331d9",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/test_breadloaf_slot_detail.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 69,
+          "bytes": 4045,
+          "sha256": "cff5224cb8bf0b5a7b3f940e8048cdc60367f537122574a4ff4c468155387a49",
+          "part": "part_028.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S199",
+      "path": "validation/test_breadloaf_transition_routing.py",
+      "bytes": 2796,
+      "lines": 46,
+      "sha256": "6e66454ac91a1ae3c04a38e216b8d476494c7a358d58aa6aedd1f89246619301",
+      "git_blob": "775424b1fd5e3b03e10ad47676b983ea7190dd62",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/test_breadloaf_transition_routing.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 46,
+          "bytes": 2796,
+          "sha256": "6e66454ac91a1ae3c04a38e216b8d476494c7a358d58aa6aedd1f89246619301",
+          "part": "part_028.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S200",
+      "path": "validation/test_breadloaf_workflow.py",
+      "bytes": 2970,
+      "lines": 55,
+      "sha256": "b2f639b9cfbaa94ec3c4586d36d3281d344ba5b64ddee053397242b6e3ec54ab",
+      "git_blob": "299e57c25475a857227a02b3cc1d847b0e679fab",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/test_breadloaf_workflow.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 55,
+          "bytes": 2970,
+          "sha256": "b2f639b9cfbaa94ec3c4586d36d3281d344ba5b64ddee053397242b6e3ec54ab",
+          "part": "part_028.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S201",
+      "path": "validation/test_controller_limits.py",
+      "bytes": 4283,
+      "lines": 79,
+      "sha256": "ae8cfa7f80d5241066efc9de15d0c85a63cdb3a6f607044d3ce12ed368f22c2b",
+      "git_blob": "593203571db5e45d86f0401ee2c96ec46cc34548",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/test_controller_limits.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 79,
+          "bytes": 4283,
+          "sha256": "ae8cfa7f80d5241066efc9de15d0c85a63cdb3a6f607044d3ce12ed368f22c2b",
+          "part": "part_028.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S202",
+      "path": "validation/test_core_contracts.py",
+      "bytes": 5524,
+      "lines": 106,
+      "sha256": "1f80ec56681462356e03935fa7daf5284a984bbef61b8f2ab51dbb499aa3bcf7",
+      "git_blob": "1c34fb340f036b4960b1a4308a25f7e06a0d68fb",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/test_core_contracts.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 106,
+          "bytes": 5524,
+          "sha256": "1f80ec56681462356e03935fa7daf5284a984bbef61b8f2ab51dbb499aa3bcf7",
+          "part": "part_028.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S203",
+      "path": "validation/test_design_job.py",
+      "bytes": 1523,
+      "lines": 34,
+      "sha256": "7f42189af125ad954bb588f28f0483bfddc2385bef7637cfc6797600f48a7fd7",
+      "git_blob": "6346f56b6569109ff38d4ca6633073d27f2c4bda",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/test_design_job.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 34,
+          "bytes": 1523,
+          "sha256": "7f42189af125ad954bb588f28f0483bfddc2385bef7637cfc6797600f48a7fd7",
+          "part": "part_029.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S204",
+      "path": "validation/test_detailed_spm_analysis.py",
+      "bytes": 1568,
+      "lines": 34,
+      "sha256": "37ff8774f3bf0af32059eaeaa09825770a221da0116a627e6e64e5767f2b5161",
+      "git_blob": "87d4bf79c916d3ac958252445b3b22242f166a5b",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/test_detailed_spm_analysis.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 34,
+          "bytes": 1568,
+          "sha256": "37ff8774f3bf0af32059eaeaa09825770a221da0116a627e6e64e5767f2b5161",
+          "part": "part_029.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S205",
+      "path": "validation/test_detailed_spm_recipe.py",
+      "bytes": 3356,
+      "lines": 66,
+      "sha256": "980f958f7ef141b0b476d6cc87729ed114dbe1f6781609a0a81886b065e356ab",
+      "git_blob": "48dee061c34390ffcdee43a9e57bf9f8b53612c5",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/test_detailed_spm_recipe.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 66,
+          "bytes": 3356,
+          "sha256": "980f958f7ef141b0b476d6cc87729ed114dbe1f6781609a0a81886b065e356ab",
+          "part": "part_029.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S206",
+      "path": "validation/test_dimension_grid.py",
+      "bytes": 602,
+      "lines": 16,
+      "sha256": "0f6cf1b207c13dbeb1314a89ca1be732fb8115b7c90caca3d3cc7383344fd463",
+      "git_blob": "a9324cbdecd708665449aa02efa27428190e7b74",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/test_dimension_grid.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 16,
+          "bytes": 602,
+          "sha256": "0f6cf1b207c13dbeb1314a89ca1be732fb8115b7c90caca3d3cc7383344fd463",
+          "part": "part_029.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S207",
+      "path": "validation/test_flux_limits.py",
+      "bytes": 1987,
+      "lines": 43,
+      "sha256": "825647b8b77576e82bf672c125b2e9a87cfadfcf0a1a8c8c7feceb1f527e206f",
+      "git_blob": "328cfcdb166f47221d115358182e1bd9884cb3ec",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/test_flux_limits.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 43,
+          "bytes": 1987,
+          "sha256": "825647b8b77576e82bf672c125b2e9a87cfadfcf0a1a8c8c7feceb1f527e206f",
+          "part": "part_029.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S208",
+      "path": "validation/test_formula_workflow.py",
+      "bytes": 8239,
+      "lines": 121,
+      "sha256": "e8ab16440e3393d3c0ce497a448a1c478382cb2c2b94915b8e796cbf0eacb882",
+      "git_blob": "df36490d68aa7fa11c42876f134c20d08a69cb7b",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/test_formula_workflow.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 121,
+          "bytes": 8239,
+          "sha256": "e8ab16440e3393d3c0ce497a448a1c478382cb2c2b94915b8e796cbf0eacb882",
+          "part": "part_029.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S209",
+      "path": "validation/test_magnet_boundary_check.py",
+      "bytes": 2155,
+      "lines": 45,
+      "sha256": "e8459f13738f57cbedd9a6bea5f356631b186aad12824fae3c296d06995a7299",
+      "git_blob": "1ad012f158a7eb00497c4be5c24ca4d9f12ca7fb",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/test_magnet_boundary_check.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 45,
+          "bytes": 2155,
+          "sha256": "e8459f13738f57cbedd9a6bea5f356631b186aad12824fae3c296d06995a7299",
+          "part": "part_029.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S210",
+      "path": "validation/test_native_torque_feedback.py",
+      "bytes": 1262,
+      "lines": 27,
+      "sha256": "0c126b85eb4db4a650ec4305266d63cfbec32e061c828cbcfa0815ceafcffe90",
+      "git_blob": "eb29be4887a38632fd29b03450d05cda7e90b379",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/test_native_torque_feedback.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 27,
+          "bytes": 1262,
+          "sha256": "0c126b85eb4db4a650ec4305266d63cfbec32e061c828cbcfa0815ceafcffe90",
+          "part": "part_029.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S211",
+      "path": "validation/test_native_winding_review.py",
+      "bytes": 1934,
+      "lines": 36,
+      "sha256": "904448f573efae568a2d559ff54e6bee84c7ada6e06d9d030c3612f63039f269",
+      "git_blob": "cc7c34af3fd924d20c6e7f13b475b9f3943eb265",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/test_native_winding_review.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 36,
+          "bytes": 1934,
+          "sha256": "904448f573efae568a2d559ff54e6bee84c7ada6e06d9d030c3612f63039f269",
+          "part": "part_029.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S212",
+      "path": "validation/test_operating_control.py",
+      "bytes": 4268,
+      "lines": 81,
+      "sha256": "c9d3a9655721874cf27e110736c4a6e43f2f94c8c35e850e3df6a3e90098b331",
+      "git_blob": "72899074f9b687962e005e43757fa4bee972bf57",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/test_operating_control.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 81,
+          "bytes": 4268,
+          "sha256": "c9d3a9655721874cf27e110736c4a6e43f2f94c8c35e850e3df6a3e90098b331",
+          "part": "part_029.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S213",
+      "path": "validation/test_result_review.py",
+      "bytes": 2580,
+      "lines": 51,
+      "sha256": "2d1e46e44302387baa2e40cecce01f6a2c84883489042588afc0769144efe835",
+      "git_blob": "a1283a9567dcb9755d34a37a087754e0e15bc542",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/test_result_review.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 51,
+          "bytes": 2580,
+          "sha256": "2d1e46e44302387baa2e40cecce01f6a2c84883489042588afc0769144efe835",
+          "part": "part_029.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S214",
+      "path": "validation/test_review_fixes.py",
+      "bytes": 7371,
+      "lines": 125,
+      "sha256": "9cfc4d64a051d9249687d70eb9bab382cdc7073b795e9627f796781473a73619",
+      "git_blob": "83bb516e0168772e4575977e4cf6fbd9acd5fed1",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/test_review_fixes.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 125,
+          "bytes": 7371,
+          "sha256": "9cfc4d64a051d9249687d70eb9bab382cdc7073b795e9627f796781473a73619",
+          "part": "part_029.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S215",
+      "path": "validation/test_rotor_catalog.py",
+      "bytes": 6167,
+      "lines": 93,
+      "sha256": "06dfc619afd0abe967bdace4abcb9230422441619ada8df1b165c047e1b70b4b",
+      "git_blob": "0c40fb859b38f4cc3bf3d8935b49398630e8c6fb",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/test_rotor_catalog.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 93,
+          "bytes": 6167,
+          "sha256": "06dfc619afd0abe967bdace4abcb9230422441619ada8df1b165c047e1b70b4b",
+          "part": "part_029.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S216",
+      "path": "validation/test_spm_geometry.py",
+      "bytes": 4942,
+      "lines": 80,
+      "sha256": "0c848322c2f45fc517c5b45136bcfe6b7366c61ef8cfe1be85c832e896fc04de",
+      "git_blob": "f965411e7ba3f8f2a9e39dde12925796f04e3872",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/test_spm_geometry.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 80,
+          "bytes": 4942,
+          "sha256": "0c848322c2f45fc517c5b45136bcfe6b7366c61ef8cfe1be85c832e896fc04de",
+          "part": "part_030.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S217",
+      "path": "validation/test_spm_interaction_analysis.py",
+      "bytes": 2148,
+      "lines": 45,
+      "sha256": "d31564c868139b25282f8a0559ccf0fa7b05862fa1ec8c3d13d944fdd6c969a0",
+      "git_blob": "9e86575b44155d671111d2367eb85c0d31cf6867",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/test_spm_interaction_analysis.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 45,
+          "bytes": 2148,
+          "sha256": "d31564c868139b25282f8a0559ccf0fa7b05862fa1ec8c3d13d944fdd6c969a0",
+          "part": "part_030.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S218",
+      "path": "validation/test_spm_interaction_plan.py",
+      "bytes": 1182,
+      "lines": 25,
+      "sha256": "2319809c014334733e8966602f3c824a4f79ec0e68232a6caae367acd5cc98ff",
+      "git_blob": "7b615f6308eb209b609772c5c4d6362713db7522",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/test_spm_interaction_plan.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 25,
+          "bytes": 1182,
+          "sha256": "2319809c014334733e8966602f3c824a4f79ec0e68232a6caae367acd5cc98ff",
+          "part": "part_030.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S219",
+      "path": "validation/test_spm_ripple.py",
+      "bytes": 3393,
+      "lines": 68,
+      "sha256": "cebcbce254bcb9f73c3ad233f559e83609b7f7eee9d2f4d257847bfa48ba74a2",
+      "git_blob": "21f42b46c8307c7ded8cc3118e879a3d74e8be29",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/test_spm_ripple.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 68,
+          "bytes": 3393,
+          "sha256": "cebcbce254bcb9f73c3ad233f559e83609b7f7eee9d2f4d257847bfa48ba74a2",
+          "part": "part_030.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S220",
+      "path": "validation/test_spm_ripple_calibration.py",
+      "bytes": 2070,
+      "lines": 38,
+      "sha256": "e46168c67b61c5349046b0a3c35b98c6b3b789719a5627b4018c38877c379818",
+      "git_blob": "18eb4cb96d76f5f09fa7b87f3464220fa3a10bb3",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/test_spm_ripple_calibration.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 38,
+          "bytes": 2070,
+          "sha256": "e46168c67b61c5349046b0a3c35b98c6b3b789719a5627b4018c38877c379818",
+          "part": "part_030.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S221",
+      "path": "validation/test_spm_ripple_operating_point.py",
+      "bytes": 1894,
+      "lines": 43,
+      "sha256": "98f200a68925647bdc214d28141e8308b5eb75f752b0f5cc87e729306ce11c5c",
+      "git_blob": "c021a78ea4cb53e038037edc0f23aebb0b17a24f",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/test_spm_ripple_operating_point.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 43,
+          "bytes": 1894,
+          "sha256": "98f200a68925647bdc214d28141e8308b5eb75f752b0f5cc87e729306ce11c5c",
+          "part": "part_030.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S222",
+      "path": "validation/test_spm_saturation_review.py",
+      "bytes": 1416,
+      "lines": 30,
+      "sha256": "6c093dd727f3cedd0b3465ffa82d0076c6639f40105efeebae2314f450cbc0ef",
+      "git_blob": "c44fce89100d482d8ec1cda6a0dd4c6edc27322f",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/test_spm_saturation_review.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 30,
+          "bytes": 1416,
+          "sha256": "6c093dd727f3cedd0b3465ffa82d0076c6639f40105efeebae2314f450cbc0ef",
+          "part": "part_030.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S223",
+      "path": "validation/test_task_queue.py",
+      "bytes": 9571,
+      "lines": 163,
+      "sha256": "300793ed44112562c08636184d38120283fc47122cbf8917fa7b5b9da14a23bf",
+      "git_blob": "5193ffdb0ac1082fe209e85015de69b258f05abd",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/test_task_queue.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 163,
+          "bytes": 9571,
+          "sha256": "300793ed44112562c08636184d38120283fc47122cbf8917fa7b5b9da14a23bf",
+          "part": "part_030.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S224",
+      "path": "validation/test_topology_study.py",
+      "bytes": 2383,
+      "lines": 42,
+      "sha256": "5ff0990373f462232730fbc9c1ef3f0dea18561d5226c83367be60abaf9185b0",
+      "git_blob": "192b08413f3aeca9842d14851ae60c8e8ad9dac4",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/test_topology_study.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 42,
+          "bytes": 2383,
+          "sha256": "5ff0990373f462232730fbc9c1ef3f0dea18561d5226c83367be60abaf9185b0",
+          "part": "part_030.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S225",
+      "path": "validation/test_verification_conditions.py",
+      "bytes": 1489,
+      "lines": 26,
+      "sha256": "69b0eaf7b6d40c9cbbbdfdf8b382de2704f503e25bdf588eb92c64a6bc2ee785",
+      "git_blob": "1bcb320f6a5e2f047e7ebdb7fe086a039e740ef7",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/test_verification_conditions.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 26,
+          "bytes": 1489,
+          "sha256": "69b0eaf7b6d40c9cbbbdfdf8b382de2704f503e25bdf588eb92c64a6bc2ee785",
+          "part": "part_030.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S226",
+      "path": "validation/test_voltage_fallback.py",
+      "bytes": 1359,
+      "lines": 30,
+      "sha256": "f13a78eb69143bef38218ec95076886e399d6c041f879f1da3b38f6a1deff302",
+      "git_blob": "f1df25c66303ff819a1ce8bf0478d8b71c8d422c",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/test_voltage_fallback.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 30,
+          "bytes": 1359,
+          "sha256": "f13a78eb69143bef38218ec95076886e399d6c041f879f1da3b38f6a1deff302",
+          "part": "part_030.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S227",
+      "path": "validation/test_winding_layout.py",
+      "bytes": 1645,
+      "lines": 33,
+      "sha256": "41cbcb1650bd2eef86a730a244af4b3e8b57a807ff83bd13ff9ec94547d30472",
+      "git_blob": "bc0d102ba08c92a6944d1d0abd95fb7b46281492",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/test_winding_layout.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 33,
+          "bytes": 1645,
+          "sha256": "41cbcb1650bd2eef86a730a244af4b3e8b57a807ff83bd13ff9ec94547d30472",
+          "part": "part_030.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S228",
+      "path": "validation/topology_study.py",
+      "bytes": 10665,
+      "lines": 157,
+      "sha256": "4142a89a725a796189d36404fb851102ffdbc2050d031bca50a62b7925ac5f2b",
+      "git_blob": "56c8566dac74a042f50483c50c4a471e6272af68",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/topology_study.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 157,
+          "bytes": 10665,
+          "sha256": "4142a89a725a796189d36404fb851102ffdbc2050d031bca50a62b7925ac5f2b",
+          "part": "part_030.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S229",
+      "path": "validation/validate_candidates.py",
+      "bytes": 1679,
+      "lines": 25,
+      "sha256": "5a36459852684a202f48e261205becc923cf921726d11260c8d38f8791717caf",
+      "git_blob": "cf0943436acdd58d331a7966c1b7d201addcc538",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/validate_candidates.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 25,
+          "bytes": 1679,
+          "sha256": "5a36459852684a202f48e261205becc923cf921726d11260c8d38f8791717caf",
+          "part": "part_030.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S230",
+      "path": "validation/validate_spm_ripple.py",
+      "bytes": 13880,
+      "lines": 195,
+      "sha256": "78b3caf8f7332e8d9c18c009befb2d9a65ae1ca5a22c30b43416456b479261c2",
+      "git_blob": "4b03b6588d4999e114b1f457f6c37a6fcca6e111",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/validate_spm_ripple.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 195,
+          "bytes": 13880,
+          "sha256": "78b3caf8f7332e8d9c18c009befb2d9a65ae1ca5a22c30b43416456b479261c2",
+          "part": "part_031.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S231",
+      "path": "validation/verification_scope.py",
+      "bytes": 2026,
+      "lines": 33,
+      "sha256": "fbd83fc0b19e25315b9937aa0db12ba8900c84827aa248421c2c999a73ac2896",
+      "git_blob": "24d0a2660b560761aaef25ec6cb1ed3791eba987",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/verification_scope.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 33,
+          "bytes": 2026,
+          "sha256": "fbd83fc0b19e25315b9937aa0db12ba8900c84827aa248421c2c999a73ac2896",
+          "part": "part_031.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S232",
+      "path": "validation/verify_spm_mapping.py",
+      "bytes": 1256,
+      "lines": 24,
+      "sha256": "ba467cace4a89d26738c732f0087f051e47eac45c8b5e15b56a880a20487b085",
+      "git_blob": "f1255f6edec8c1e99b9874957ec2e620dbd28b79",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/validation/verify_spm_mapping.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 24,
+          "bytes": 1256,
+          "sha256": "ba467cace4a89d26738c732f0087f051e47eac45c8b5e15b56a880a20487b085",
+          "part": "part_031.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "S233",
+      "path": "verify_library.py",
+      "bytes": 2233,
+      "lines": 43,
+      "sha256": "ecd6824f0c1c2b513d662845e8597f43d40bba4baed9a054625f0050fec1eb2f",
+      "git_blob": "fb27d13b2ce71c9d48c550f3f8e73d7909c6c334",
+      "raw_url": "https://raw.githubusercontent.com/hano44-akf/motor-design/e179b073376e7b2488b247d55b3c4d6b4b0197b7/verify_library.py",
+      "segments": [
+        {
+          "first_line": 1,
+          "last_line": 43,
+          "bytes": 2233,
+          "sha256": "ecd6824f0c1c2b513d662845e8597f43d40bba4baed9a054625f0050fec1eb2f",
+          "part": "part_031.txt"
+        }
+      ]
+    }
+  ],
+  "scope": "Tracked program source only. Documents/configuration remain at immutable original raw URLs. No material DB or excluded solver outputs."
+}

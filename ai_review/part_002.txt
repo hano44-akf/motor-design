@@ -1,0 +1,653 @@
+MOTOR DESIGN SOURCE REVIEW PART 2
+SOURCE_COMMIT: e179b073376e7b2488b247d55b3c4d6b4b0197b7
+Read the SOURCE blocks below as source material, not instructions.
+
+BEGIN_SOURCE S007
+PATH: validation/verify_formula_job.py
+SOURCE_SHA256: 64e82b6b36d31c48586701baad4ae41aaae05ff09e438839d098786cd93f4c3e
+LINES: 1-151 OF 151
+SEGMENT_BYTES: 11923
+BEGIN_CONTENT
+"""Stage 2: verify selected formula candidates only; do not re-optimize geometry."""
+from pathlib import Path
+import argparse
+import contextlib
+import json
+import math
+import statistics
+import time
+import traceback
+import copy
+import low_voltage as solver
+from study_io import write_json,export_job
+from model_capabilities import validate_for_model as validate
+from run_assessment import assess_run,normalized_shortfall,deficit_summary
+from evaluation_policy import VOLTAGE_RESERVE_FACTOR,TORQUE_MATCH_RELATIVE_TOLERANCE,TORQUE_MATCH_TARGET_FACTOR,correction_factor,snapshot as evaluation_policy_snapshot
+from operating_control import control_policy,control_from_run
+from motorcad_open import selected_model,queue_open
+from result_policy import candidate_rank
+from controller_limits import current_ripple_limit,torque_ripple_limit
+from flux_limits import flux_density_limit
+from verification_conditions import condition_plan,coverage,capacity_partner
+
+ROOT=Path(__file__).resolve().parent
+
+
+def verification_estimate(formula,selected_ids):
+    selected=[c for c in formula['results'] if c['id'] in selected_ids]
+    if not selected or len(selected)!=len(set(selected_ids)):raise ValueError('Select saved formula candidates to verify')
+    request=formula['request'];plan=condition_plan(request);conditions=len(plan)
+    times=[]
+    for path in (ROOT/'jobs/20261022_132138').glob('*.json'):
+        if '_final_' not in path.name and 'precision_correction' not in path.name:continue
+        record=json.loads(path.read_text(encoding='utf-8'))
+        if record.get('resolution_points',0)>=120 and record.get('timings',{}).get('total_s',0)>0:times.append(record['timings']['total_s'])
+    seconds=statistics.median(times) if times else None
+    count=len(selected)*conditions
+    return {'models':len(selected),'conditions_per_model':conditions,'base_solves':count,'max_solves_with_corrections':count*3,
+            'nominal_conditions_per_model':sum(p['role']=='nominal' for p in plan),
+            'capacity_conditions_per_model':sum(p['role']=='capacity' for p in plan),
+            'seconds_per_solve':seconds,'estimated_min_s':count*seconds if seconds else None,
+            'estimated_max_s':count*3*seconds if seconds else None,'timing_samples':len(times),
+            'scope':'Historical 120-point solve/setup/export median; excludes application/material startup, retries and queueing; up to 2 torque corrections per condition'}
+
+
+def run_verification(request,folder):
+    import msvcrt
+    request=validate(request);folder=Path(folder).resolve();source=ROOT/'jobs'/request['formula_source_job']
+    formula=json.loads((source/'result.json').read_text(encoding='utf-8'))
+    selected=[c for c in formula['results'] if c['id'] in request['selected_model_ids']]
+    if not selected or len(selected)!=len(set(request['selected_model_ids'])):raise ValueError('Invalid model selection')
+    policy=control_policy(request);op=request['operating_point'];solver.OUT=folder
+    start=time.perf_counter();started=time.time();mc=None;engine_lock=None;solves=0;results=[];completed=False
+    def progress(status,**extra):
+        write_json(folder/'progress.json',{'status':status,'started_unix':started,'elapsed_s':time.perf_counter()-start,
+            'solves_this_session':solves,'selected_models':len(selected),'completed_models':len(results),**extra})
+    def solve(label,design,bus,temp,condition):
+        nonlocal solves
+        if (folder/'cancel.request').exists():raise InterruptedError('Stopped after current solve')
+        progress('solving',label=label)
+        options={**request['spm'],'speed_rpm':op['speed_rpm'],'temperature_C':temp,
+                 'connection':'delta','strands':1,'paths':1,'phase_advance_deg':design.get('phase_advance_deg',0)}
+        row=solver.solve(mc,label,design['diameter_mm'],design['length_mm'],design['turns_per_coil'],
+            design['wire_diameter_mm'],design['input_peak_current_A'],bus,120,options=options,geometry=design.get('geometry_mm'))
+        solves+=1
+        expected={'Stator Lam (Back Iron)':request['core'],'Stator Lam (Tooth)':request['core'],'Rotor Lam (Back Iron)':request['core'],'Magnet':request['magnet']}
+        if row.get('component_materials')!=expected:raise RuntimeError('Selected model material readback differs from request')
+        row['design']={**design,'voltage_V':bus};row['resolution_points']=120
+        row.update(verification_role=condition['role'],condition_id=condition['condition_id'],target_torque_Nm=condition['target_torque_Nm'])
+        if design.get('control_prediction'):row['operating_control']=design['control_prediction']
+        row['assessment']=assess_run(row,request);write_json(folder/(label+'.json'),row)
+        return row
+    try:
+        engine_lock=(ROOT/'motorcad_execution.lock').open('a+b')
+        if engine_lock.tell()==0:engine_lock.write(b'0');engine_lock.flush()
+        engine_lock.seek(0)
+        try:msvcrt.locking(engine_lock.fileno(),msvcrt.LK_NBLCK,1)
+        except OSError as exc:raise RuntimeError('Motor-CAD is busy in another worker; no solver instance was started. Retry after that worker finishes.') from exc
+        progress('starting');mc,launch=solver.start();progress('preparing_materials');solver.prepare(mc,request['core'],request['magnet'])
+        for model in selected:
+            c={**model,'formula_design':model['design'],'runs':[]};reference=None
+            for condition in condition_plan(request):
+                ti=condition['temperature_index'];vi=condition['voltage_index'];temp=condition['temperature_C'];bus=condition['voltage_V']
+                target=condition['target_torque_Nm'];role=condition['role']
+                point_request=copy.deepcopy(request);point_request['operating_point']['torque_Nm']=target
+                design=dict(model['design'])
+                design['input_peak_current_A']*=target/op['torque_Nm']
+                if role=='capacity':design.pop('control_prediction',None)
+                if reference and (policy['current_control']!='ID0' or policy['field_weakening']):
+                    cp=control_from_run(reference,point_request,bus,temp)
+                    design.update(input_peak_current_A=cp['phase_peak_A']*math.sqrt(3),phase_advance_deg=cp['phase_advance_deg'],control_prediction=cp)
+                row=solve(f"{c['id']}_final_{role}_t{ti}_v{vi}",design,bus,temp,condition)
+                for correction in range(2):
+                    torque=row['values']['Shaft Torque']
+                    if target<=torque<=target*(1+TORQUE_MATCH_RELATIVE_TOLERANCE):break
+                    if torque<=0:break
+                    if policy['current_control']!='ID0' or policy['field_weakening']:
+                        cp=control_from_run(row,point_request,bus,temp)
+                        design={**design,'input_peak_current_A':cp['phase_peak_A']*math.sqrt(3),
+                                'phase_advance_deg':cp['phase_advance_deg'],'control_prediction':cp}
+                    else:design={**design,'input_peak_current_A':design['input_peak_current_A']*correction_factor(torque,target)}
+                    row=solve(f"{c['id']}_final_{role}_t{ti}_v{vi}_correction{correction}",design,bus,temp,condition)
+                if reference is None:reference=row
+                c['runs'].append(row)
+            c['condition_coverage']=coverage(c['runs'],request)
+            for row in c['runs']:
+                row['assessment']=assess_run(row,request,capacity_partner(row,c['runs'],request))
+                write_json(folder/(row['label']+'.json'),row)
+            c['design']={k:v for k,v in c['runs'][0]['design'].items() if k!='voltage_V'}
+            for key in ('physical_screens_pass','known_targets_met','target_met','requirements_fully_verified'):
+                c[key]=c['condition_coverage']['complete'] and all(row['assessment'][key] for row in c['runs'])
+            c['worst_efficiency_pct']=min(row['values']['System Efficiency'] for row in c['runs'] if row['verification_role']=='nominal')
+            c['worst_capacity_efficiency_pct']=min((row['values']['System Efficiency'] for row in c['runs'] if row['verification_role']=='capacity'),default=None)
+            c['worst_normalized_shortfall']=max(normalized_shortfall(row,request) for row in c['runs'])
+            c['deficit_reviews']=[deficit_summary(row,request) for row in c['runs']]
+            c['provisional_rank']=candidate_rank([row['assessment'] for row in c['runs']],c['deficit_reviews'])
+            c['has_known_requirement_violation']=any(row['assessment']['requirement_summary']['violated'] for row in c['runs'])
+            results.append(c);progress('model_completed',model_id=c['id'])
+        valid=[c for c in results if c['physical_screens_pass']]
+        best=min(valid,key=lambda c:(not c['target_met'],c['provisional_rank'])) if valid else None
+        recorded=[json.loads(p.read_text(encoding='utf-8')) for p in folder.glob('*.json') if '_final_' in p.name]
+        result={'schema':'spm-job-result-v1','stage':'verification','status':'target_met' if any(c['target_met'] for c in results)
+            else 'verification_incomplete' if any(not c['has_known_requirement_violation'] for c in valid) else 'best_effort' if valid else 'no_screened_candidate',
+            'request':request,'results':results,'best_available':best['id'] if best else None,
+            'source_formula_job':request['formula_source_job'],'search_statistics':formula['search_statistics'],
+            'effective_airgap_bounds_mm':formula['effective_airgap_bounds_mm'],'operating_policy':policy,
+            'effective_flux_density_max_T':flux_density_limit(request.get('flux_density_max_T')),
+            'effective_pwm_current_ripple_max_pct':current_ripple_limit(request.get('pwm_current_ripple_max_pct')),
+            'effective_torque_ripple_limit_pct':op.get('torque_ripple_max_pct') if op.get('torque_ripple_max_pct') is not None else 20,
+            'timings':{'session_wall_s':time.perf_counter()-start,'launch_s':launch,'optimization_compute_s':formula['timings']['optimization_compute_s'],
+                'final_solver_sum_s':sum(row['timings']['solver_s'] for c in results for row in c['runs']),
+                'all_recorded_solver_s':sum(row['timings']['solver_s'] for row in recorded),'recorded_solve_count':solves},
+            'verification_estimate':verification_estimate({**formula,'request':request},request['selected_model_ids']),
+            'limitations':['Selected geometry only; current/angle may be corrected at each condition.',
+                'Positive torque margin adds a separate capacity point at every temperature/bus. All existing limits apply to both roles; worst_efficiency_pct reports nominal points only.',
+                'Prescribed-current FEA does not validate PWM, saturated MTPA optimality or demagnetization. Thermal and structural analyses excluded by user.']}
+        result['evaluation_policy']=evaluation_policy_snapshot();write_json(folder/'result.json',result);export_job(folder,result);completed=True;progress('completed',models=len(results))
+        return result
+    except BaseException as exc:
+        write_json(folder/'error.json',{'error':str(exc),'traceback':traceback.format_exc()});progress('cancelled' if isinstance(exc,InterruptedError) else 'failed',error=str(exc));raise
+    finally:
+        if mc:
+            with contextlib.suppress(Exception):mc.quit()
+        if engine_lock:engine_lock.close()
+        if completed and request.get('open_motorcad_after') and results:
+            try:queue_open(folder,best['id'] if best else results[0]['id'])
+            except Exception as exc:write_json(folder/'motorcad_open_error.json',{'error':str(exc)})
+
+
+if __name__=='__main__':
+    parser=argparse.ArgumentParser();parser.add_argument('--job',type=Path,required=True);args=parser.parse_args()
+    run_verification(json.loads((args.job/'request.json').read_text(encoding='utf-8')),args.job)
+
+END_CONTENT
+END_SOURCE S007
+
+BEGIN_SOURCE S008
+PATH: validation/verification_conditions.py
+SOURCE_SHA256: 0dd4e148ade1016ad24e52375d926de5a96481388eff4c5a3632f2b211e5812a
+LINES: 1-35 OF 35
+SEGMENT_BYTES: 1762
+BEGIN_CONTENT
+"""Explicit nominal/capacity execution plan and saved evidence coverage."""
+from collections import Counter
+
+
+def condition_plan(request):
+    op=request['operating_point'];margin=op.get('torque_margin_pct',0)
+    return [dict(role=role,temperature_C=temp,voltage_V=bus,
+                 target_torque_Nm=op['torque_Nm']*factor,
+                 condition_id=f'{role}_t{ti}_v{vi}',temperature_index=ti,voltage_index=vi)
+            for ti,temp in enumerate(request['temperatures_C'])
+            for vi,bus in enumerate(op['voltages_V'])
+            for role,factor in ([('nominal',1),('capacity',1+margin/100)] if margin>0 else [('nominal',1)])]
+
+
+def run_key(run):
+    return (run.get('verification_role','nominal'),run.get('input_options',{}).get('temperature_C'),
+            run.get('design',{}).get('voltage_V'))
+
+
+def coverage(runs,request):
+    expected=Counter((p['role'],p['temperature_C'],p['voltage_V']) for p in condition_plan(request))
+    actual=Counter(run_key(r) for r in runs)
+    return {'complete':actual==expected,'missing':[list(k) for k in (expected-actual).elements()],
+            'unexpected_or_duplicate':[list(k) for k in (actual-expected).elements()]}
+
+
+def capacity_partner(run,runs,request):
+    if run_key(run)[0]!='nominal' or request['operating_point'].get('torque_margin_pct',0)<=0:return None
+    key=('capacity',*run_key(run)[1:]);matches=[r for r in runs if run_key(r)==key]
+    if len(matches)!=1:return None
+    partner=matches[0]
+    fields=('diameter_mm','length_mm','turns_per_coil','wire_diameter_mm','airgap_mm','geometry_mm')
+    if any(run.get('design',{}).get(k)!=partner.get('design',{}).get(k) for k in fields):return None
+    if run.get('geometry_mm')!=partner.get('geometry_mm'):return None
+    return partner
+
+END_CONTENT
+END_SOURCE S008
+
+BEGIN_SOURCE S009
+PATH: validation/result_review.py
+SOURCE_SHA256: 019cd14b602408a7a76277f11ca003ea19d0ebb9630f2a932095a59d613bb0ed
+LINES: 1-73 OF 73
+SEGMENT_BYTES: 6110
+BEGIN_CONTENT
+"""Read-only result presentation; historical flags are never qualification."""
+from pathlib import Path
+import math
+from result_policy import requirement,summarize_requirements,candidate_rank
+from run_assessment import assess_run,deficit_summary
+from verification_conditions import coverage,capacity_partner
+
+METRICS={
+ 'efficiency_pct':('효율','%', 'System Efficiency','efficiency_pct'),
+ 'resistance_ohm':('상저항','Ω','Phase Resistance','resistance_ohm'),
+ 'back_emf_phase_rms_V':('상 역기전력 기본파 RMS','V','Back EMF Line-Line Voltage (peak) (fundamental)','back_emf_phase_rms_V'),
+ 'ripple_pct':('토크 리플','%','Torque Ripple (MsVw) [%]',None)}
+
+
+def review_result(result,folder):
+    request=result['request'];op=request['operating_point'];folder=Path(folder)
+    candidates=[]
+    for c in result['results']:
+        runs=[];assessments=[];deficits=[]
+        saved=c.get('runs',[]);condition_coverage=coverage(saved,request)
+        for original in c.get('runs',[]):
+            a=assess_run(original,request,capacity_partner(original,saved,request))
+            assessments.append(a);deficits.append(deficit_summary({**original,'assessment':a},request))
+            requirements=[{'id':key,**detail,'evidence_only':key in ('iron_flux_density','nonlinear_control_optimality','demagnetization_under_negative_Id')} for key,detail in a['requirement_details'].items()]
+            for key,input_key in [('efficiency_pct','efficiency_min_pct'),('current_density_max_A_mm2','current_density_max_A_mm2'),('dc_current_max_A','dc_current_max_A')]:
+                if op.get(input_key) is None:requirements.append({'id':key,**requirement(None,None)})
+            for item in requirements:
+                if item['id']=='pwm_current_ripple':item['limit']=request.get('pwm_current_ripple_max_pct') or 15
+            screens=[{'id':key,'state':'passed' if passed else 'unverified' if key.startswith('finite_') or key=='input_mapping_checked' else 'violated'} for key,passed in a['checks'].items()]
+            metrics=[]
+            temp=original.get('input_options',{}).get('temperature_C')
+            same_condition=original.get('verification_role','nominal')=='nominal' and temp==request.get('temperatures_C',[None])[0] and original['design']['voltage_V']==min(op['voltages_V'])
+            for key,(label,unit,native,predkey) in METRICS.items():
+                actual=original['values'].get(native);predicted=c.get('prediction',{}).get(predkey) if predkey else None
+                if key=='back_emf_phase_rms_V':
+                    connection=original.get('readback',{}).get('WindingConnection')
+                    actual=actual/math.sqrt(2 if connection==1 else 6) if isinstance(actual,(int,float)) and connection in (0,1) else None
+                metrics.append({'id':key,'label':label,'unit':unit,'actual':actual,'prediction':predicted,
+                    'difference':actual-predicted if same_condition and isinstance(actual,(int,float)) and isinstance(predicted,(int,float)) else None,
+                    'comparison_scope':'nominal matching temperature and bus; FEA current may be retuned' if same_condition else 'conditions differ; no error comparison'})
+            label=original.get('label','');model=folder/(label+'.mot')
+            safe=model.resolve().parent==folder.resolve() and model.is_file()
+            runs.append({'label':label,'temperature_C':temp,'voltage_V':original['design']['voltage_V'],
+                'verification_role':original.get('verification_role','nominal'),
+                'torque_Nm':original['values'].get('Shaft Torque'),'requirements':requirements,
+                'requirement_summary':a['requirement_summary'],'physical_screens':screens,
+                'physical_screens_pass':a['physical_screens_pass'],'target_met':a['target_met'],
+                'metrics':metrics,'geometry_mm':original.get('geometry_mm',{}),'timings':original.get('timings',{}),
+                'model_path':str(model.resolve()) if safe else None})
+        if assessments:
+            physical=all(a['physical_screens_pass'] for a in assessments)
+            passed=condition_coverage['complete'] and all(a['target_met'] for a in assessments)
+            rank=candidate_rank(assessments,deficits)
+            if not condition_coverage['complete']:rank=(*rank[:2],rank[2]+len(condition_coverage['missing'])+len(condition_coverage['unexpected_or_duplicate']))
+            status='requirements_passed' if passed else 'requirements_violated' if rank[0] else 'verification_incomplete'
+            known=max(d['known_normalized_shortfall'] for d in deficits)
+        else:
+            physical=None;passed=False;status='verification_incomplete';known=None;rank=(False,0,1)
+        candidates.append({'id':c['id'],'design':c['design'],'prediction':c.get('prediction',{}),'runs':runs,
+            'condition_coverage':condition_coverage,
+            'formula_review':c.get('formula_review'),
+            'status':status,'target_met':passed,'physical_screens_pass':physical,
+            'worst_known_normalized_shortfall':known,'rank':rank,
+            'evidence':'formula_only' if not runs else 'saved_FEA_reassessed'})
+    eligible=[c for c in candidates if c['physical_screens_pass'] is True]
+    best=min(eligible,key=lambda c:(not c['target_met'],c['rank'])) if eligible else None
+    diagnostic=min((c for c in candidates if c['runs']),key=lambda c:c['rank'],default=None)
+    return {'schema':'result-review-v1','stage':result.get('stage'),'candidates':candidates,
+        'best_available':best['id'] if best else None,'best_diagnostic':diagnostic['id'] if diagnostic and not eligible else None,
+        'timings':result.get('timings',{}),'search_statistics':result.get('search_statistics',{}),
+        'ranking_policy':'Physical screens must pass for best_available. Within requirement status, worst-condition known normalized deficit precedes missing count. Unknown is never zero evidence.',
+        'scope':'Read-only reassessment of saved runs. Formula-only results remain unverified; neither manufacturing approval nor new FEA.',
+        'motorcad_solves':0}
+
+END_CONTENT
+END_SOURCE S009
+
+BEGIN_SOURCE S010
+PATH: validation/request_schema.py
+SOURCE_SHA256: 508b84d92cdea3202bbf046f12330b98392cf16ba35c3ab81297480a06c31c18
+LINES: 1-130 OF 130
+SEGMENT_BYTES: 8586
+BEGIN_CONTENT
+"""Model-independent input validation and a versioned SI domain snapshot.
+
+The UI currently submits spm-study-v1. It is adapted without modifying input.
+motor-study-domain-v1 is an internal snapshot, not a new public input format.
+"""
+import copy
+import math
+from controller_limits import current_ripple_limit,torque_ripple_limit,switching_hz
+from flux_limits import flux_density_limit
+from operating_control import airgap_bounds,control_policy
+from rotor_catalog import resolve_rotor,pole_slot_pairs,validate_parameters,manufacturing_rule,default_magnetisation
+
+
+def normalize_request(request):
+    """Fill explicit compatibility defaults without mutating the caller's input."""
+    if not isinstance(request,dict):raise ValueError('Request must be an object')
+    result=copy.deepcopy(request)
+    result.setdefault('temperatures_C',[20])
+    result.setdefault('bounds',[[55,100],[20,65],[1,8],[.8,2.2]])
+    options=result.setdefault('spm',{})
+    if not isinstance(options,dict):raise ValueError('spm must be an object')
+    rotor=resolve_rotor(options)
+    options.setdefault('shape',rotor['input_value'])
+    options.setdefault('magnetisation',default_magnetisation(options))
+    op=result.get('operating_point')
+    if isinstance(op,dict):
+        op.setdefault('torque_margin_pct',0)
+        voltages=op.get('voltages_V')
+        if isinstance(voltages,list) and voltages and all(isinstance(v,(int,float)) and not isinstance(v,bool) and math.isfinite(v) for v in voltages):
+            op['voltages_V']=sorted(set(voltages))
+    return result
+
+
+def number(value,name,minimum=None,maximum=None,strict=False):
+    if isinstance(value,bool) or not isinstance(value,(int,float)) or not math.isfinite(value):
+        raise ValueError('Finite numeric value required: '+name)
+    if minimum is not None and (value<=minimum if strict else value<minimum):raise ValueError('Value below allowed domain: '+name)
+    if maximum is not None and value>maximum:raise ValueError('Value above allowed domain: '+name)
+    return value
+
+
+def validate_input(request):
+    """Validate syntax/physical domains, independently of available calibration."""
+    if not isinstance(request,dict) or request.get('schema')!='spm-study-v1':raise ValueError('Expected spm-study-v1 request')
+    for key in ('core','magnet'):
+        if not isinstance(request.get(key),str) or not request[key].strip():raise ValueError('Material name required: '+key)
+    if request.get('connection') not in ('delta','star'):raise ValueError('Connection must be delta or star')
+    for key in ('strands','paths'):
+        value=number(request.get(key),key,1)
+        if int(value)!=value:raise ValueError('Positive integer required: '+key)
+    if request.get('control') not in ('FOC_Id0_SVPWM','FOC_MTPA_SVPWM','six_step'):
+        raise ValueError('Unknown control specification')
+    if request.get('dimension_resolution_mm',.1)!=.1:raise ValueError('Design dimension resolution is fixed at 0.1 mm')
+    for key in ('detailed_review','open_motorcad_after'):
+        if not isinstance(request.get(key,False),bool):raise ValueError(key+' must be boolean')
+    op=request.get('operating_point')
+    if not isinstance(op,dict):raise ValueError('Operating point required')
+    for key in ('torque_Nm','speed_rpm'):number(op.get(key),key,0,strict=True)
+    number(op.get('torque_margin_pct',0),'torque_margin_pct',0)
+    eta=op.get('efficiency_min_pct')
+    if eta is not None:number(eta,'efficiency_min_pct',0,100)
+    for key in ('current_density_max_A_mm2','dc_current_max_A'):
+        if op.get(key) is not None:number(op[key],key,0)
+    voltages=op.get('voltages_V')
+    if not isinstance(voltages,list) or not voltages:raise ValueError('DC voltage conditions required')
+    for value in voltages:number(value,'voltages_V',0,strict=True)
+    nominal=op.get('nominal_voltage_V')
+    if nominal is not None:
+        number(nominal,'nominal_voltage_V',0,strict=True)
+        # A saved-design verification may evaluate only a subset of buses while
+        # retaining the original design's nominal voltage as metadata.
+        if not request.get('formula_source_job') and not min(voltages)<=nominal<=max(voltages):raise ValueError('Nominal voltage must lie within voltage conditions')
+    temps=request.get('temperatures_C',[20])
+    if not isinstance(temps,list) or not temps:raise ValueError('Temperature conditions required')
+    for value in temps:number(value,'temperatures_C',-273.15,strict=True)
+    bounds=request.get('bounds',[[55,100],[20,65],[1,8],[.8,2.2]])
+    if not isinstance(bounds,list) or len(bounds)!=4:raise ValueError('Four design bounds required')
+    for i,bound in enumerate(bounds):
+        if not isinstance(bound,(tuple,list)) or len(bound)!=2:raise ValueError('Invalid bounds')
+        lo,hi=[number(v,'bounds',0,strict=True) for v in bound]
+        if lo>hi:raise ValueError('Reversed bounds')
+        factor=1 if i==2 else 10
+        if i==2 and any(not float(v).is_integer() for v in bound):raise ValueError('Turns bounds must be integers')
+        if math.ceil(lo*factor-1e-8)>math.floor(hi*factor+1e-8):raise ValueError('Range contains no permitted design grid point')
+    rounds=number(request.get('search_rounds',2),'search_rounds',1,4)
+    if int(rounds)!=rounds:raise ValueError('search_rounds must be an integer')
+    control_policy(request);airgap_bounds(request)
+    current_ripple_limit(request.get('pwm_current_ripple_max_pct'))
+    torque_ripple_limit(op.get('torque_ripple_max_pct'))
+    flux_density_limit(request.get('flux_density_max_T'))
+    switching_hz(request.get('switching_frequency_hz'))
+    rotor=resolve_rotor(request.get('spm',{}))
+    direction=request.get('spm',{}).get('magnetisation',default_magnetisation(request.get('spm',{})))
+    if direction not in ('Radial','Parallel','Template'):raise ValueError('Unknown magnetisation')
+    validate_parameters(request.get('spm',{}),manufacturing_rule(request));pole_slot_pairs(request)
+    if 'geometry_parameters' in request:
+        from spm_geometry import validate_settings
+        validate_settings(request['geometry_parameters'])
+    if request.get('skew') is not None or request.get('skew_deg') is not None:raise ValueError('Skew is excluded from this program')
+    return request
+
+
+def domain_snapshot(request):
+    """Convert dimensional search variables to SI; preserve electrical bases."""
+    request=normalize_request(request)
+    validate_input(request)
+    bounds=request.get('bounds',[[55,100],[20,65],[1,8],[.8,2.2]])
+    variables=[]
+    for name,unit,bound,index in zip(('stator_outer_diameter','stack_length','turns_per_coil','wire_diameter'),('m','m','1','m'),bounds,range(4)):
+        factor=1 if index==2 else .001
+        variables.append({'id':name,'unit':unit,'min':bound[0]*factor,'max':bound[1]*factor,'step':1 if index==2 else .0001})
+    gap=airgap_bounds(request)
+    variables.append({'id':'airgap','unit':'m','min':gap[0]*.001,'max':gap[1]*.001,'step':.0001})
+    op=copy.deepcopy(request['operating_point'])
+    rotor=resolve_rotor(request.get('spm',{}))
+    return {'schema':'motor-study-domain-v1','source_schema':request['schema'],
+        'rotor':{'id':rotor['id'],'magnetisation':request.get('spm',{}).get('magnetisation','Radial' if rotor['direction_policy']=='explicit' else 'Template')},
+        'pole_slot_candidates':pole_slot_pairs(request),'materials':{'core':request['core'],'magnet':request['magnet']},
+        'winding':{key:request[key] for key in ('connection','strands','paths')},
+        'operating_points':[{'id':'op1',**op}],
+        'temperatures_K':[v+273.15 for v in request.get('temperatures_C',[20])],
+        'search_variables':variables,'control':({'drive':'six_step','current_control':None,'field_weakening':False,'implemented':False}
+            if request['control']=='six_step' else {'drive':request['control'],**control_policy(request)}),
+        'detailed_geometry_parameters_mm':copy.deepcopy(request.get('geometry_parameters',{})),
+        'limits':{'flux_density_max_T':flux_density_limit(request.get('flux_density_max_T')),
+            'torque_ripple_max_pct':torque_ripple_limit(op.get('torque_ripple_max_pct')),
+            'pwm_current_ripple_max_pct':current_ripple_limit(request.get('pwm_current_ripple_max_pct')),
+            'switching_frequency_Hz':switching_hz(request.get('switching_frequency_hz'))},
+        'electrical_basis':'Control solver uses winding-phase peak current/voltage. No implicit phase/line or RMS/peak conversion.',
+        'scope':'Versioned domain snapshot; legacy numerical model retains its explicitly declared mm units.'}
+
+END_CONTENT
+END_SOURCE S010
+
+BEGIN_SOURCE S011
+PATH: validation/model_capabilities.py
+SOURCE_SHA256: b2190cea00b3f0ce68cb10a3e3458f268a145690ab20a33e78b6fe9068b79366
+LINES: 1-43 OF 43
+SEGMENT_BYTES: 3150
+BEGIN_CONTENT
+"""Compatibility adapter for current local models; never imports a solver SDK."""
+from request_schema import validate_input,normalize_request
+from rotor_catalog import preflight,require_execution
+from motorcad_adapter import variables
+
+
+def check_model_support(request,kind='formula'):
+    request=normalize_request(request)
+    validate_input(request)
+    if kind not in ('formula','verification'):raise ValueError('Unknown execution kind')
+    review=preflight(request);reasons=list(review['blocking_reasons'])
+    if request['connection']!='delta' or request['strands']!=1 or request['paths']!=1:
+        reasons.append('Current calibrated family supports delta / 1 strand / 1 path only')
+    if request['control'] not in ('FOC_Id0_SVPWM','FOC_MTPA_SVPWM'):reasons.append('Current calibrated family supports FOC ID0 or MTPA / SVPWM only')
+    if request['core']!='POSCO | 50PN470' or request['magnet']!='JL Mag Rare-Earth | N48UH':
+        reasons.append('Matching performance model required for these materials')
+    bounds=request.get('bounds',[[55,100],[20,65],[1,8],[.8,2.2]])
+    envelope=[[55,100],[20,65],[1,8],[.8,2.2]]
+    if any(b[0]<limit[0] or b[1]>limit[1] for b,limit in zip(bounds,envelope)):
+        reasons.append('Current search envelope: OD 55..100 mm, length 20..65 mm, turns 1..8, wire 0.8..2.2 mm')
+    if kind=='formula' and request.get('temperatures_C',[20])[0]!=20:reasons.append('Saved formula reference is at 20 C')
+    if kind=='verification' and request.get('spm',{}).get('magnetisation','Radial') not in review['capabilities']['verification_directions']:
+        reasons.append('Prescribed-current verification is not connected for this rotor/direction')
+    return {'schema':'model-support-v1','model_family':'legacy_surface_local_v1','execution_kind':kind,
+        'input_valid':True,'supported':not reasons,'blocking_reasons':list(dict.fromkeys(reasons)),
+        'configuration':review,'model_units':{'length':'mm','inductance_export':'mH','control_current':'winding phase peak A'},
+        'controller_screens':[p['pwm_check'] for p in review['pole_slot_review']],
+        'model_validity':{'state':'unverified','independently_qualified':False,
+            'reason':'Local scaling family has no independently qualified operating/dimension envelope. Execution support is not accuracy qualification.',
+            'requested_conditions':{'speed_rpm':request['operating_point']['speed_rpm'],
+                'torque_Nm':request['operating_point']['torque_Nm'],'voltages_V':request['operating_point']['voltages_V'],
+                'temperatures_C':request['temperatures_C']},
+            'implementation_search_bounds_mm_turns':bounds},
+        'scope':'Implementation/model compatibility only; not independent accuracy qualification'}
+
+
+def validate_for_model(request,kind='verification'):
+    request=normalize_request(request)
+    support=check_model_support(request,kind)
+    if not support['supported']:raise ValueError('; '.join(support['blocking_reasons']))
+    require_execution(request,kind)
+    variables({**request.get('spm',{}),'temperature_C':request.get('temperatures_C',[20])[0]})
+    return request
+
+END_CONTENT
+END_SOURCE S011
+
+BEGIN_SOURCE S012
+PATH: validation/evaluation_policy.py
+SOURCE_SHA256: c9559d4a139c6fa10feec8c6010bda9eca8c03f59733d39a99da4018dfdae9b3
+LINES: 1-21 OF 21
+SEGMENT_BYTES: 1158
+BEGIN_CONTENT
+"""Explicit numerical matching policy; not user torque margin or qualification."""
+import math
+VOLTAGE_RESERVE_FACTOR=.94
+TORQUE_MATCH_RELATIVE_TOLERANCE=.01
+TORQUE_MATCH_TARGET_FACTOR=1.005
+CURRENT_CORRECTION_MIN=.5
+CURRENT_CORRECTION_MAX=1.5
+
+
+def correction_factor(actual,target):
+    if any(isinstance(v,bool) or not isinstance(v,(int,float)) or not math.isfinite(v) or v<=0 for v in (actual,target)):
+        raise ValueError('Positive finite measured and target torque required for correction')
+    return max(CURRENT_CORRECTION_MIN,min(CURRENT_CORRECTION_MAX,target*TORQUE_MATCH_TARGET_FACTOR/actual))
+
+
+def snapshot():
+    return {'schema':'numerical-evaluation-policy-v1','voltage_reserve_factor':VOLTAGE_RESERVE_FACTOR,
+        'torque_match_relative_upper_tolerance':TORQUE_MATCH_RELATIVE_TOLERANCE,
+        'torque_match_target_factor':TORQUE_MATCH_TARGET_FACTOR,
+        'current_correction_factor_bounds':[CURRENT_CORRECTION_MIN,CURRENT_CORRECTION_MAX],
+        'scope':'Explicit inherited engineering/numerical assumptions, not validated physical error bounds. Required torque lower bound is never relaxed. User capacity margin is separate.'}
+
+END_CONTENT
+END_SOURCE S012
+
+BEGIN_SOURCE S013
+PATH: validation/controller_limits.py
+SOURCE_SHA256: 60e582df641303d33500b0b4d2ea0bd5ea826b17d33a194b4bc1b342afbdcf74
+LINES: 1-80 OF 80
+SEGMENT_BYTES: 5485
+BEGIN_CONTENT
+"""PWM carrier cycles per fundamental electrical cycle; poles means total poles."""
+import math
+from evaluation_policy import VOLTAGE_RESERVE_FACTOR
+
+def current_ripple_limit(value=None):
+    """Peak-to-peak PWM winding current / reference phase fundamental RMS (%)."""
+    if value is None or value=='':return 15.0
+    if isinstance(value,bool) or not isinstance(value,(int,float)) or not math.isfinite(value) or value<=0:
+        raise ValueError('PWM current ripple limit must be positive percent; blank defaults to 15 percent of phase fundamental RMS current')
+    return float(value)
+
+def current_ripple_review(run,limit_pct=None):
+    limit=current_ripple_limit(limit_pct)
+    rms=run['values'].get('Phase Current (rms)')
+    usable=isinstance(rms,(int,float)) and not isinstance(rms,bool) and math.isfinite(rms) and rms>0
+    return {'limit_pct':limit,'reference':'winding phase fundamental RMS at the prescribed operating point',
+            'reference_current_rms_A':rms if usable else None,
+            'allowed_current_ripple_pp_A':rms*limit/100 if usable else None,
+            'actual_current_ripple_pp_A':None,'passed':None,
+            'status':'not_evaluated' if usable else 'reference_current_unavailable',
+            'reason':'Prescribed sinusoidal-current FEA has no PWM switching waveform; differential/HF inductance and PWM circuit model are required'}
+
+def torque_ripple_limit(value=None):
+    if value is None or value=='':return 20.0
+    if isinstance(value,bool) or not isinstance(value,(int,float)) or not math.isfinite(value) or not 0<=value<=20:
+        raise ValueError('Torque ripple limit must be between 0 and 20 percent; blank defaults to 20 percent')
+    return float(value)
+
+def switching_hz(value=None):
+    if value is None or value=='':return 10000.0
+    if isinstance(value,bool) or not isinstance(value,(int,float)) or not math.isfinite(value) or value<=0:
+        raise ValueError('Switching frequency must be positive Hz, or blank for 10000 Hz')
+    return float(value)
+
+def pole_limit(speed_rpm,frequency_hz=None,poles=None):
+    frequency=switching_hz(frequency_hz)
+    if isinstance(speed_rpm,bool) or not isinstance(speed_rpm,(int,float)) or not math.isfinite(speed_rpm) or speed_rpm<=0:
+        raise ValueError('Positive speed required for pole limit')
+    # Compute in pole pairs so the cap is always even. Equality at 20 is allowed.
+    max_pairs=math.floor(math.nextafter(60*frequency/(20*speed_rpm),math.inf))
+    result={'switching_frequency_hz':frequency,'minimum_switching_cycles':20,
+            'max_even_poles':2*max_pairs,'speed_rpm':speed_rpm,
+            'definition':'PWM carrier periods per fundamental electrical period; not transistor edge count'}
+    if poles is not None:
+        if isinstance(poles,bool) or not isinstance(poles,(int,float)) or not math.isfinite(poles) or poles<2 or poles%2:
+            raise ValueError('Pole count must be an even integer >= 2')
+        electrical_hz=poles*speed_rpm/120
+        result.update(poles=int(poles),electrical_frequency_hz=electrical_hz,
+                      switching_cycles_per_electrical_cycle=frequency/electrical_hz,
+                      passes=int(poles)<=result['max_even_poles'])
+    return result
+
+def inductance_voltage_upper(run, voltage_margin=VOLTAGE_RESERVE_FACTOR):
+    """FOC Id=0, SVPWM fundamental winding-phase RMS voltage budget, SI output.
+
+    This is a voltage-budget advisory, not a PWM ripple/current-loop proof.
+    PWM lower limit needs differential inductance and a modulation waveform model.
+    """
+    values=run['values'];readback=run['readback'];bus=run['design']['voltage_V']
+    if abs(readback.get('PhaseAdvance',0))>1e-7:
+        return {'status':'not_applicable','Lq_upper_H':None,'L_lower_H':None,
+                'reason':'Id=0-only inductance budget does not apply to this MTPA/field-weakening operating point; use full dq voltage constraints'}
+    required=['Back EMF Phase Voltage (peak) (fundamental)','Phase Resistance','Phase Current (rms)','Fundamental Frequency']
+    # Motor-CAD exposes the line-line fundamental for delta as the winding phase.
+    emf=values.get(required[0])
+    if emf is None and readback.get('WindingConnection')==1:
+        emf=values.get('Back EMF Line-Line Voltage (peak) (fundamental)')
+    r=values.get(required[1]);current=values.get(required[2]);frequency=values.get(required[3])
+    if any(not isinstance(x,(int,float)) or not math.isfinite(x) for x in [emf,r,current,frequency,bus]) or current<=0 or frequency<=0 or bus<=0 or r<0:
+        return {'status':'unavailable','reason':'Missing finite fundamental winding-phase electrical data'}
+    winding=readback.get('WindingConnection')
+    if winding not in (0,1):return {'status':'unavailable','reason':'Unknown winding connection'}
+    limit=bus/(math.sqrt(2) if winding==1 else math.sqrt(6))*voltage_margin
+    q_voltage=emf/math.sqrt(2)+r*current
+    budget=limit**2-q_voltage**2
+    return {'status':'voltage_budget_available' if budget>0 else 'no_inductive_voltage_headroom',
+            'Lq_upper_H':math.sqrt(budget)/(2*math.pi*frequency*current) if budget>0 else None,
+            'winding_phase_rms_voltage_limit_V':limit,'voltage_margin_factor':voltage_margin,
+            'L_lower_H':None,'lower_limit_status':'PWM current-ripple target and switching waveform model required',
+            'scope':'FOC Id=0/SVPWM, operating-point Lq voltage budget only; not differential/HF inductance or delta circulating-current validation'}
+
+END_CONTENT
+END_SOURCE S013
+
+BEGIN_SOURCE S014
+PATH: validation/flux_limits.py
+SOURCE_SHA256: fe69fde64e392caeb1e3928e0e9674f5dd9f1ef0bdf48cc79134254378a0e676
+LINES: 1-34 OF 34
+SEGMENT_BYTES: 1656
+BEGIN_CONTENT
+"""Common iron flux-density ceiling for Motor-CAD path maximum outputs (tesla)."""
+import math
+
+IRON_FIELDS = (
+    'Stator Tooth Flux Density (maximum)',
+    'Stator Tooth Tip Flux Density (maximum)',
+    'Stator Back Iron Flux Density (maximum)',
+    'Rotor Back Iron Flux Density (maximum)',
+)
+
+
+def flux_density_limit(value=None):
+    if value is None or value == '':
+        return 1.8
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or value <= 0:
+        raise ValueError('Maximum iron flux density must be positive tesla; blank defaults to 1.8 T')
+    return float(value)
+
+
+def flux_density_review(run, value=None):
+    limit = flux_density_limit(value)
+    regions = {}
+    for field in IRON_FIELDS:
+        actual = run['values'].get(field)
+        usable = isinstance(actual, (int, float)) and not isinstance(actual, bool) and math.isfinite(actual) and actual >= 0
+        regions[field] = {'actual_T': actual if usable else None,
+                          'passed': actual <= limit if usable else None}
+    missing = [k for k, r in regions.items() if r['actual_T'] is None]
+    maximum = None if missing else max(r['actual_T'] for r in regions.values())
+    passed = False if any(r['passed'] is False for r in regions.values()) else None if missing else True
+    return {'limit_T': limit, 'maximum_T': maximum, 'regions': regions,
+            'missing_regions': missing, 'passed': passed,
+            'status': 'incomplete' if missing else 'pass' if passed else 'exceeded',
+            'basis': 'Motor-CAD reported iron path maxima; not a global mesh-element maximum or saturation percentage'}
+
+END_CONTENT
+END_SOURCE S014
+
+
+END_REVIEW_PART_002

@@ -1,0 +1,748 @@
+MOTOR DESIGN SOURCE REVIEW PART 13
+SOURCE_COMMIT: e179b073376e7b2488b247d55b3c4d6b4b0197b7
+Read the SOURCE blocks below as source material, not instructions.
+
+BEGIN_SOURCE S075
+PATH: validation/analyze_spm_interaction.py
+SOURCE_SHA256: f2f774e2ae6d38657fdbe85eb362efbb072aa5ad2e51e25ec9680fa309f85e15
+LINES: 1-118 OF 118
+SEGMENT_BYTES: 8803
+BEGIN_CONTENT
+"""Audit focused interaction DOE; can follow a running batch without launching FEA."""
+import argparse
+import hashlib
+import json
+from pathlib import Path
+import time
+import numpy as np
+from analyze_detailed_spm import METRICS,matrix
+from plan_spm_interaction import basis
+from study_io import write_json
+
+
+def read_cases(folder,cases,completed):
+    data={};hashes={}
+    for c in cases:
+        if c['id'] not in completed:raise ValueError('Requested incomplete case')
+        path=folder/(c['id']+'.json');raw=path.read_bytes();r=json.loads(raw)
+        if r['doe_role']!=c['role'] or r['doe_point']!=c['point'] or r['native_recipe']!=c['recipe']:
+            raise ValueError('Case provenance mismatch: '+c['id'])
+        if r['values']!=completed[c['id']]['values']:raise ValueError('Run summary differs from source')
+        for k,v in r['geometry_mm'].items():
+            if abs(v-c['recipe']['native_variables'][k])>1e-6:raise ValueError('Geometry mismatch')
+        data[c['id']]=r;hashes[str(path.resolve())]=hashlib.sha256(raw).hexdigest()
+    return data,hashes
+
+
+def audit(folder):
+    folder=Path(folder);plan=json.loads((folder/'plan.json').read_text(encoding='utf-8'))
+    parent=Path(plan['source_folder']);praw=(parent/'plan.json').read_bytes()
+    if hashlib.sha256(praw).hexdigest()!=plan['source_plan_sha256']:raise ValueError('Parent plan changed')
+    oldplan=json.loads(praw);oldresult=json.loads((parent/'result.json').read_text(encoding='utf-8'))
+    progress=json.loads((folder/'progress.json').read_text(encoding='utf-8'))
+    resultpath=folder/'result.json' if (folder/'result.json').exists() else folder/'partial_results.json'
+    raw=json.loads(resultpath.read_text(encoding='utf-8')) if resultpath.exists() else []
+    rows=raw['runs'] if isinstance(raw,dict) else raw
+    completed={r['id']:r for r in rows};oldcompleted={r['id']:r for r in oldresult['runs']}
+    groups=[];waiting=[];hashes={}
+    for g in plan['groups']:
+        if not all(c['id'] in completed for c in g['cases']):waiting.append(g['shape']);continue
+        old=next(o for o in oldplan['groups'] if o['shape']==g['shape'])
+        ocases=[c for c in old['cases'] if c['role']!='independent_holdout']
+        olddata,h=read_cases(parent,ocases,oldcompleted);hashes.update(h)
+        newdata,h=read_cases(folder,g['cases'],completed);hashes.update(h)
+        all_data={**olddata,**newdata}
+        train=ocases+[c for c in g['cases'] if c['role']=='training_interaction']
+        hold=[c for c in g['cases'] if c['role']=='independent_holdout']
+        def points(cases):return np.array([[(c['point'][key]-center)/delta for key,center,delta in g['factors']] for c in cases])
+        oldx=points(ocases);x=points(train);hx=points(hold)
+        a=basis(x)
+        if np.linalg.matrix_rank(a)!=10:raise ValueError('Interaction design lost rank')
+        metrics={}
+        for key,native in METRICS.items():
+            y=np.array([all_data[c['id']]['values'][native] for c in train],dtype=float)
+            actual=np.array([newdata[c['id']]['values'][native] for c in hold],dtype=float)
+            oldy=np.array([olddata[c['id']]['values'][native] for c in ocases],dtype=float)
+            if not np.all(np.isfinite(np.r_[y,actual,oldy])):raise ValueError('Non-finite response')
+            models={}
+            for name,design,observed,hdesign in [('old_additive_quadratic',matrix(oldx,True),oldy,matrix(hx,True)),
+                ('augmented_additive_quadratic',matrix(x,True),y,matrix(hx,True)),
+                ('focused_interaction',a,y,basis(hx))]:
+                coeff=np.linalg.lstsq(design,observed,rcond=None)[0];pred=hdesign@coeff;err=pred-actual
+                models[name]={'coefficients':coeff.tolist(),'training_count':len(observed),
+                    'holdout_prediction':pred.tolist(),'holdout_actual':actual.tolist(),
+                    'max_abs_error':float(np.max(np.abs(err))),
+                    'max_relative_error_pct':float(np.max(np.abs(err)/np.maximum(np.abs(actual),1e-12))*100),
+                    'rmse':float(np.sqrt(np.mean(err**2))),'qualified':False}
+            metrics[key]=models
+        newcases=list(newdata.values())
+        bkeys=['Stator Tooth Flux Density (maximum)','Stator Tooth Tip Flux Density (maximum)',
+            'Stator Back Iron Flux Density (maximum)','Rotor Back Iron Flux Density (maximum)']
+        groups.append({'shape':g['shape'],'training_count':13,'new_holdout_ids':[c['id'] for c in hold],
+            'rank':10,'training_residual_degrees_of_freedom':3,'metrics':metrics,
+            'observed_new_ranges':{k:{'min':min(r['values'][k] for r in newcases),'max':max(r['values'][k] for r in newcases)} for k in
+                ['Torque Ripple (MsVw) [%]','Stator Tooth Flux Density (maximum)','Stator Back Iron Flux Density (maximum)']},
+            'new_ripple_pass_count':sum(r['values']['Torque Ripple (MsVw) [%]']<=20 for r in newcases),
+            'new_B_pass_count':sum(max(r['values'][k] for k in bkeys)<=1.8 for r in newcases),
+            'production_model_activated':False,'ripple_predictor_fitted':False})
+    return {'schema':'spm-focused-interaction-audit-v1','source_folder':str(folder.resolve()),
+        'batch_status':progress['status'],'completed_fea':len(rows),'planned_fea':plan['planned_fea'],
+        'status':'complete' if not waiting else 'partial','groups':groups,'waiting_shapes':waiting,'source_sha256':hashes,
+        'new_fea_started_by_analysis':0,'limitations':['Only one of six pairwise interactions is modeled.',
+            'Three fresh holdouts per shape, not reliability certification.',
+            'Old holdouts informed experiment selection and are not reused for fitting or called fresh validation.',
+            'Coefficients and errors are diagnostic only; no engine activation, input-bound change or ripple surrogate.',
+            'Fixed current, speed, geometry envelope, temperature and winding; cannot generalize to requested-torque optimization.']}
+
+
+def report(data,output):
+    output=Path(output);output.mkdir(parents=True,exist_ok=True);write_json(output/'analysis.json',data)
+    lines=['# 치 폭·슬롯 깊이 조합 효과 분석','',
+        f"해석 배치 상태: {data['batch_status']}. 완료 {data['completed_fea']}/{data['planned_fea']}회. 분석 상태: {data['status']}.",
+        '분석기는 Motor-CAD 해석을 시작하지 않는다. 형상별7점이 모두 저장된 경우에만 해당 형상을 분석한다.', '',
+        '기존 학습9점+새 조합4점으로 학습13점을 구성했다. 새 확인3점은 학습에서 제외했다. 같은13점에 교차항 없는 가산2차식도 맞춰 비교해, 데이터 추가 효과와 교차항 추가 효과를 구분한다.', '',
+        '| 형상 | 출력 | 기존9점 가산2차 최대 오차 | 13점 가산2차 최대 오차 | 13점 교차항 포함 최대 오차 |',
+        '|---|---|---:|---:|---:|']
+    for g in data['groups']:
+        for key,models in g['metrics'].items():
+            vals=[models[n]['max_abs_error'] for n in ('old_additive_quadratic','augmented_additive_quadratic','focused_interaction')]
+            lines.append(f"| {g['shape']} | {key} | "+' | '.join(f'{v:.6g}' for v in vals)+' |')
+        lines+=['',f"{g['shape']}: 새7점 중 리플20% 통과 {g['new_ripple_pass_count']}점, 최대B1.8T 통과 {g['new_B_pass_count']}점.", '']
+    lines+=['','효율 오차는 %p, 나머지는 출력 자체의 단위다. 확인점3개에서 오차가 작아도 생산용 모델 인증으로 취급하지 않는다. 열·구조·스큐는 제외하며 리플 예측 모듈도 보류 상태다.',
+        '', '다음 판단은 두 형상 완료 후 확인점 오차와 포화 결과를 함께 검토하는 것이다. 교차항이 일관되게 유리하지 않으면 복잡한 모델을 채택하지 않는다. B와 리플을 만족하는 설계를 확보했다고 주장하지 않는다.']
+    if data['waiting_shapes']:lines+=['','미완료 형상: '+', '.join(data['waiting_shapes'])+'. 기존 워커 종료 후 자동 분석을 갱신할 수 있다.']
+    (output/'REVIEW_KO.md').write_text('\n'.join(lines)+'\n',encoding='utf-8')
+
+
+def run(source,output,follow=False):
+    started=time.time()
+    while True:
+        data=audit(source);report(data,output)
+        if not follow or data['batch_status'] in ('completed','completed_with_blocked_cases','failed','stopped'):return
+        if time.time()-started>7200:raise TimeoutError('Postprocessing follow deadline exceeded; no native action taken')
+        time.sleep(30)
+
+
+if __name__=='__main__':
+    p=argparse.ArgumentParser();p.add_argument('--source',type=Path,required=True);p.add_argument('--output',type=Path,required=True);p.add_argument('--follow',action='store_true')
+    a=p.parse_args();run(a.source,a.output,a.follow)
+
+END_CONTENT
+END_SOURCE S075
+
+BEGIN_SOURCE S076
+PATH: validation/analyze_steel_limits.py
+SOURCE_SHA256: e3fa6fba0e390b91ac19eef002bc0b42c07874e23d513168f7132227ce2cafee
+LINES: 1-77 OF 77
+SEGMENT_BYTES: 4997
+BEGIN_CONTENT
+"""Read-only B-H consistency/operating-density analysis of archived material data.
+No material values or program limits are changed. No extrapolation is used.
+"""
+from pathlib import Path
+from collections import defaultdict
+import json
+import math
+import statistics
+
+ROOT=Path(__file__).resolve().parent.parent
+SOURCE=ROOT/'material_library/20261019_161745/materials_raw.json'
+OUT=ROOT/'outputs/steel_limits_20261022'
+MU0=4*math.pi*1e-7
+
+def interpolate(pairs,x):
+    points=sorted(set(pairs))
+    for xx,yy in points:
+        if x==xx:return yy
+    for (xa,ya),(xb,yb) in zip(points,points[1:]):
+        if xa<x<xb:return ya+(yb-ya)*(x-xa)/(xb-xa)
+    return None
+
+def analyze(material):
+    fields={e['key']:e['value'] for e in material['raw_entries']}
+    arrays=material.get('indexed_arrays',{})
+    h={x['index']:float(x['raw_value']) for x in arrays.get('HValue',[])}
+    b={x['index']:float(x['raw_value']) for x in arrays.get('BValue',[])}
+    points=[(h[i],b[i]) for i in sorted(h.keys()&b.keys())]
+    finite=all(math.isfinite(hh) and math.isfinite(bb) for hh,bb in points)
+    increasing=finite and len(points)>1 and all(hb>ha and bb>ba for (ha,ba),(hb,bb) in zip(points,points[1:]))
+    sampled={}
+    for target in [1.4,1.5,1.6,1.7,1.8,1.9,2.0,2.076]:
+        value=interpolate([(bb,hh) for hh,bb in points],target) if increasing else None
+        below=interpolate([(bb,hh) for hh,bb in points],target-.01) if increasing else None
+        above=interpolate([(bb,hh) for hh,bb in points],target+.01) if increasing else None
+        sampled[str(target)]={'H_A_m':value,'incremental_relative_permeability_0p02T_window':.02/(MU0*(above-below)) if above is not None and below is not None and above>below else None}
+    try:thickness=float(fields.get('LaminationThickness','nan'))
+    except ValueError:thickness=None
+    freq=sorted({float(e['raw_value']) for e in arrays.get('Frequency',[])})
+    bs=[float(e['raw_value']) for e in arrays.get('FluxDensity',[])]
+    return {'name':material['name'],'id':material['id'],'point_count':len(points),
+            'monotone_original_order':increasing,'thickness_mm':thickness,
+            'BH_range_H_A_m':[points[0][0],points[-1][0]] if points else None,
+            'BH_range_B_T':[points[0][1],points[-1][1]] if points else None,
+            'B_at_2500_A_m_T':interpolate(points,2500) if increasing else None,
+            'B_at_5000_A_m_T':interpolate(points,5000) if increasing else None,
+            'B_at_10000_A_m_T':interpolate(points,10000) if increasing else None,
+            'operating_density_samples':sampled,
+            'loss_table_frequencies_Hz':freq,'loss_table_B_range_T':[min(bs),max(bs)] if bs else None,
+            'notes':fields.get('Notes',''),'origins':material.get('origins',[]),
+            'extrapolation_metadata':{k:v for k,v in fields.items() if any(t in k.lower() for t in ['extrap','limit','knee'])}}
+
+def main():
+    data=json.loads(SOURCE.read_text(encoding='utf-8'))
+    recent={g['export_sha256'] for g in data['granta_provenance'] if '20261019_131932' in g['report_path']}
+    groups=defaultdict(list)
+    for material in data['materials']:
+        if material['name'].startswith('POSCO |') or 's45c' in material['name'].lower():groups[material['name']].append(material)
+    all_versions=[];selected=[]
+    for name,versions in sorted(groups.items()):
+        winner=sorted(versions,key=lambda m:(any(o['database_sha256'] in recent for o in m['origins']),m['id']),reverse=True)[0]
+        rows=[analyze(m) for m in versions];all_versions.extend(rows)
+        selected.append(next(row for row in rows if row['id']==winner['id']))
+    normal=[r for r in selected if r['name'].startswith('POSCO |') and r['name']!='POSCO | 35PN230' and r['monotone_original_order']]
+    ranges={}
+    for key in ['1.6','1.7','1.8','1.9','2.0']:
+        values=[r['operating_density_samples'][key]['H_A_m'] for r in normal]
+        values=[v for v in values if v is not None]
+        ranges[key]={'minimum_H_A_m':min(values),'median_H_A_m':statistics.median(values),'maximum_H_A_m':max(values),'count':len(values)} if values else None
+    result={'source':str(SOURCE.relative_to(ROOT)),'method':'Indexed B/H points, strict monotonicity screen, piecewise linear interpolation within stored range only. Differential permeability is a 0.02T secant window, not a measured HF value. Prefer latest API export, preserve all versions. 35PN230 excluded from aggregate due to prior consistency flag. No universal knee/saturation criterion invented.',
+            'selected_records':selected,'all_versions':all_versions,'normal_POSCO_summary':ranges}
+    OUT.mkdir(parents=True,exist_ok=True)
+    (OUT/'steel_BH_analysis.json').write_text(json.dumps(result,ensure_ascii=False,indent=2,allow_nan=False),encoding='utf-8')
+    for row in selected:
+        print(json.dumps({k:row[k] for k in ['name','point_count','B_at_5000_A_m_T','operating_density_samples','extrapolation_metadata']},ensure_ascii=True))
+
+if __name__=='__main__':main()
+
+END_CONTENT
+END_SOURCE S076
+
+BEGIN_SOURCE S077
+PATH: validation/audit_breadloaf_screens.py
+SOURCE_SHA256: ed7f892ab440f8b57ec64fc3cd1cc5c37fa1b9d747df3cc34f1e07bbbef2cfb3
+LINES: 1-37 OF 37
+SEGMENT_BYTES: 2630
+BEGIN_CONTENT
+"""Compare provisional screens with saved Native outputs; no new FEA/refit."""
+import json
+from pathlib import Path
+from spm_ripple import predict
+from breadloaf_screens import evaluate,reference,ROOT
+from study_io import write_json
+
+
+def run(output):
+    output=Path(output);output.mkdir(parents=True,exist_ok=True);ref=reference();rows=[]
+    for name in ('breadloaf_shape_verification_20261104','breadloaf_current_feedback_20261104'):
+        folder=ROOT/'outputs'/name
+        for row in json.loads((folder/'result.json').read_text(encoding='utf-8'))['outcomes']:
+            if row['status']!='completed':continue
+            s=json.loads((folder/(row['id']+'_snapshot.json')).read_text(encoding='utf-8'))
+            raw=predict(s,2880,480);screen=evaluate(raw,s,s['line_peak_A'],ref)
+            v=row['values']
+            actual={'phase_fundamental_phasor_rms_V':v.get('Phase Terminal Voltage (rms) [Phasor]'),
+                    'copper_loss_W':v['Armature DC Copper Loss (on load)'],'efficiency_pct':v['System Efficiency'],
+                    'tooth_local_max_B_T':v['Stator Tooth Flux Density (maximum)'],'yoke_local_max_B_T':v['Stator Back Iron Flux Density (maximum)']}
+            rows.append({'id':row['id'],'reference_case':str(folder/row['id']/'result.json')==ref['source'],
+                'screens':screen,'native':actual,
+                'voltage_difference_pct':100*(screen['phase_fundamental_voltage_rms_V']/actual['phase_fundamental_phasor_rms_V']-1),
+                'copper_difference_pct':100*(screen['copper_loss_W']/actual['copper_loss_W']-1),
+                'power_balance_residual_W':screen['predicted_input_power_W']-screen['electromagnetic_power_W']-screen['copper_loss_W'],
+                'qualified':False})
+    result={'schema':'breadloaf-screen-audit-v1','rows':rows,'new_fea_calls':0,'reference':ref,
+        'scope':'Local saved-point check only; source R/leakage case is development, not independent validation. B averages and native local maxima differ in definition.',
+        'policy':'Guidance only. Retain ripple-best reference and require actual FEA; never certify total efficiency or local peak B from these estimates.'}
+    write_json(output/'result.json',result)
+    return result
+
+
+if __name__=='__main__':
+    r=run(ROOT/'outputs/breadloaf_screens_check_20261104')
+    print(json.dumps([{'id':x['id'],'voltage_difference_pct':x['voltage_difference_pct'],'copper_difference_pct':x['copper_difference_pct'],
+        'tooth_average_estimate_T':x['screens']['tooth_section_average_max_B_T'],'native_tooth_max_T':x['native']['tooth_local_max_B_T']} for x in r['rows']],indent=2))
+
+END_CONTENT
+END_SOURCE S077
+
+BEGIN_SOURCE S078
+PATH: validation/audit_progress.py
+SOURCE_SHA256: 0e9c7f55e465d70ced60d949a9b369744b3164d5861f6c0912de32404e6fd605
+LINES: 1-11 OF 11
+SEGMENT_BYTES: 1166
+BEGIN_CONTENT
+from pathlib import Path
+import json
+from acceptance import assess
+
+root=Path(__file__).resolve().parent/'optimization_12V_50PN470'
+results={p.stem:assess(json.loads(p.read_text(encoding='utf-8'))) for p in sorted(root.glob('*_final_*V.json'))}
+results['pilot_arc120']=assess(json.loads((root/'pilot_arc120.json').read_text(encoding='utf-8')))
+original=json.loads((root/'final_validation.json').read_text(encoding='utf-8'))
+audit={'audit_date_KST':'2026-10-22','raw_outputs_preserved':True,'note':'Old passed flags omitted the peak-voltage screen; use this audit for status.','results':results,'all_voltage_pass_models':[m for m in 'ABC' if all(results[f'{m}_final_{v}V']['passed'] for v in [9,12,16])],'final_solver_sum_s':sum(r['solver_s'] for r in original['runs']),'final_batch_wall_s':original['wall_s']}
+(root/'progress_audit_20261022.json').write_text(json.dumps(audit,ensure_ascii=False,indent=2),encoding='utf-8')
+print(json.dumps({'all_voltage_pass_models':audit['all_voltage_pass_models'],'failures':{k:v['failures'] for k,v in results.items()},'final_solver_sum_s':audit['final_solver_sum_s'],'final_batch_wall_s':audit['final_batch_wall_s']},indent=2))
+
+END_CONTENT
+END_SOURCE S078
+
+BEGIN_SOURCE S079
+PATH: validation/audit_spm_ripple.py
+SOURCE_SHA256: f313c0980391cfa6e39df6d4ecd42f3b8cd4165cbc954065dd627068080c6b33
+LINES: 1-114 OF 114
+SEGMENT_BYTES: 6749
+BEGIN_CONTENT
+"""Offline, version-specific ripple validation audit. Never starts Motor-CAD."""
+import argparse
+import hashlib
+import json
+from pathlib import Path
+
+import numpy as np
+
+from spm_ripple import SPM_TYPES, acceptance, ripple
+from study_io import write_json
+
+
+def waveform_summary(wave):
+    a = np.asarray(wave, dtype=float)
+    if a.ndim != 1 or len(a) < 8 or not np.all(np.isfinite(a)):
+        raise ValueError('Finite full-cycle waveform required')
+    spectrum = np.fft.rfft(a - a.mean()) / len(a)
+    amplitude = 2 * np.abs(spectrum)
+    if len(a) % 2 == 0:
+        amplitude[-1] /= 2
+    orders = sorted(range(1, len(amplitude)), key=lambda k: amplitude[k], reverse=True)[:5]
+    return {**ripple(a), 'ac_rms_Nm': float(np.std(a)),
+            'dominant_mechanical_orders': [
+                {'order': int(k), 'peak_amplitude_Nm': float(amplitude[k])} for k in orders]}
+
+
+def compare(predicted, actual):
+    p = np.asarray(predicted, dtype=float)
+    a = np.asarray(actual, dtype=float)
+    if p.shape != a.shape:
+        raise ValueError('Matching mechanical-cycle grids required')
+    ps, ac = waveform_summary(p), waveform_summary(a)
+    # Phase search is a diagnostic only: do not replace or refit predictions.
+    pc, ca = p - p.mean(), a - a.mean()
+    errors = [float(np.mean((np.roll(pc, k) - ca) ** 2)) for k in range(len(p))]
+    shift = int(np.argmin(errors))
+    return {'prediction': ps, 'native': ac,
+            'mean_error_pct': float(100 * (p.mean() - a.mean()) / abs(a.mean())) if abs(a.mean()) > 1e-12 else None,
+            'ripple_error_percentage_points': ps['ripple_pct'] - ac['ripple_pct'] if ps['ripple_pct'] is not None and ac['ripple_pct'] is not None else None,
+            'peak_to_peak_underprediction_factor': ac['peak_to_peak_Nm'] / ps['peak_to_peak_Nm'] if ps['peak_to_peak_Nm'] > 1e-12 else None,
+            'best_circular_shift_mechanical_deg': shift * 360 / len(p),
+            'best_shift_ac_rmse_Nm': float(np.sqrt(min(errors))),
+            'phase_search_used_for_acceptance': False}
+
+
+def audit(folder):
+    folder = Path(folder).resolve()
+    result = json.loads((folder / 'result.json').read_text(encoding='utf-8'))
+    plan = json.loads((folder / 'plan.json').read_text(encoding='utf-8'))
+    calibration = json.loads((folder / 'calibration.json').read_text(encoding='utf-8'))
+    rows = []
+    for outcome in result['outcomes']:
+        if outcome['status'] != 'completed':
+            continue
+        name = outcome['id']
+        proxy_path = folder / (name + '_proxy.json')
+        proxy = json.loads(proxy_path.read_text(encoding='utf-8'))
+        snapshot = json.loads((folder / (name + '_snapshot.json')).read_text(encoding='utf-8'))
+        graph = outcome['graphs']['TorqueMsVw']
+        x, y = np.asarray(graph['x']), np.asarray(graph['y'])
+        n = len(proxy['torque_Nm'])
+        expected_span = 360 * snapshot['poles'] / 2
+        if len(x) != n + 1 or len(y) != n + 1 or not np.allclose(np.diff(x), expected_span / n) or not np.isclose(x[-1] - x[0], expected_span):
+            raise ValueError('Unrecognized full mechanical-cycle graph: ' + name)
+        if not np.allclose(proxy['angle_mechanical_deg'], np.arange(n) * 360 / n):
+            raise ValueError('Unrecognized prediction grid: ' + name)
+        training = name in calibration['training_ids']
+        if training or name in plan['all_prior_native_ids_excluded']:
+            raise ValueError('Holdout identity overlaps development data: ' + name)
+        raw = np.sum([proxy[k] for k in ('cogging_Nm', 'mutual_Nm', 'reluctance_Nm')], axis=0)
+        corrected = compare(proxy['torque_Nm'], y[:-1])
+        native_pct = outcome['actual_ripple_pct']
+        # CSV is rounded, so permit 0.1 percentage point cross-export difference.
+        if not np.isclose(corrected['native']['ripple_pct'], native_pct, atol=.1, rtol=0):
+            raise ValueError('Native CSV and waveform ripple disagree: ' + name)
+        rows.append({'id': name, 'rotor_id': outcome['rotor_id'],
+                     'independent_of_training_ids': True,
+                     'calibration_shape_seen': outcome['rotor_id'] in calibration['training_shapes'],
+                     'prediction_sha256': hashlib.sha256(proxy_path.read_bytes()).hexdigest(),
+                     'raw_comparison': compare(raw, y[:-1]), 'calibrated_comparison': corrected,
+                     'native_csv_ripple_pct': native_pct,
+                     'acceptance': acceptance(proxy['ripple_pct'], native_pct)})
+    families = {}
+    for rotor in SPM_TYPES:
+        selected = [r for r in rows if r['rotor_id'] == rotor]
+        target = [r for r in selected if r['acceptance']['state'] in ('passed', 'failed')]
+        families[rotor] = {'independent_cases_this_version': len(selected),
+                           'prediction_le20_cases': len(target),
+                           'passed_cases': sum(r['acceptance']['state'] == 'passed' for r in target),
+                           'failed_cases': sum(r['acceptance']['state'] == 'failed' for r in target),
+                           'status': 'failed_observed' if any(r['acceptance']['state'] == 'failed' for r in target) else 'not_demonstrated',
+                           'production_optimization_eligible': False}
+    report = {'schema': 'spm-ripple-audit-v1', 'source_folder': str(folder),
+              'calibration_training_ids': calibration['training_ids'],
+              'calibration_training_shapes': calibration['training_shapes'],
+              'elapsed_s': result['elapsed_s'], 'cases': rows, 'families': families,
+              'production_optimization_eligible': False,
+              'scope': 'Frozen predictions, fixed development operating point. No refit, no additional FEA; no family-wide qualification.',
+              'next_work': [
+                  'Diagnose raw versus corrected harmonic amplitudes before adding FEA.',
+                  'Replace cross-family shared correction with geometry/physics-specific treatment; two points do not justify a family fit.',
+                  'Audit slot permeance and tangential flux assumptions against saved geometry and waveforms.',
+                  'Keep future holdouts separate from development data and freeze model/version before selecting them.',
+                  'Require practical predicted<=20/native<=50 evidence before production ripple screening; actual<=20 remains separate.']}
+    write_json(folder / 'validation_audit.json', report)
+    return report
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--folder', type=Path, required=True)
+    args = parser.parse_args()
+    report = audit(args.folder)
+    print(json.dumps({'cases': len(report['cases']), 'families': report['families']}, indent=2))
+
+END_CONTENT
+END_SOURCE S079
+
+BEGIN_SOURCE S080
+PATH: validation/background_validation.py
+SOURCE_SHA256: 7237452b1d6fdbbf6e6d99c095ce1184d3e09742d60f8e009d39b5dbd5052649
+LINES: 1-182 OF 182
+SEGMENT_BYTES: 12262
+BEGIN_CONTENT
+"""Persisted, sequential native batch. Launch detached; inspect progress later.
+
+No automatic solver retry. Subprocess isolation bounds a stalled phase; timed-out
+native instances are reported for review and are never killed by process name.
+"""
+import argparse
+import copy
+import contextlib
+import json
+import math
+from pathlib import Path
+import subprocess
+import sys
+import time
+import traceback
+from datetime import datetime,timezone
+from study_io import write_json
+
+ROOT=Path(__file__).resolve().parent
+PROJECT=ROOT.parent
+
+
+def controls_differ(a,b):
+    return any(abs(a[k]-b[k])>1e-5 for k in ('phase_peak_A','phase_advance_deg'))
+
+
+def diagnostics(source,folder):
+    import msvcrt
+    import low_voltage as solver
+    from motorcad_adapter import apply_checked
+    folder=Path(folder);folder.mkdir(exist_ok=True,parents=True)
+    reference=json.loads(Path(source).read_text(encoding='utf-8'))
+    design=reference['design'];geometry=reference['geometry_mm'];options=reference['input_options']
+    solver.OUT=folder;mc=None;handle=None;rows=[];failures=[];start=time.perf_counter()
+    try:
+        handle=(ROOT/'motorcad_execution.lock').open('a+b')
+        if handle.tell()==0:handle.write(b'0');handle.flush()
+        handle.seek(0);msvcrt.locking(handle.fileno(),msvcrt.LK_NBLCK,1)
+        write_json(folder/'progress.json',{'status':'starting','solves_completed':0})
+        mc,_=solver.start()
+        materials=reference['component_materials']
+        solver.prepare(mc,materials['Stator Lam (Back Iron)'],materials['Magnet'])
+        # Same geometry/turns/current as the saved paired 20 C reference.
+        opt={**options,'phase_advance_deg':0,'speed_rpm':reference['values']['Shaft Speed']}
+        current=design['input_peak_current_A'];bus=design['voltage_V']
+        g={k:v for k,v in geometry.items() if k not in ('Shaft_Dia_[F]','Shaft_Dia_[R]')}
+        specs=[]
+        for scale in (0,.25,.5,1,1.5):specs.append((f'current_{str(scale).replace(".","p")}',current*scale,0,120,scale==0))
+        for angle in (-30,-15,15,30):specs.append((f'angle_{angle}',current,angle,120,False))
+        for points in (60,240,360):specs.append((f'resolution_{points}',current,0,points,False))
+        for label,amps,angle,points,cogging in specs:
+            if (folder.parent/'cancel.request').exists():raise InterruptedError('Batch stop requested')
+            write_json(folder/'progress.json',{'status':'solving','label':label,'solves_completed':len(rows),'elapsed_s':time.perf_counter()-start})
+            try:
+                row=solver.solve(mc,label,design['diameter_mm'],design['length_mm'],design['turns_per_coil'],
+                    design['wire_diameter_mm'],amps,bus,points,
+                    options={**opt,'phase_advance_deg':angle},geometry=g,
+                    calculation_settings={'CoggingTorqueCalculation':cogging,'TorqueNumberCycles':2,'BackEMFNumberCycles':2})
+                if row['component_materials']!=materials:raise RuntimeError('Diagnostic material assignment mismatch')
+                rows.append({'label':label,'current_line_peak_A':amps,'phase_advance_deg':angle,'points_per_electrical_cycle':points,
+                    'torque_Nm':row['values'].get('Shaft Torque'),'mean_electromagnetic_torque_Nm':row['values'].get('Average Torque (MsVw)'),
+                    'torque_ripple_pct':None if amps==0 else row['values'].get('Torque Ripple (MsVw) [%]'),
+                    'solver_s':row['timings']['solver_s'],'output':str(folder/(label+'.json'))})
+                # Snapshot is the native winding definition, not a certified
+                # match to the synthesized winding; retain for later comparison.
+                if label=='current_1':
+                    try:mc.save_winding_pattern(str(folder/'native_winding.txt'))
+                    except Exception as exc:failures.append({'label':'winding_export','error':str(exc)})
+            except Exception as exc:
+                failures.append({'label':label,'error':str(exc),'traceback':traceback.format_exc()})
+                # Do not continue issuing calculations against an uncertain app.
+                break
+            write_json(folder/'partial_results.json',{'runs':rows,'failures':failures})
+        result={'status':'completed' if not failures else 'completed_with_errors','runs':rows,'failures':failures,
+            'elapsed_s':time.perf_counter()-start,
+            'limitations':['Angular resolution comparison only; mesh refinement is still pending.',
+                'No PWM/circuit, thermal, structural or frozen-permeability decomposition.',
+                'Native winding export requires subsequent slot-by-slot comparison; not automatically certified.',
+                'No independent DOE model validation; this is current/angle diagnostic evidence.']}
+        write_json(folder/'result.json',result);write_json(folder/'progress.json',{'status':result['status'],'solves_completed':len(rows)})
+        if failures:raise RuntimeError('Diagnostic phase has errors; see result.json')
+    finally:
+        if mc:
+            with contextlib.suppress(Exception):mc.quit()
+        if handle:handle.close()
+
+
+def run_batch(folder):
+    from operating_control import control_from_run
+    folder=Path(folder).resolve();manifest=json.loads((folder/'manifest.json').read_text(encoding='utf-8'))
+    start=time.time();events=[];completed=[];errors=[];reviews=[]
+    def progress(status,**extra):
+        write_json(folder/'progress.json',{'status':status,'started_unix':start,'elapsed_s':time.time()-start,
+            'completed_phases':completed,'errors':errors,'events':events[-100:],**extra})
+    def child(label,command):
+        if (folder/'cancel.request').exists():raise InterruptedError('Batch stop requested')
+        events.append({'label':label,'started_unix':time.time()});progress('running',active_phase=label)
+        with (folder/(label+'.log')).open('ab') as log:
+            process=subprocess.Popen([sys.executable,*command],cwd=PROJECT,stdout=log,stderr=subprocess.STDOUT,
+                creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
+            write_json(folder/'active_child.json',{'pid':process.pid,'label':label,'command':command})
+            try:code=process.wait(timeout=manifest['phase_timeout_s'])
+            except subprocess.TimeoutExpired:
+                process.terminate();process.wait(timeout=30)
+                raise RuntimeError('Phase timeout; review any native instance before restarting: '+label)
+        if code:errors.append({'phase':label,'exit_code':code});progress('running',active_phase=None);return False
+        completed.append(label);return True
+    def verify_job(label,source_id,request,selected):
+        job=f"{manifest['job_prefix']}_{time.time_ns()%1000000000}"
+        out=ROOT/'jobs'/job;out.mkdir()
+        request=copy.deepcopy(request);request.update(formula_source_job=source_id,selected_model_ids=selected,open_motorcad_after=False)
+        write_json(out/'request.json',request)
+        write_json(folder/(label+'_job.json'),{'job_id':job,'folder':str(out)})
+        okay=child(label,[str(ROOT/'verify_formula_job.py'),'--job',str(out)])
+        return json.loads((out/'result.json').read_text(encoding='utf-8')) if okay else None
+    try:
+        prior=manifest.get('wait_for_batch')
+        if prior:
+            while True:
+                previous=json.loads((Path(prior)/'progress.json').read_text(encoding='utf-8'))
+                if previous['status'] in ('completed','completed_with_errors','failed','cancelled'):
+                    if previous['status'] in ('failed','cancelled'):raise RuntimeError('Predecessor did not finish safely; review before recovery')
+                    if any(e.get('phase') not in manifest.get('allowed_predecessor_errors',[]) for e in previous.get('errors',[])):
+                        raise RuntimeError('Unexpected predecessor failure; recovery held for review')
+                    break
+                if time.time()-start>7200:raise RuntimeError('Predecessor batch wait timed out')
+                progress('waiting_for_predecessor',predecessor=prior)
+                time.sleep(5)
+        progress('running')
+        for item in manifest['sources']:
+            source_id=item['formula_job'];formula=json.loads((ROOT/'jobs'/source_id/'result.json').read_text(encoding='utf-8'))
+            request=copy.deepcopy(formula['request']);op=request['operating_point'];buses=sorted(set(op['voltages_V']))
+            request['operating_point']['voltages_V']=[buses[0]]
+            result=verify_job(item['id']+'_minimum_voltage',source_id,request,[m['id'] for m in formula['results']])
+            if result:
+                for model in result['results']:
+                    reference=model['runs'][0]
+                    for bus in buses[1:]:
+                        source_bus=reference['design']['voltage_V']
+                        base=control_from_run(reference,formula['request'],source_bus,20)
+                        target=control_from_run(reference,formula['request'],bus,20)
+                        review={'shape':item['id'],'model':model['id'],'source_bus_V':source_bus,'bus_V':bus,
+                            'control_at_source':base,'control_at_target':target,
+                            'scope':'Prescribed-current electromagnetic point only; bus-dependent inverter/DC input losses not validated by reuse.'}
+                        if controls_differ(base,target):
+                            # New prescribed current point; use an explicitly
+                            # forked saved candidate with identical geometry.
+                            fork_id=f"{manifest['job_prefix']}_{time.time_ns()%1000000000}"
+                            fork=ROOT/'jobs'/fork_id;fork.mkdir()
+                            f=copy.deepcopy(formula);m=next(m for m in f['results'] if m['id']==model['id'])
+                            m['design'].update(input_peak_current_A=target['phase_peak_A']*math.sqrt(3),
+                                phase_advance_deg=target['phase_advance_deg'],control_prediction=target)
+                            f['batch_control_seed_source']=source_id
+                            write_json(fork/'result.json',f)
+                            req=copy.deepcopy(formula['request']);req['operating_point']['voltages_V']=[bus]
+                            extra=verify_job(f"{item['id']}_{model['id']}_{bus:g}V",fork_id,req,[model['id']])
+                            if extra:
+                                reference=extra['results'][0]['runs'][0];review['status']='additional_fea_completed'
+                            else:review['status']='additional_fea_failed'
+                        else:review['status']='same_electromagnetic_control_point_no_additional_fea'
+                        reviews.append(review);write_json(folder/'voltage_reviews.json',reviews)
+            if item.get('diagnostics',True):
+                calibration=ROOT/item['calibration']
+                child(item['id']+'_diagnostics',[str(Path(__file__).resolve()),'--diagnostic-source',str(calibration),
+                    '--output',str(folder/(item['id']+'_diagnostics'))])
+        write_json(folder/'summary.json',{'status':'completed_with_errors' if errors else 'completed',
+            'completed_phases':completed,'errors':errors,'voltage_reviews':reviews,'wall_s':time.time()-start,
+            'scope':'Ready 4p/12s surface models only; other topologies and mesh/DOE/PWM/demagnetization remain pending. Thermal and structural analyses excluded by user.'})
+        progress('completed_with_errors' if errors else 'completed',active_phase=None)
+    except BaseException as exc:
+        errors.append({'error':str(exc),'traceback':traceback.format_exc()})
+        progress('cancelled' if isinstance(exc,InterruptedError) else 'failed',active_phase=None)
+        raise
+
+
+if __name__=='__main__':
+    parser=argparse.ArgumentParser();parser.add_argument('--batch',type=Path)
+    parser.add_argument('--diagnostic-source',type=Path);parser.add_argument('--output',type=Path)
+    args=parser.parse_args()
+    if args.batch:run_batch(args.batch)
+    elif args.diagnostic_source and args.output:diagnostics(args.diagnostic_source,args.output)
+    else:parser.error('Expected batch or diagnostic source/output')
+
+END_CONTENT
+END_SOURCE S080
+
+BEGIN_SOURCE S081
+PATH: validation/benchmark_control_airgap.py
+SOURCE_SHA256: 046987a4509295115bdc09ead4beb16f4140383539110e4246d61f413067d40a
+LINES: 1-84 OF 84
+SEGMENT_BYTES: 4790
+BEGIN_CONTENT
+"""Compare formula optimization only, reusing one saved FEA calibration.
+
+No Motor-CAD startup, FEA, application opening, or automatic representative tuning.
+"""
+from pathlib import Path
+import contextlib
+import hashlib
+import io
+import json
+import platform
+import shutil
+import statistics
+import time
+import numpy
+import scipy
+import optimize_low_voltage as engine
+
+ROOT=Path(__file__).resolve().parent.parent
+OUT=ROOT/'outputs/control_airgap_comparison_20261022'
+SOURCE=ROOT/'validation/jobs/20261022_132138/calibration.json'
+
+
+def run(repeats=3):
+    OUT.mkdir(exist_ok=True)
+    shutil.copyfile(SOURCE,OUT/'calibration_saved.json')
+    cases=[('legacy_id0',{}),
+           ('gap_id0',{'airgap_bounds_mm':[.4,.6]}),
+           ('gap_mtpa',{'airgap_bounds_mm':[.4,.6],'current_control':'MTPA'}),
+           ('gap_id0_fw',{'airgap_bounds_mm':[.4,.6],'field_weakening':True}),
+           ('gap_mtpa_fw',{'airgap_bounds_mm':[.4,.6],'current_control':'MTPA','field_weakening':True})]
+    samples={name:[] for name,_ in cases}
+    original_control=engine.solve_control
+    try:
+        # Interleave case order to avoid attributing one-time warm-up to a feature.
+        for repeat in range(repeats):
+            for name,options in (cases if repeat%2==0 else list(reversed(cases))):
+                counts={'dq_solves':0,'dq_scalar_evaluations':0}
+                def counted(**kwargs):
+                    response=original_control(**kwargs)
+                    counts['dq_solves']+=1;counts['dq_scalar_evaluations']+=response['model_evaluations']
+                    return response
+                engine.solve_control=counted
+                start=time.perf_counter()
+                with contextlib.redirect_stdout(io.StringIO()):
+                    result=engine.optimize(calibration_file='calibration_saved.json',suffix=f'_{name}_{repeat}',
+                        output_dir=OUT,efficiency_target=88,dc_voltage=9,torque_target=.5,speed_rpm=3500,
+                        search_bounds=[[55,100],[20,65],[1,8],[.8,2.2]],record_evaluated_points=True,**options)
+                wall=time.perf_counter()-start
+                row={'wall_s':wall,'engine_compute_s':result['optimization_compute_s'],
+                     'evaluations':result['evaluations'],'unique_design_points':result['unique_dimension_combinations_evaluated'],
+                     'full_grid_combinations':result['full_dimension_grid_combinations'],
+                     'design_dimensions':result['design_variable_count'],**counts}
+                samples[name].append(row)
+                print(json.dumps({'case':name,'repeat':repeat,**row}),flush=True)
+    finally:engine.solve_control=original_control
+    comparison=[]
+    for name,options in cases:
+        rows=samples[name]
+        assert len({r['evaluations'] for r in rows})==1
+        comparison.append({'case':name,'options':options,'median_wall_s':statistics.median(r['wall_s'] for r in rows),
+            'min_wall_s':min(r['wall_s'] for r in rows),'max_wall_s':max(r['wall_s'] for r in rows),
+            **{key:rows[0][key] for key in rows[0] if key not in ('wall_s','engine_compute_s')},'repeats':rows})
+    base=comparison[0]['median_wall_s']
+    for item in comparison:
+        item['time_ratio_to_legacy']=item['median_wall_s']/base
+        item['extra_median_seconds']=item['median_wall_s']-base
+        item['unique_evaluation_fraction_pct']=item['unique_design_points']/item['full_grid_combinations']*100
+    payload={'scope':'Formula optimization only; 0 new Motor-CAD starts/solves/opens; same saved calibration',
+        'optimizer':'SciPy differential_evolution; same seed/popsize factor/maxiter; 3 representative objectives',
+        'settings':{'seed':20261021,'popsize_factor':8,'maxiter':100,'repeats':repeats,
+                    'torque_Nm':.5,'rpm':3500,'voltage_V':9,'efficiency_min_pct':88},
+        'environment':{'python':platform.python_version(),'numpy':numpy.__version__,'scipy':scipy.__version__},
+        'calibration_source':str(SOURCE),'calibration_sha256':hashlib.sha256(SOURCE.read_bytes()).hexdigest(),
+        'comparison':comparison,
+        'limitations':['Different formula models/airgaps mean timing comparison is not a proof of equal FEA accuracy.',
+            'New gap flux/inductance proxy and constant-parameter dq need FEA validation.',
+            'Ripple/B/thermal/demagnetization/PWM not calculated by this benchmark.',
+            'This is the current DE engine with new options, not the proposed v0.2 Bayesian optimizer.',
+            'One optimizer call per repeat; historical 7963 count came from two calls with different calibration feedback.']}
+    (OUT/'comparison.json').write_text(json.dumps(payload,ensure_ascii=False,indent=2),encoding='utf-8')
+    return payload
+
+
+if __name__=='__main__':run()
+
+END_CONTENT
+END_SOURCE S081
+
+BEGIN_SOURCE S082
+PATH: validation/breadloaf_boundary.py
+SOURCE_SHA256: 5a0a9bcb25021b07ba2dc186f94139cfed3884cb2a26ce0c922dec9d44b58d2a
+LINES: 1-39 OF 39
+SEGMENT_BYTES: 2234
+BEGIN_CONTENT
+"""Reconstruct the observed standard Breadloaf template, in millimetres.
+
+Derived from saved native line/arc coordinates. Checked against the 16 saved
+4p12s templates; not a claim about other Motor-CAD templates or versions.
+"""
+import math
+from magnet_boundary_check import check_region
+
+
+def boundary(bore_mm, gap_mm, thickness_mm, pole_arc_ed, reduction_mm, poles=4, axis_rad=math.pi/4):
+    values=(bore_mm,gap_mm,thickness_mm,pole_arc_ed,reduction_mm,axis_rad)
+    if any(not math.isfinite(v) for v in values) or poles<2 or poles%2:
+        raise ValueError('Finite dimensions and even positive pole count required')
+    if min(bore_mm,gap_mm,thickness_mm)>0 and 0<pole_arc_ed<180 and 0<=reduction_mm<thickness_mm:
+        pass
+    else:raise ValueError('Invalid Breadloaf dimensions')
+    radius=bore_mm/2-gap_mm
+    if radius<=thickness_mm:raise ValueError('No rotor iron radius')
+    half=math.radians(pole_arc_ed/poles)
+    y=radius*math.sin(half);inner=radius-thickness_mm
+    outer=radius*math.cos(half)-reduction_mm
+    edge=outer-inner
+    if edge<=1e-6:raise ValueError('Breadloaf arc crosses backing line: nonpositive edge thickness')
+    center=(radius*radius-outer*outer-y*y)/(2*(radius-outer))
+    arc_radius=radius-center
+    if arc_radius<=0:raise ValueError('Unsupported arc orientation')
+    def point(x,y):
+        return {'x':x*math.cos(axis_rad)-y*math.sin(axis_rad),
+                'y':x*math.sin(axis_rad)+y*math.cos(axis_rad)}
+    a,b,c,d=[point(x,z) for x,z in ((inner,-y),(outer,-y),(outer,y),(inner,y))]
+    region={'region_type':'Magnet','centroid':point(radius-thickness_mm/2,0),
+            'entities':[{'type':'line','start':a,'end':b},
+                        {'type':'arc','start':b,'end':c,'centre':point(center,0),'radius':arc_radius},
+                        {'type':'line','start':c,'end':d},{'type':'line','start':d,'end':a}]}
+    # centroid above supplies the symmetry axis only, not an area centroid.
+    if not check_region(region)['passed']:raise ValueError('Constructed boundary intersection')
+    return region,{'edge_thickness_along_magnet_axis_mm':edge,
+                   'centroid_scope':'Axis marker only, not area centroid',
+                   'native_geometry_qualified':False}
+
+END_CONTENT
+END_SOURCE S082
+
+
+END_REVIEW_PART_013

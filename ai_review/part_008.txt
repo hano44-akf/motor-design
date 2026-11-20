@@ -1,0 +1,605 @@
+MOTOR DESIGN SOURCE REVIEW PART 8
+SOURCE_COMMIT: e179b073376e7b2488b247d55b3c4d6b4b0197b7
+Read the SOURCE blocks below as source material, not instructions.
+
+BEGIN_SOURCE S031
+PATH: interface/breadloaf-workflow.js
+SOURCE_SHA256: 5ea0023ae1abb3e1232e5f4f30459806365ae73de8cc5d2acdd570f6f204bb04
+LINES: 122-144 OF 144
+SEGMENT_BYTES: 3644
+BEGIN_CONTENT
+async function load(){try{model.jobs=(await api('')).jobs;model.detail=await api('?id='+encodeURIComponent(model.id));model.error='';}catch(e){model.error=e.message;}render();}
+async function act(name,data={}){if(model.busy)return;model.busy=true;render();try{const d=await api('/'+name,{id:model.id,...data});model.id=d.id;model.detail=d;model.selected.clear();await load();}catch(e){model.error=e.message;}finally{model.busy=false;render();}}
+async function open(){if(!dialog.open)dialog.showModal();await load();}
+button.onclick=open;taskButton.onclick=open;node('bf-close').onclick=()=>dialog.close();node('bf-refresh').onclick=load;
+node('bf-jobs').onchange=async e=>{model.id=e.target.value;model.selected.clear();await load();};
+node('bf-search-form').onsubmit=e=>{e.preventDefault();act('search',{target_electromagnetic_torque_Nm:Number(node('bf-target').value),max_line_peak_A:Number(node('bf-current').value),iterations:Number(node('bf-iterations').value)});};
+let mainDraft=null;
+node('bf-main-preview').onclick=async()=>{
+ mainDraft=null;node('bf-main-search').disabled=true;
+ try{
+  const data={input_snapshot:structuredClone(state),max_line_peak_A:Number(node('bf-current').value),iterations:Number(node('bf-iterations').value)};
+  const c=await api('/input-preview',data);
+  node('bf-main-preview-result').innerHTML=`<p>${c.can_search?'입력 연결 가능 · 예비 탐색 범위':'실행 차단 · 입력 확인 필요'}</p><ul>${[...c.errors,...c.applied,...c.deferred].map(x=>`<li>${esc(x)}</li>`).join('')}</ul><p>요구 축토크 ${num(c.requested_shaft_torque_Nm)} N·m · 선전류 첨두 한도 ${num(c.max_line_peak_A)} A</p>${c.search_space?`<p>자유 변수 ${c.search_space.free_variable_count}개 · 전체 격자 조합 ${num(c.search_space.full_grid_combinations)}개</p>${spaceTable(c.search_space.variables)}`:''}`;
+  if(c.can_search){mainDraft=data;node('bf-main-search').disabled=false;}
+ }catch(e){node('bf-main-preview-result').textContent=e.message;}
+};
+node('bf-main-search').onclick=()=>{if(mainDraft)act('search',mainDraft);};
+dialog.addEventListener('change',e=>{if(e.target.dataset.bfId){e.target.checked?model.selected.add(e.target.dataset.bfId):model.selected.delete(e.target.dataset.bfId);render();}});
+dialog.addEventListener('click',e=>{const id=e.target.closest('button')?.id;if(id==='bf-prepare')act('prepare',{selected_ids:[...model.selected]});if(id==='bf-start')act('start');if(id==='bf-review')act('review');if(id==='bf-feedback')act('feedback');});
+setInterval(()=>{if(dialog.open&&!model.busy&&(['running','searching'].includes(model.detail?.state)||model.detail?.inductance_experiment?.state==='running'||model.detail?.flux_mapping_experiment?.state==='running'))load();},5000);
+let saved;
+async function mount(){if(typeof state==='undefined'||state.page!==4||document.querySelector('#breadloaf-results'))return;const section=document.createElement('section');section.id='breadloaf-results';section.className='panel';section.innerHTML='<h2>Breadloaf 리플 개발 결과</h2><p>불러오는 중…</p>';document.querySelector('#content').append(section);try{saved=await api('?id=pilot-feedback');section.innerHTML=`<h2>Breadloaf 리플 개발 결과</h2>${table(saved)}${summary(saved)}<button id="bf-results-open">탐색·검증 작업 열기</button><p>고정 개발 조건의 결과이며 현재 입력한 설계 사양의 최적화 결과가 아닙니다. Flat 리플은 보류 중입니다.</p>`;section.querySelector('button').onclick=open;}catch(e){section.textContent=e.message;}}
+new MutationObserver(mount).observe(document.querySelector('#content'),{childList:true});mount();
+
+END_CONTENT
+END_SOURCE S031
+
+BEGIN_SOURCE S032
+PATH: interface/check-backend.cjs
+SOURCE_SHA256: 90dc55d748601e4592d2de61add7a31e1c8ec9dc31e8e2405ea88b6f459fbe52
+LINES: 1-15 OF 15
+SEGMENT_BYTES: 1765
+BEGIN_CONTENT
+const {chromium}=require('C:/Users/jo061/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');
+const assert=require('node:assert/strict');
+(async()=>{const browser=await chromium.launch({channel:'msedge',headless:true});try{
+ const page=await browser.newPage({viewport:{width:1440,height:1000}});const errors=[];page.on('pageerror',e=>errors.push(e.message));
+ await page.goto('http://127.0.0.1:8765/?job=20261022_085158');await page.locator('#engine-open').click();
+ await page.locator('#engine-example').click();
+ let request=await page.evaluate(()=>toStudyRequest());assert.equal(request.operating_point.torque_Nm,.5);assert.deepEqual(request.operating_point.voltages_V,[9,12,16]);assert.equal(request.spm.magnetisation,'Radial');
+ await page.locator('#engine-close').click();await page.locator('[data-page="1"]').click();
+ await page.locator('[data-mode="od"]').selectOption('range');await page.locator('[data-geom="od"][data-bound="min"]').fill('70');await page.locator('[data-geom="od"][data-bound="max"]').fill('90');
+ await page.locator('[data-open-units]').first().click();await page.locator('[data-unit-option="length"]').selectOption('m');await page.locator('#apply-units').click();
+ request=await page.evaluate(()=>toStudyRequest());assert.deepEqual(request.bounds[0],[70,90]);
+ await page.locator('[data-mode="gap"]').selectOption('fixed');await page.locator('[data-geom="gap"][data-bound="fixed"]').fill('0.001');
+ assert.match(await page.evaluate(()=>{try{toStudyRequest();return '';}catch(e){return e.message;}}),/자동 비례/);
+ assert.deepEqual(errors,[]);console.log('PASS: local engine UI, request mapping, SI/display conversion, unsupported fixed geometry rejection');
+}finally{await browser.close();}})();
+
+END_CONTENT
+END_SOURCE S032
+
+BEGIN_SOURCE S033
+PATH: interface/check-breadloaf-comparison.cjs
+SOURCE_SHA256: 02d4b88d23e67a1c47ae8908aeeafe9f91f5d1bf82d49c48ea66c01311e6b4da
+LINES: 1-199 OF 199
+SEGMENT_BYTES: 14397
+BEGIN_CONTENT
+const {chromium}=require('C:/Users/jo061/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');
+const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
+(async()=>{
+ const out=path.resolve(__dirname,'../outputs/breadloaf_shaft_verification_20261105/ui-check');fs.mkdirSync(out,{recursive:true});
+ const browser=await chromium.launch({channel:'msedge',headless:true});
+ try{
+  const p=await browser.newPage({viewport:{width:1440,height:1000}}),errors=[],posts=[];
+  p.on('pageerror',e=>errors.push(e.message));p.on('request',r=>{if(r.method()==='POST')posts.push(r.url());});
+  await p.goto('http://127.0.0.1:8765/');await p.locator('#breadloaf-open').click();
+  await p.locator('#bf-jobs option[value="shaft-validation"]').waitFor({state:'attached'});
+  await p.locator('#bf-jobs').selectOption('shaft-validation');
+  await p.waitForFunction(()=>document.querySelector('#bf-detail').innerText.includes('30.538'));
+  const data=await(await p.request.get('http://127.0.0.1:8765/api/breadloaf?id=shaft-validation')).json();
+  assert.equal(data.state,'completed');assert.equal(data.progress.completed_fea,1);
+  assert.equal(data.summary.workflow.next_action,'revise_geometry_for_ripple');
+  assert.equal(data.operating_comparison.refit_performed,false);
+  assert.equal(await p.locator('#bf-feedback').count(),0);
+  assert.match(await p.locator('#bf-detail').innerText(),/0.49945/);
+  assert.match(await p.locator('#bf-detail').innerText(),/7.19207/);
+  await p.locator('#bf-detail h4').last().scrollIntoViewIfNeeded();
+  await p.screenshot({path:path.join(out,'comparison.png'),fullPage:true});
+  await p.setViewportSize({width:390,height:844});
+  assert.equal(await p.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
+  await p.locator('#bf-jobs').selectOption('fine-validation');
+  await p.waitForFunction(()=>document.querySelector('#bf-detail').innerText.includes('13.068'));
+  const fine=await(await p.request.get('http://127.0.0.1:8765/api/breadloaf?id=fine-validation')).json();
+  assert.equal(fine.fea_counts.required,1);assert.equal(fine.fea_counts.completed,1);
+  assert.equal(fine.fea_counts.unresolved_required,0);
+  assert.equal(fine.summary.workflow.next_action,'resolve_remaining_verification');
+  assert.equal(fine.summary.cases[0].current_feedback.status,'not_needed_target_met');
+  const remaining=fine.remaining_drive_review.cases[0];
+  assert.equal(remaining.remaining_validation_item_count,3);
+  assert.equal(remaining.pwm_reference.allowed_current_ripple_pp_A,2.4495);
+  assert.equal(remaining.pwm_reference.passed,null);
+  assert.equal(remaining.voltage_screen[1].native_at_this_bus,false);
+  assert.equal(fine.inductance_experiment.required,1);
+  assert.equal(fine.inductance_experiment.completed,1);
+  assert.equal(fine.inductance_experiment.available_graphs,12);
+  assert.equal(fine.inductance_experiment.pwm_ripple_certified,false);
+  assert.equal(fine.pwm_preview.unit_evidence.rpc_graph_unit,'H');
+  assert.equal(fine.pwm_preview.pwm_ripple_certified,false);
+  const pwm16=fine.pwm_preview.rows.find(r=>r.bus_V===16);
+  assert.equal(pwm16.preview_relation,'orientation_sensitive_limit');
+  assert.equal(pwm16.passed,null);
+  assert.equal(fine.pwm_numerical_review.source_matches,true);
+  assert.equal(fine.pwm_numerical_review.cases.length,6);
+  assert.equal(fine.pwm_numerical_review.physical_model_qualified,false);
+  assert.equal(fine.flux_mapping_experiment.required,6);
+  assert.equal(fine.flux_mapping_experiment.prior_diagnostic_fea,9);
+  assert.equal(fine.flux_mapping_experiment.pwm_ripple_certified,false);
+  assert.equal(fine.flux_mapping_experiment.completed,6);
+  assert.equal(fine.flux_mapping_experiment.data_validated_cases,6);
+  assert.equal(fine.flux_mapping_experiment.review.status,'central_jacobian_assembled');
+  assert.equal(fine.flux_mapping_experiment.review.response_rows_excitation_columns_explicit,true);
+  assert.equal(fine.flux_mapping_experiment.review.matrix_qualified,false);
+  assert.equal(fine.pwm_direct_preview.source_matches,true);
+  assert.equal(fine.pwm_direct_preview.matrix_orientation_resolved,true);
+  assert.equal(fine.pwm_direct_preview.unit_evidence.end_added_H,0);
+  assert.equal(fine.pwm_direct_preview.rows.length,3);
+  for(const row of fine.pwm_direct_preview.rows){
+   assert.equal(row.passed,null);assert.equal(row.actual_pwm_ripple_pp_A,null);
+   assert.equal(row.preview_relation,'estimated_below_limit');
+  }
+  assert.equal(fine.pwm_direct_numerical_review.source_matches,true);
+  assert.equal(fine.pwm_direct_numerical_review.cases.length,3);
+  assert.equal(fine.pwm_direct_numerical_review.physical_model_qualified,false);
+  assert.equal(fine.rows[0].pwm_advisory.available,true);
+  assert.equal(fine.rows[0].pwm_advisory.state,'estimated_below_limit');
+  assert.equal(fine.rows[0].pwm_advisory.used_for_guidance,false);
+  assert.equal(fine.rows[0].pwm_advisory.automatic_rejection,false);
+  assert.equal(fine.rows[0].pwm_advisory.passed,null);
+  const outside=await(await p.request.get('http://127.0.0.1:8765/api/breadloaf?id=shaft-validation')).json();
+  assert.equal(outside.rows[0].pwm_advisory.available,false);
+  assert.equal(outside.rows[0].pwm_advisory.state,'unverified');
+  assert.equal(fine.pwm_low_cost_comparison.source_matches,true);
+  assert.equal(fine.pwm_low_cost_comparison.rows.length,5);
+  assert.equal(fine.pwm_low_cost_comparison.family_extension_allowed,false);
+  assert.equal(fine.pwm_low_cost_comparison.new_native_fea,0);
+  await p.locator('#bf-inductance-comparison').waitFor();
+  assert.equal(fine.leakage_geometry_review.source_matches,true);
+  assert.equal(fine.leakage_geometry_review.rows.length,3);
+  assert.equal(fine.leakage_geometry_review.family_extension_allowed,false);
+  assert.equal(fine.leakage_geometry_review.new_native_fea,0);
+  assert.equal(fine.leakage_geometry_review.rows[1].native_comparison,null);
+  await p.locator('#bf-leakage-geometry').waitFor();
+  assert.equal(fine.detailed_slot_review.source_matches,true);
+  assert.equal(fine.detailed_slot_review.saved_geometry_holdouts.length,8);
+  assert.equal(fine.detailed_slot_review.layer_policy.physical_layer_mapping_confirmed,false);
+  assert.equal(fine.detailed_slot_review.family_extension_allowed,false);
+  assert.equal(fine.detailed_slot_review.new_native_fea,0);
+  await p.locator('#bf-detailed-slot').waitFor();
+  assert.equal(fine.conductor_coordinate_review.source_matches,true);
+  assert.equal(fine.conductor_coordinate_review.required_wires_per_slot,12);
+  assert.equal(fine.conductor_coordinate_review.saved_coordinates.boundary_compatible_raw_count,10);
+  assert.equal(fine.conductor_coordinate_review.saved_coordinates_match_required_count,false);
+  assert.equal(fine.conductor_coordinate_review.physical_layer_mapping_confirmed,false);
+  assert.equal(fine.conductor_coordinate_review.new_geometric_packing.failure_is_impossibility_proof,false);
+  assert.equal(fine.conductor_coordinate_review.new_native_fea,0);
+  await p.locator('#bf-conductor-audit').waitFor();
+  assert.equal(fine.continuous_packing_review.source_matches,true);
+  assert.equal(fine.continuous_packing_review.target_wires,12);
+  assert.equal(fine.continuous_packing_review.independent_native_boundary_check.geometrically_verified,true);
+  assert.equal(fine.continuous_packing_review.grid_0p1mm_check.geometrically_verified,false);
+  assert.equal(fine.continuous_packing_review.physical_layer_mapping_confirmed,false);
+  assert.equal(fine.continuous_packing_review.native_winding_updated,false);
+  assert.equal(fine.continuous_packing_review.new_native_fea,0);
+  await p.locator('#bf-continuous-packing').waitFor();
+  assert.equal(fine.whole_grid_packing_review.source_matches,true);
+  assert.equal(fine.whole_grid_packing_review.candidate_count,2527);
+  assert.equal(fine.whole_grid_packing_review.complete_supported_cavity_grid_enumerated,true);
+  assert.equal(fine.whole_grid_packing_review.continuous_impossibility_proof,false);
+  assert.equal(fine.whole_grid_packing_review.qualified,false);
+  assert.equal(fine.whole_grid_packing_review.new_native_fea,0);
+  await p.locator('#bf-whole-grid').waitFor();
+  assert.equal(fine.dimension_resolution_policy.design_length_step_mm,.1);
+  assert.equal(fine.dimension_resolution_policy.derived_coordinate_mode,'continuous');
+  assert.equal(fine.selected_continuous_packing.source_matches,true);
+  assert.equal(fine.selected_continuous_packing.geometric_check.geometrically_verified,true);
+  assert.equal(fine.selected_continuous_packing.coordinates_rounded,false);
+  assert.equal(fine.selected_continuous_packing.whole_grid_diagnostic_required,false);
+  assert.equal(fine.selected_continuous_packing.electrical_assignment_confirmed,false);
+  await p.locator('#bf-selected-packing').waitFor();
+  assert.equal(fine.coil_coordinate_proposal.source_matches,true);
+  assert.equal(fine.coil_coordinate_proposal.conductor_count,144);
+  assert.deepEqual(fine.coil_coordinate_proposal.phase_counts,[48,48,48]);
+  assert.equal(fine.coil_coordinate_proposal.logical_assignment_verified,true);
+  assert.equal(fine.coil_coordinate_proposal.physical_layer_mapping_confirmed,false);
+  assert.equal(fine.coil_coordinate_proposal.end_routing_verified,false);
+  assert.equal(fine.coil_coordinate_proposal.conductor_derived_end_area_mm2,null);
+  assert.equal(fine.coil_coordinate_proposal.new_native_fea,0);
+  await p.locator('#bf-coil-assignment').waitFor();
+  assert.equal(fine.end_routing_review.source_matches,true);
+  assert.equal(fine.end_routing_review.route_count,132);
+  assert.equal(fine.end_routing_review.model_status,'spacing_violations_in_proposal');
+  assert.ok(fine.end_routing_review.curve_clearance_check.confirmed_conflicts>0);
+  assert.equal(fine.end_routing_review.end_routing_verified,false);
+  assert.equal(fine.end_routing_review.used_for_optimization,false);
+  assert.equal(fine.end_routing_review.end_inductance_H,null);
+  assert.equal(fine.end_routing_review.new_native_fea,0);
+  await p.locator('#bf-end-routing').waitFor();
+  assert.equal(fine.route_adjustment_review.source_matches,true);
+  assert.equal(fine.route_adjustment_review.end_routing_verified,false);
+  assert.equal(fine.route_adjustment_review.new_native_fea,0);
+  assert.equal(fine.route_adjustment_review.optimizer.evaluations,520);
+  assert.equal(fine.route_adjustment_review.selected_check.confirmed_conflicts,504);
+  assert.equal(fine.route_adjustment_review.selected_check.unresolved_pairs,93);
+  await p.locator('#bf-route-adjustment').waitFor();
+  assert.equal(fine.route_conflict_review.source_matches,true);
+  assert.equal(fine.route_conflict_review.pair_count,597);
+  assert.equal(fine.route_conflict_review.by_relation.same_coil,212);
+  assert.equal(fine.route_conflict_review.by_relation.different_phase,385);
+  assert.equal(fine.route_conflict_review.fixed_endpoint_blocked_pairs,0);
+  assert.equal(fine.route_conflict_review.end_routing_verified,false);
+  assert.equal(fine.route_conflict_review.new_native_fea,0);
+  await p.locator('#bf-route-conflicts').waitFor();
+  assert.equal(fine.bundle_routing_review.source_matches,true);
+  assert.equal(fine.bundle_routing_review.trial_accepted,true);
+  assert.equal(fine.bundle_routing_review.optimizer.parameter_count,48);
+  assert.equal(fine.bundle_routing_review.trial_check.confirmed_conflicts,417);
+  assert.equal(fine.bundle_routing_review.trial_check.unresolved_pairs,108);
+  assert.equal(fine.bundle_routing_review.connection_and_exit_controls_preserved,true);
+  assert.equal(fine.bundle_routing_review.end_routing_verified,false);
+  assert.equal(fine.bundle_routing_review.new_native_fea,0);
+  await p.locator('#bf-bundle-routing').waitFor();
+  assert.equal(fine.transition_routing_review.source_matches,true);
+  assert.equal(fine.transition_routing_review.trial_accepted,false);
+  assert.equal(fine.transition_routing_review.trial_by_relation.same_coil.unresolved,58);
+  assert.equal(fine.transition_routing_review.selected_check.confirmed_conflicts,417);
+  assert.equal(fine.transition_routing_review.connection_and_exit_controls_preserved,true);
+  assert.equal(fine.transition_routing_review.new_native_fea,0);
+  assert.deepEqual(fine.transition_routing_review.routes,fine.bundle_routing_review.routes);
+  await p.locator('#bf-transition-routing').waitFor();
+  assert.equal(fine.clearance_refinement_review.source_matches,true);
+  assert.equal(fine.clearance_refinement_review.cases.baseline.confirmed_conflicts,424);
+  assert.equal(fine.clearance_refinement_review.cases.trial.confirmed_conflicts,410);
+  assert.equal(fine.clearance_refinement_review.cases.baseline.unresolved_pairs,0);
+  assert.equal(fine.clearance_refinement_review.cases.trial.unresolved_pairs,0);
+  assert.equal(fine.clearance_refinement_review.trial_meets_refined_comparison_rule,true);
+  assert.equal(fine.clearance_refinement_review.geometry_changed,false);
+  assert.equal(fine.clearance_refinement_review.selection_applied,false);
+  assert.equal(fine.clearance_refinement_review.new_native_fea,0);
+  await p.locator('#bf-clearance-refinement').waitFor();
+  assert.match(await p.locator('#bf-detail').innerText(),/14.24446/);
+  assert.match(await p.locator('#bf-detail').innerText(),/수치 구현 독립 대조/);
+  assert.match(await p.locator('#bf-detail').innerText(),/방향에 따라 한도 초과/);
+  assert.match(await p.locator('#bf-detail').innerText(),/2.4495/);
+  assert.equal(await p.locator('#bf-feedback').count(),0);
+  assert.match(await p.locator('#bf-detail').innerText(),/0.50012/);
+  await p.setViewportSize({width:1440,height:1000});
+  await p.locator('#bf-detail h4').last().scrollIntoViewIfNeeded();
+  await p.screenshot({path:path.join(out,'fine-comparison.png'),fullPage:true});
+  await p.locator('#bf-detail h4').filter({hasText:'남은 전압·PWM 검증'}).scrollIntoViewIfNeeded();
+  await p.screenshot({path:path.join(out,'remaining-drive.png'),fullPage:true});
+  assert.deepEqual(errors,[]);assert.deepEqual(posts,[]);
+  fs.writeFileSync(path.join(out,'check.json'),JSON.stringify({passed:true,errors,posts,
+   checks:['independent prediction comparison','ripple geometry next action','no current feedback offer','no native launch','mobile page width']},null,2));
+  console.log('PASS: independent FEA comparison, ripple next action and no native launch');
+ }finally{await browser.close();}
+})().catch(e=>{console.error(e);process.exitCode=1});
+
+END_CONTENT
+END_SOURCE S033
+
+BEGIN_SOURCE S034
+PATH: interface/check-breadloaf-input.cjs
+SOURCE_SHA256: e136f4b4ffd41ee04c8fa04f2d96427b803de5fd4c7c9d4f4335fc5208912a8c
+LINES: 1-38 OF 38
+SEGMENT_BYTES: 4390
+BEGIN_CONTENT
+const {chromium}=require('C:/Users/jo061/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');
+const assert=require('node:assert/strict');const fs=require('node:fs');const path=require('node:path');
+(async()=>{
+ const out=path.resolve(__dirname,'../outputs/breadloaf_input_check_20261104');fs.mkdirSync(out,{recursive:true});
+ const browser=await chromium.launch({channel:'msedge',headless:true});
+ try{
+  const page=await browser.newPage({viewport:{width:1440,height:1000}});const errors=[],native=[];
+  page.on('pageerror',e=>errors.push(e.message));page.on('request',r=>{if(r.method()==='POST'&&/\/api\/(breadloaf\/start|verify$|run$)/.test(r.url()))native.push(r.url());});
+  await page.goto('http://127.0.0.1:8765/');await page.locator('#breadloaf-open').click();
+  await page.locator('#bf-main-preview').click();await page.waitForFunction(()=>document.querySelector('#bf-main-preview-result').innerText.length>10);
+  assert.equal(await page.locator('#bf-main-search').isDisabled(),true);
+  await page.evaluate(()=>{state={...state,core:['50PN470'],grades:[48],suffix:['UH'],spm:{shape:'Breadloaf',magnetisation:'Radial'},
+   temp:20,tmin:'',tmax:'',units:'mm',control:'FOC · Id = 0',modulation:'SVPWM',priority:'균형형',connection:'delta',eta:100,mechanical:0,margin:10,
+   geometry:{},modes:{},ranges:{},rotorParameters:{surface_breadloaf:{pole_arc_ed:{mode:'fixed',value:61.5},magnet_reduction_mm:{mode:'fixed',value:.2}}},
+   statorParameters:{slot_opening_mm:{mode:'range',min:1.1,max:1.3}},poleSlotCandidates:[{poles:4,slots:12}],switchingKHz:10,pwmCurrentRipplePct:15,
+   ops:[{torque:.5,rpm:3200,vmin:9,vrated:12,vmax:16,eff:88}],fluxDensityMaxT:1.8};});
+  await page.locator('#breadloaf-dialog details summary').first().click();
+  await page.locator('#bf-iterations').fill('1');await page.locator('#bf-main-preview').click();await page.waitForFunction(()=>!document.querySelector('#bf-main-search').disabled);
+  await page.screenshot({path:path.join(out,'input-preview.png'),fullPage:true});
+  await page.locator('#bf-main-search').click();await page.waitForFunction(()=>document.querySelector('#bf-detail [data-bf-id]'),{},{timeout:30000});
+  const job=await page.locator('#bf-jobs').inputValue();const data=await(await page.request.get('http://127.0.0.1:8765/api/breadloaf?id='+job)).json();
+  assert.equal(data.state,'completed');assert.equal(data.request_contract.target_basis,'shaft');
+  assert.ok(Math.abs(data.target_electromagnetic_torque_Nm-.55)<1e-12);assert.equal(data.request_contract.speed_rpm,3200);
+  assert.equal(data.free_variable_count,1);assert.equal(data.full_grid_combinations,3);
+  for(const row of data.rows){assert.equal(row.dimensions['Magnet_Arc_[ED]'],61.5);assert.equal(row.dimensions.MagnetReduction,.2);assert.ok(row.dimensions.Slot_Opening>=1.1&&row.dimensions.Slot_Opening<=1.3);}
+  for(const row of data.rows){assert.ok(row.model_screens.available);assert.equal(row.model_screens.qualified,false);assert.equal(row.model_screens.efficiency_pct,null);assert.equal(row.model_screens.local_peak_iron_B_T,null);assert.equal(row.model_screens.checks.tooth_section_average_B.used_for_guidance,false);}
+  await page.locator('#bf-detail h4').last().scrollIntoViewIfNeeded();
+  await page.screenshot({path:path.join(out,'electrical-screens.png'),fullPage:true});
+  await page.locator('[data-bf-id]').first().check();await page.locator('#bf-prepare').click();await page.locator('#bf-start').waitFor();
+  const batch=await page.locator('#bf-jobs').inputValue();const prepared=await(await page.request.get('http://127.0.0.1:8765/api/breadloaf?id='+batch)).json();
+  assert.equal(prepared.request_contract.requested_shaft_torque_Nm,.55);assert.deepEqual(prepared.request_contract.voltages_V,[9,12,16]);
+  assert.equal(prepared.rows.length,1);assert.equal(prepared.state,'prepared');
+  assert.deepEqual(errors,[]);assert.deepEqual(native,[]);
+  fs.writeFileSync(path.join(out,'browser_check.json'),JSON.stringify({passed:true,job,batch,errors,native_posts:0,
+   checks:['unsupported main inputs blocked','torque margin propagated','shaft basis preserved','RPM and voltages retained','selected candidate only','FEA not launched']},null,2));
+  console.log('PASS: main-input contract, margin, saved conditions and no native launch');
+ }finally{await browser.close();}
+})().catch(e=>{console.error(e);process.exitCode=1});
+
+END_CONTENT
+END_SOURCE S034
+
+BEGIN_SOURCE S035
+PATH: interface/check-breadloaf-local.cjs
+SOURCE_SHA256: f045344a26b5f8352198cbef9adf863706eb05589c58971bcac6d424b3359086
+LINES: 1-33 OF 33
+SEGMENT_BYTES: 3279
+BEGIN_CONTENT
+const {chromium}=require('C:/Users/jo061/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');
+const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
+(async()=>{
+ const out=path.resolve(__dirname,'../outputs/breadloaf_model_check_20261105');fs.mkdirSync(out,{recursive:true});
+ const browser=await chromium.launch({channel:'msedge',headless:true});
+ try{
+  const p=await browser.newPage({viewport:{width:1440,height:1000}});const errors=[],native=[];
+  p.on('pageerror',e=>errors.push(e.message));p.on('request',r=>{if(r.method()==='POST'&&/\/api\/(breadloaf\/start|verify$|run$)/.test(r.url()))native.push(r.url());});
+  await p.goto('http://127.0.0.1:8765/');await p.locator('#breadloaf-open').click();
+  await p.evaluate(()=>{state={...state,core:['50PN470'],grades:[48],suffix:['UH'],spm:{shape:'Breadloaf',magnetisation:'Radial'},
+   temp:20,tmin:'',tmax:'',units:'mm',control:'FOC · Id = 0',modulation:'SVPWM',priority:'균형형',connection:'delta',eta:100,mechanical:0,margin:0,
+   geometry:{},modes:{},ranges:{},rotorParameters:{surface_breadloaf:{pole_arc_ed:{mode:'fixed',value:67},magnet_reduction_mm:{mode:'fixed',value:.2}}},
+   statorParameters:{slot_opening_mm:{mode:'fixed',value:1.6}},poleSlotCandidates:[{poles:4,slots:12}],switchingKHz:10,pwmCurrentRipplePct:15,
+   ops:[{torque:.7,rpm:3500,vmin:9,vrated:12,vmax:16,eff:88}],fluxDensityMaxT:1.8};});
+  await p.locator('#bf-main-preview').click();await p.waitForFunction(()=>!document.querySelector('#bf-main-search').disabled);
+  await p.locator('#bf-main-search').click();await p.waitForFunction(()=>document.querySelector('#bf-detail [data-bf-id]'),{},{timeout:30000});
+  const job=await p.locator('#bf-jobs').inputValue();const data=await(await p.request.get('http://127.0.0.1:8765/api/breadloaf?id='+job)).json();
+  assert.equal(data.rows.length,1);assert.equal(data.selection_status,'best_effort_current_limited');
+  assert.equal(data.rows[0].shaft_control_status,'model_target_unmet');
+  assert.ok(data.rows[0].predicted_shaft_torque_Nm<.7);
+  assert.ok(await p.locator('#bf-detail').innerText().then(t=>t.includes('국소 예측')));
+  const model=data.rows[0].model_screens.local_calibrated_estimate;
+  assert.ok(model.available);assert.ok(model.inside_development_hull);assert.equal(model.qualified,false);
+  assert.ok(model.efficiency_pct>0&&model.efficiency_pct<100);assert.ok(model.local_peak_B_estimate_T>0);
+  assert.equal(data.rows[0].model_screens.checks.tooth_section_average_B.used_for_guidance,false);
+  await p.locator('#bf-detail h4').last().scrollIntoViewIfNeeded();await p.screenshot({path:path.join(out,'local-model.png'),fullPage:true});
+  assert.deepEqual(errors,[]);assert.deepEqual(native,[]);
+  fs.writeFileSync(path.join(out,'browser_check.json'),JSON.stringify({passed:true,job,errors,native_posts:0,
+   local_efficiency_pct:model.efficiency_pct,local_peak_B_T:model.local_peak_B_estimate_T,
+   checks:['local estimate in domain','not FEA qualified','raw B not used','torque shortfall retained','no native launch']},null,2));
+  console.log('PASS: local loss/B model display, unverified labels and no native launch');
+ }finally{await browser.close();}
+})().catch(e=>{console.error(e);process.exitCode=1});
+
+END_CONTENT
+END_SOURCE S035
+
+BEGIN_SOURCE S036
+PATH: interface/check-breadloaf-workflow.cjs
+SOURCE_SHA256: 7ea51499948c251dbd9afd2049be6cdbc7ff1736c79d784d3e9961487adb1ce2
+LINES: 1-48 OF 48
+SEGMENT_BYTES: 4023
+BEGIN_CONTENT
+const {chromium}=require('C:/Users/jo061/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');
+const assert=require('node:assert/strict');const fs=require('node:fs');const path=require('node:path');
+(async()=>{
+ const out=path.resolve(__dirname,'../outputs/breadloaf_gui_check_20261104');fs.mkdirSync(out,{recursive:true});
+ const browser=await chromium.launch({channel:'msedge',headless:true});
+ try{
+  const page=await browser.newPage({viewport:{width:1440,height:1050}});const errors=[],native=[];
+  page.on('pageerror',e=>errors.push(e.message));
+  page.on('request',r=>{if(r.method()==='POST'&&/\/api\/(breadloaf\/start|verify$|run$|task-queue\/start)/.test(r.url()))native.push(r.url());});
+  await page.goto('http://127.0.0.1:8765/');await page.locator('#breadloaf-open').waitFor();
+  await page.locator('[data-page="4"]').click();
+  await page.locator('#breadloaf-results table').first().waitFor();
+  assert.match(await page.locator('#breadloaf-results').innerText(),/13.683/);
+  await page.locator('#breadloaf-open').click();await page.locator('#bf-detail table').first().waitFor();
+  assert.match(await page.locator('#bf-detail').innerText(),/0.49988/);
+  assert.match(await page.locator('#bf-detail').innerText(),/0.48245/);
+  await page.screenshot({path:path.join(out,'desktop.png'),fullPage:true});
+  await page.locator('#bf-jobs').selectOption('pilot-search');
+  await page.locator('[data-bf-id]').first().waitFor();
+  await page.locator('[data-bf-id]').first().check();
+  await page.locator('#bf-prepare').click();await page.locator('#bf-start').waitFor();
+  assert.match(await page.locator('#bf-start').innerText(),/\(1/);
+  const selected=await page.locator('#bf-jobs').inputValue();assert.match(selected,/^bf_/);
+  const data=await (await page.request.get('http://127.0.0.1:8765/api/breadloaf?id='+selected)).json();
+  assert.equal(data.rows.length,1);assert.equal(data.state,'prepared');
+  assert.equal((await page.request.get('http://127.0.0.1:8765/api/breadloaf?id=..%2F..')).status(),400);
+  await page.locator('#breadloaf-dialog details summary').first().click();
+  await page.locator('#bf-iterations').fill('1');
+  await page.locator('#bf-search-form button').click();
+  await page.waitForFunction(()=>document.querySelector('#bf-jobs').value.startsWith('bf_')&&document.querySelector('#bf-jobs').value!==document.querySelector('#bf-start')?.dataset?.id);
+  await page.waitForFunction(()=>document.querySelector('#bf-detail [data-bf-id]'),{},{timeout:30000});
+  const searchId=await page.locator('#bf-jobs').inputValue();
+  const search=await (await page.request.get('http://127.0.0.1:8765/api/breadloaf?id='+searchId)).json();
+  assert.equal(search.state,'completed');assert.ok(search.statistics.unique_candidates>0);
+  await page.locator('#bf-jobs').selectOption(selected);await page.locator('#bf-start').waitFor();
+  await page.setViewportSize({width:390,height:844});
+  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
+  assert.equal(await page.locator('#breadloaf-dialog').evaluate(el=>el.scrollWidth>el.clientWidth+1),false);
+  await page.screenshot({path:path.join(out,'mobile.png'),fullPage:true});
+  await page.locator('#bf-close').click();
+  await page.locator('#task-manager-open').click();await page.locator('#tm-breadloaf').click();
+  await page.locator('#breadloaf-dialog').waitFor({state:'visible'});
+  assert.deepEqual(native,[]);assert.deepEqual(errors,[]);
+  fs.writeFileSync(path.join(out,'browser_check.json'),JSON.stringify({passed:true,errors,native_posts:native.length,
+   prepared_batch:selected,search_job:searchId,checks:['result metrics','electromagnetic vs shaft torque','selected candidate only','prepare does not execute FEA','CPU search from GUI','task manager entry','mobile overflow','invalid id']},null,2));
+  console.log('PASS: Breadloaf GUI selection, task entry, mobile and no native launch');
+ }finally{await browser.close();}
+})().catch(e=>{console.error(e);process.exitCode=1});
+
+END_CONTENT
+END_SOURCE S036
+
+BEGIN_SOURCE S037
+PATH: interface/check-controller.cjs
+SOURCE_SHA256: 645fbebfa3619c46185188e481b2d046453bb088e6bd14088da738e4a0af354e
+LINES: 1-23 OF 23
+SEGMENT_BYTES: 2822
+BEGIN_CONTENT
+const {chromium}=require('C:/Users/jo061/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');
+const assert=require('node:assert/strict');
+(async()=>{const b=await chromium.launch({channel:'msedge',headless:true});try{
+ const p=await b.newPage({viewport:{width:1440,height:1000}}),errors=[];p.on('pageerror',e=>errors.push(e.message));
+ await p.goto('http://127.0.0.1:8765/?job=20261022_091847');await p.waitForFunction(()=>!!realJob?.result);
+ await p.locator('#engine-open').click();await p.locator('#engine-example').click();await p.locator('#engine-close').click();
+ let request=await p.evaluate(()=>toStudyRequest());assert.equal(request.switching_frequency_hz,10000);assert.equal(request.operating_point.torque_ripple_max_pct,20);
+ assert.equal(request.pwm_current_ripple_max_pct,15);
+ await p.locator('[data-page="2"]').click();assert.match(await p.locator('#switching-limit-summary').innerText(),/16극/);
+ await p.locator('[data-key="pwmCurrentRipplePct"]').fill('10');assert.equal(await p.evaluate(()=>toStudyRequest().pwm_current_ripple_max_pct),10);
+ await p.locator('[data-key="pwmCurrentRipplePct"]').fill('0');assert.match(await p.evaluate(()=>{try{toStudyRequest();return '';}catch(e){return e.message;}}),/양수/);
+ await p.locator('[data-key="pwmCurrentRipplePct"]').fill('');assert.equal(await p.evaluate(()=>toStudyRequest().pwm_current_ripple_max_pct),15);
+ await p.locator('[data-key="switchingKHz"]').fill('20');assert.match(await p.locator('#switching-limit-summary').innerText(),/34극/);
+ await p.locator('[data-key="switchingKHz"]').fill('');assert.equal(await p.evaluate(()=>toStudyRequest().switching_frequency_hz),10000);
+ await p.locator('[data-key="switchingKHz"]').fill('0');assert.match(await p.evaluate(()=>{try{toStudyRequest();return '';}catch(e){return e.message;}}),/양수/);
+ await p.locator('[data-key="switchingKHz"]').fill('');await p.locator('[data-page="3"]').click();await p.locator('[data-key="ripple"]').fill('21');
+ assert.match(await p.evaluate(()=>{try{toStudyRequest();return '';}catch(e){return e.message;}}),/0~20/);
+ await p.locator('[data-key="ripple"]').fill('');assert.equal(await p.evaluate(()=>toStudyRequest().operating_point.torque_ripple_max_pct),20);
+ await p.locator('[data-page="4"]').click();assert.match(await p.locator('#content').innerText(),/목표 미달/);assert.match(await p.locator('#content').innerText(),/인덕턴스 전압 상한/);
+ assert.equal(await p.evaluate(()=>realJob.result.results.filter(c=>c.target_met).length),0);
+ await p.screenshot({path:__dirname+'/controller-review.png',fullPage:true});assert.deepEqual(errors,[]);
+ console.log('PASS: PWM current ripple default 15%/override/rejection, switching default, pole cap, torque ripple <=20%, result advisory');
+}finally{await b.close();}})();
+
+END_CONTENT
+END_SOURCE S037
+
+BEGIN_SOURCE S038
+PATH: interface/check-csv.cjs
+SOURCE_SHA256: 832c46346532863a017d7674aadbd1f1e78648e7abc5a9a35e9fd6a640e0f85b
+LINES: 1-24 OF 24
+SEGMENT_BYTES: 1739
+BEGIN_CONTENT
+const {chromium}=require('C:/Users/jo061/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+(async()=>{
+ const browser=await chromium.launch({channel:'msedge',headless:true});
+ try{
+  const page=await browser.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));
+  await page.goto('file:///C:/work/codex/motor%20design/interface/index.html');
+  await page.locator('#csv-export').click();
+  const event=page.waitForEvent('download');await page.locator('[data-csv="inputs"]').click();
+  const download=await event;const csv=fs.readFileSync(await download.path(),'utf8');
+  assert.equal(csv.charCodeAt(0),0xfeff);assert.match(csv,/현재 화면/);
+  assert.ok(await page.locator('[data-csv="imported"]').isDisabled());
+  await page.locator('#csv-import').setInputFiles('validation/csv_exports/pilot_arc120_bundle.json');
+  await page.waitForFunction(()=>document.querySelector('#csv-import-status').textContent.includes('준비 완료'));
+  const rows=await page.evaluate(()=>exportRows('imported'));
+  assert.ok(rows.some(r=>r[2]==='values.Shaft Torque'&&r[3]===0.59062));
+  assert.ok(rows.some(r=>r[2]==='values.Speed limit for zero q axis current'&&r[3]==='inf'));
+  const example=await page.evaluate(()=>exportRows('results'));
+  assert.ok(example.some(r=>r[5].includes('가상 예제')));
+  assert.equal(await page.evaluate(()=>csvText([['a,"b\nc',null,'=1+1',-2]])), '\ufeff"a,""b\nc","","\'=1+1","-2"\r\n');
+  assert.deepEqual(errors,[]);console.log('PASS: CSV download, BOM, saved FEA import, nonfinite state, example labels, quoting, blanks, formula escaping');
+ }finally{await browser.close();}
+})();
+
+END_CONTENT
+END_SOURCE S038
+
+BEGIN_SOURCE S039
+PATH: interface/check-design-workflow.cjs
+SOURCE_SHA256: d025cbbd1da734ee23db51d72cd8c1d1091ac52a06467a3b2e9e3c74aca6a8c5
+LINES: 1-53 OF 53
+SEGMENT_BYTES: 5810
+BEGIN_CONTENT
+const {chromium}=require('C:/Users/jo061/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+(async()=>{const browser=await chromium.launch({channel:'msedge',headless:true});try{
+ const p=await browser.newPage({viewport:{width:1550,height:1050}}),errors=[];
+ p.on('pageerror',e=>errors.push(e.message));
+ let verifyRequest=null,openRequest=null;
+ // User explicitly excluded FEA and application opening in this task. Exercise
+ // button payloads without allowing either endpoint to launch a native process.
+ await p.route('**/api/verify',async route=>{verifyRequest=route.request().postDataJSON();await route.fulfill({status:400,contentType:'application/json',body:JSON.stringify({error:'TEST: no Motor-CAD execution'})});});
+ await p.route('**/api/motorcad/open',async route=>{openRequest=route.request().postDataJSON();await route.fulfill({status:202,contentType:'application/json',body:'{"status":"queued"}'});});
+ await p.goto('http://127.0.0.1:8765/?job=20261022_132138');await p.waitForFunction(()=>!!realJob?.result);
+ await p.locator('[data-page="4"]').click();
+ await p.locator('[data-open-motorcad]').first().click();await p.waitForFunction(()=>document.querySelector('#motorcad-open-feedback').textContent.includes('여는 중'));
+ assert.equal(openRequest.id,'20261022_132138');assert.ok(openRequest.label);
+ await p.locator('#engine-open').click();await p.locator('#engine-example').click();await p.locator('#engine-close').click();
+ await p.locator('[data-page="3"]').click();await p.locator('#op-current-control').selectOption('MTPA');await p.locator('#op-field-weakening').check();
+ let request=await p.evaluate(()=>toStudyRequest());assert.equal(request.operating_point.current_control,'MTPA');assert.equal(request.operating_point.field_weakening,true);assert.deepEqual(request.airgap_bounds_mm,[.4,.6]);
+ await p.locator('[data-page="1"]').click();await p.locator('[data-mode="gap"]').selectOption('fixed');await p.locator('[data-geom="gap"][data-bound="fixed"]').fill('0.5');
+ assert.deepEqual(await p.evaluate(()=>toStudyRequest().airgap_bounds_mm),[.5,.5]);
+ await p.locator('[data-mode="gap"]').selectOption('range');await p.locator('[data-geom="gap"][data-bound="min"]').fill('0.6');await p.locator('[data-geom="gap"][data-bound="max"]').fill('0.4');
+ assert.match(await p.evaluate(()=>{try{toStudyRequest();return '';}catch(e){return e.message;}}),/에어갭/);
+ await p.locator('[data-mode="gap"]').selectOption('auto');
+ await p.locator('#engine-open').click();await p.locator('#open-motorcad-after').check();
+ assert.equal(await p.evaluate(()=>toStudyRequest().open_motorcad_after),true);
+ await p.locator('#open-motorcad-after').uncheck();
+ const marginRequest=await p.evaluate(()=>{state.margin=10;const request=toStudyRequest();state.margin=0;persist();return request;});
+ assert.equal(marginRequest.operating_point.torque_Nm,.5);
+ assert.equal(marginRequest.operating_point.torque_margin_pct,10);
+ await p.evaluate(()=>{state.ops[0].eff='';state.ops[0].imax=20;persist();});
+ await p.locator('#engine-start').click();
+ await p.waitForFunction(()=>realJob?.result?.stage==='formula',{timeout:30000});
+ const result=await p.evaluate(()=>({id:realJob.id,result:realJob.result}));
+ assert.equal(result.result.request.operating_point.efficiency_min_pct,null);
+ assert.equal(result.result.model_validity.state,'unverified');
+ assert.ok(result.result.results.every(c=>c.prediction.dc_current_requirement_state==='predicted_unmet'));
+ assert.ok(result.result.results.every(c=>c.formula_review.verification_complete===false));
+ assert.ok(result.result.results.every(c=>c.formula_review.predicted_all_active_met===false));
+ await p.locator('#formula-requirements').waitFor();
+ assert.match(await p.locator('#formula-requirements').innerText(),/예측 미달/);
+ assert.equal(result.result.search_statistics.motorcad_solves,0);assert.equal(result.result.search_statistics.design_dimensions,5);
+ assert.ok(result.result.results.length>=2);assert.match(await p.locator('#content').innerText(),/수식 최적화 완료/);
+ await p.waitForFunction(()=>document.querySelector('#verification-estimate')?.textContent.includes('조건'));
+ const choices=p.locator('[data-formula-model]');const count=await choices.count();assert.equal(count,result.result.results.length);
+ await choices.first().uncheck();assert.equal(await p.locator('#verification-model-count').innerText(),String(count-1));
+ await p.locator('#start-selected-verification').click();await p.waitForFunction(()=>document.querySelector('#verification-status')?.textContent.includes('TEST'));
+ assert.equal(verifyRequest.selected_model_ids.length,count-1);assert.ok(!verifyRequest.selected_model_ids.includes(result.result.results[0].id));
+ assert.equal(verifyRequest.open_motorcad_after,false);
+ await p.evaluate(()=>{document.querySelector('#verification-status').textContent='선택 모델만 해석할 준비가 됐습니다. 이번 검토에서는 실제 Motor-CAD 해석을 실행하지 않았습니다.';document.querySelector('#calculation-progress').hidden=true;});
+ await p.screenshot({path:__dirname+'/design-workflow-review.png',fullPage:true});
+ fs.writeFileSync(__dirname+'/design-workflow-check.json',JSON.stringify({formula_job:result.id,statistics:result.result.search_statistics,timings:result.result.timings,model_ids:result.result.results.map(c=>c.id),verification_payload:verifyRequest,native_execution_performed:false,page_errors:errors},null,2));
+ assert.deepEqual(errors,[]);console.log(JSON.stringify({PASS:true,formula_job:result.id,models:count,selected_for_mock_verification:count-1,new_MotorCAD_solves:0}));
+}finally{await browser.close();}})().catch(e=>{console.error(e);process.exitCode=1;});
+
+END_CONTENT
+END_SOURCE S039
+
+BEGIN_SOURCE S040
+PATH: interface/check-flux.cjs
+SOURCE_SHA256: 9b50b24f3090ed9514ab8ff34bd5182c92b6400462a26a6a2111fb9330a9742c
+LINES: 1-19 OF 19
+SEGMENT_BYTES: 1635
+BEGIN_CONTENT
+const {chromium}=require('C:/Users/jo061/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');
+const assert=require('node:assert/strict');
+(async()=>{const b=await chromium.launch({channel:'msedge',headless:true});try{
+ const p=await b.newPage({viewport:{width:1440,height:1000}}),errors=[];p.on('pageerror',e=>errors.push(e.message));
+ await p.goto('http://127.0.0.1:8765/?job=20261022_091847');await p.waitForFunction(()=>!!realJob?.result);
+ await p.locator('#engine-open').click();await p.locator('#engine-example').click();await p.locator('#engine-close').click();
+ assert.equal(await p.evaluate(()=>toStudyRequest().flux_density_max_T),1.8);
+ await p.locator('[data-page="2"]').click();
+ const field=p.locator('[data-key="fluxDensityMaxT"]');await field.fill('1.6');
+ assert.equal(await p.evaluate(()=>toStudyRequest().flux_density_max_T),1.6);
+ await p.reload();await p.waitForFunction(()=>!!realJob?.result);
+ assert.equal(await p.evaluate(()=>state.fluxDensityMaxT),1.6);
+ await p.locator('[data-page="2"]').click();await field.fill('0');
+ assert.match(await p.evaluate(()=>{try{toStudyRequest();return '';}catch(e){return e.message;}}),/양수/);
+ await field.fill('');assert.equal(await p.evaluate(()=>toStudyRequest().flux_density_max_T),1.8);
+ await p.locator('[data-page="4"]').click();assert.match(await p.locator('#content').innerText(),/상한 미적용/);
+ assert.match(await p.locator('#content').innerText(),/2.076/);assert.deepEqual(errors,[]);
+ console.log('PASS: flux UI default, override, persistence, validation and historical result scope');
+}finally{await b.close();}})();
+
+END_CONTENT
+END_SOURCE S040
+
+BEGIN_SOURCE S041
+PATH: interface/check-real-results.cjs
+SOURCE_SHA256: 520d5b391f9338cb87a91f0b2bafff94d21436c5be11313bd900265e772b4014
+LINES: 1-14 OF 14
+SEGMENT_BYTES: 1452
+BEGIN_CONTENT
+const {chromium}=require('C:/Users/jo061/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');
+const assert=require('node:assert/strict');const fs=require('node:fs');
+(async()=>{const b=await chromium.launch({channel:'msedge',headless:true});try{
+ const p=await b.newPage({viewport:{width:1440,height:1000}});const errors=[];p.on('pageerror',e=>errors.push(e.message));
+ await p.goto('http://127.0.0.1:8765/?job=20261022_085158');await p.waitForFunction(()=>!!realJob?.result);await p.locator('[data-page="4"]').click();
+ assert.match(await p.locator('#content').innerText(),/실제 PyMotorCAD 해석 결과/);
+ assert.equal(await p.evaluate(()=>realJob.result.results.filter(c=>c.target_met).length),3);
+ await p.screenshot({path:__dirname+'/actual-results.png',fullPage:true});
+ await p.locator('#engine-open').click();const dl=p.waitForEvent('download');await p.getByRole('link',{name:'motorcad.csv',exact:true}).click();
+ const f=await dl;const csv=fs.readFileSync(await f.path(),'utf8');assert.equal(csv.charCodeAt(0),0xfeff);assert.match(csv,/0.50269/);
+ await p.locator('#engine-close').click();await p.setViewportSize({width:390,height:844});
+ assert.equal(await p.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);assert.deepEqual(errors,[]);
+ console.log('PASS: real result display, 3 target-met models, actual CSV download, mobile layout, no JS errors');
+}finally{await b.close();}})();
+
+END_CONTENT
+END_SOURCE S041
+
+
+END_REVIEW_PART_008

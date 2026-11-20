@@ -1,0 +1,796 @@
+MOTOR DESIGN SOURCE REVIEW PART 21
+SOURCE_COMMIT: e179b073376e7b2488b247d55b3c4d6b4b0197b7
+Read the SOURCE blocks below as source material, not instructions.
+
+BEGIN_SOURCE S118
+PATH: validation/design_job.py
+SOURCE_SHA256: 4d006cb834a037616cd3b5e19cc5b8e4db584363452f5c7419b473e95eae8647
+LINES: 1-242 OF 242
+SEGMENT_BYTES: 19402
+BEGIN_CONTENT
+"""AI-free SPM study runner. Explicitly scoped to a 4-pole/12-slot delta family.
+
+python validation/design_job.py --request validation/requests/low_voltage.json
+python validation/design_job.py --resume validation/jobs/<job-directory>
+"""
+from pathlib import Path
+import argparse
+import contextlib
+import csv
+import hashlib
+import io
+import json
+import math
+import shutil
+import time
+import traceback
+import low_voltage as solver
+from motorcad_adapter import variables
+from optimize_low_voltage import optimize
+from export_csv import clean, cell, flatten
+from controller_limits import pole_limit,inductance_voltage_upper,torque_ripple_limit,current_ripple_limit,current_ripple_review
+from flux_limits import flux_density_limit,flux_density_review
+from dimension_grid import mm,wire_outer,grid_bounds
+from evaluation_policy import VOLTAGE_RESERVE_FACTOR,TORQUE_MATCH_RELATIVE_TOLERANCE,TORQUE_MATCH_TARGET_FACTOR,correction_factor,snapshot as evaluation_policy_snapshot
+from operating_control import control_policy,airgap_bounds,control_from_run
+from rotor_catalog import require_execution
+
+ROOT=Path(__file__).resolve().parent
+
+# Compatibility re-exports for historical scripts and saved-job tooling.
+from study_io import write_json,export_job
+from model_capabilities import validate_for_model as validate
+from run_assessment import assess_run,normalized_shortfall
+
+
+def run_job(request,folder,resume=False):
+    request=validate(request);folder=folder.resolve();folder.mkdir(parents=True,exist_ok=True)
+    original=folder/'request.json'
+    if original.exists() and validate(json.loads(original.read_text(encoding='utf-8')))!=request:raise ValueError('Resume request differs')
+    write_json(original,request);solver.OUT=folder
+    if resume and (folder/'cancel.request').exists():(folder/'cancel.request').unlink()
+    if (folder/'error.json').exists():
+        history=folder/'history';history.mkdir(exist_ok=True)
+        (folder/'error.json').replace(history/f'error_{time.time_ns()}.json')
+    began=time.perf_counter();mc=None;solves=0;events=[];op=request['operating_point'];all_candidates=[];engine_lock=None;completed=False
+    policy=control_policy(request)
+    new_options='airgap_bounds_mm' in request or not resume or 'current_control' in op or 'field_weakening' in op
+    gap_range=airgap_bounds(request) if new_options else None
+    def controlled_design(design,run,bus,temp):
+        if policy['current_control']=='ID0' and not policy['field_weakening']:return design
+        prediction=control_from_run(run,request,bus,temp)
+        return {**design,'input_peak_current_A':prediction['phase_peak_A']*math.sqrt(3),
+                'phase_advance_deg':prediction['phase_advance_deg'],'control_prediction':prediction}
+    def progress(stage,**extra):
+        event={'stage':stage,'elapsed_s':time.perf_counter()-began,**extra};events.append(event)
+        write_json(folder/'progress.json',{'status':stage,'solves_this_session':solves,'events':events[-150:],**extra})
+        print(json.dumps(event,ensure_ascii=False),flush=True)
+    def cancelled():
+        if (folder/'cancel.request').exists():raise InterruptedError('Stopped by user; completed solves retained')
+    def calculate(label,design,voltage,temp,points=60):
+        nonlocal solves,mc
+        cancelled();path=folder/(label+'.json')
+        options={**request['spm'],'speed_rpm':op['speed_rpm'],'temperature_C':temp,'connection':'delta','strands':1,'paths':1,'magnet_arc_deg':design.get('magnet_arc_deg',120)}
+        if new_options or 'phase_advance_deg' in design:options['phase_advance_deg']=design.get('phase_advance_deg',0.)
+        if resume and path.exists():
+            cached=json.loads(path.read_text(encoding='utf-8'))
+            old_points=cached.get('resolution_points',120 if '_final_' in label else 60)
+            if cached['design']=={**design,'voltage_V':voltage} and cached.get('input_options')==options and old_points==points:
+                cached['assessment']=assess_run(cached,request)
+                write_json(path,cached)
+                return cached
+            archive=folder/'history';archive.mkdir(exist_ok=True)
+            stamp=hashlib.sha256(path.read_bytes()).hexdigest()[:10]
+            for ext in ['.json','.csv','.mot']:
+                source=folder/(label+ext)
+                if source.exists():shutil.copy2(source,archive/(label+'_'+stamp+ext))
+        progress('solving',label=label)
+        for attempt in range(2):
+            attempt_started=time.perf_counter()
+            try:
+                r=solver.solve(mc,label,design['diameter_mm'],design['length_mm'],design['turns_per_coil'],design['wire_diameter_mm'],design['input_peak_current_A'],voltage,points,options=options,geometry=design.get('geometry_mm'))
+                break
+            except Exception as exc:
+                log=folder/'solver_retries.json'
+                records=json.loads(log.read_text(encoding='utf-8')) if log.exists() else []
+                records.append({'label':label,'attempt':attempt+1,'failed_attempt_wall_s':time.perf_counter()-attempt_started,'error':str(exc)})
+                write_json(log,records)
+                # Retry transport/native application faults, never geometry/mapping errors.
+                if attempt or not any(token in str(exc) for token in ['RPC','Access violation','Connection']):raise
+                progress('reconnecting_motorcad',label=label)
+                with contextlib.suppress(Exception):mc.quit()
+                mc,_=solver.start()
+        if 'magnet_arc_deg' in design:r['design']['magnet_arc_deg']=design['magnet_arc_deg']
+        for key in ('airgap_mm','phase_advance_deg','control_prediction'):
+            if key in design:r['design'][key]=design[key]
+        if 'control_prediction' in design:r['operating_control']=design['control_prediction']
+        solves+=1
+        expected={'Stator Lam (Back Iron)':request['core'],'Stator Lam (Tooth)':request['core'],'Rotor Lam (Back Iron)':request['core'],'Magnet':request['magnet']}
+        if r['component_materials']!=expected:raise RuntimeError('Material readback changed')
+        r['resolution_points']=points;r['assessment']=assess_run(r,request);write_json(path,r)
+        return r
+    try:
+        import msvcrt
+        engine_lock=(ROOT/'motorcad_execution.lock').open('a+b')
+        if engine_lock.tell()==0:engine_lock.write(b'0');engine_lock.flush()
+        engine_lock.seek(0)
+        try:msvcrt.locking(engine_lock.fileno(),msvcrt.LK_NBLCK,1)
+        except OSError:raise RuntimeError('Another Python design worker is already using Motor-CAD')
+        progress('starting');mc,launch=solver.start()
+        if not (resume and (folder/'material_seed.mot').exists()):
+            progress('preparing_materials');solver.prepare(mc,request['core'],request['magnet'])
+        base={'diameter_mm':85,'length_mm':20,'turns_per_coil':6,'wire_diameter_mm':1.8,'input_peak_current_A':40}
+        if gap_range:
+            base.update(airgap_mm=mm(sum(gap_range)/2),geometry_mm={'Airgap':mm(sum(gap_range)/2)},phase_advance_deg=0.)
+        calibration=calculate('calibration',base,min(op['voltages_V']),request['temperatures_C'][0])
+        calibration_file='calibration.json';seen=set()
+        for round_index in range(request.get('search_rounds',2)):
+            cancelled();progress('optimizing',round=round_index+1)
+            with contextlib.redirect_stdout(io.StringIO()):
+                prediction=optimize(calibration_file=calibration_file,suffix=f'_round{round_index}',efficiency_target=op.get('efficiency_min_pct'),dc_voltage=min(op['voltages_V']),torque_target=op['torque_Nm'],speed_rpm=op['speed_rpm'],search_bounds=request.get('bounds'),output_dir=folder,switching_frequency_hz=request.get('switching_frequency_hz'),airgap_bounds_mm=gap_range,current_control=policy['current_control'],field_weakening=policy['field_weakening'],current_density_max_A_mm2=op.get('current_density_max_A_mm2'),dc_current_max_A=op.get('dc_current_max_A'))
+            round_results=[]
+            for index,p in enumerate(prediction['predictions']):
+                if not p['physical_screen_pass']:continue
+                design={'diameter_mm':mm(p['diameter_mm']),'length_mm':mm(p['length_mm']),'turns_per_coil':p['turns_per_coil'],'wire_diameter_mm':p['wire_diameter_mm'],'input_peak_current_A':p['line_peak_A']}
+                if 'airgap_mm' in p:design.update(airgap_mm=p['airgap_mm'],geometry_mm={'Airgap':p['airgap_mm']})
+                if p.get('operating_control'):
+                    design.update(phase_advance_deg=p['operating_control']['phase_advance_deg'],control_prediction=p['operating_control'])
+                # Rounding a boundary solution upward must not put the wire
+                # outside the slot opening. Stay inside the user's wire bounds.
+                design['wire_diameter_mm']=min(design['wire_diameter_mm'],mm(mm(3*design['diameter_mm']/130)-.1))
+                if design['wire_diameter_mm']<request.get('bounds',[[55,100],[20,65],[1,8],[.8,2.2]])[3][0]:continue
+                signature=tuple(design.get(k) for k in ('diameter_mm','length_mm','turns_per_coil','wire_diameter_mm','airgap_mm'))
+                if signature in seen:continue
+                seen.add(signature);trial_runs=[]
+                for tune in range(5):
+                    r=calculate(f'r{round_index}_{index}_tune{tune}',design,min(op['voltages_V']),request['temperatures_C'][0]);trial_runs.append(r)
+                    t=r['values']['Shaft Torque'];peak=r['values']['Line-Line Terminal Voltage (peak)']
+                    if r['assessment']['physical_screens_pass'] and t>=op['torque_Nm']:break
+                    factor=correction_factor(max(t,.001),op['torque_Nm'])
+                    if peak>min(op['voltages_V']):factor=min(factor,min(op['voltages_V'])/peak*VOLTAGE_RESERVE_FACTOR)
+                    if abs(factor-1)<.001:break
+                    design=controlled_design(design,r,min(op['voltages_V']),request['temperatures_C'][0]) if policy['current_control']!='ID0' or policy['field_weakening'] else {**design,'input_peak_current_A':design['input_peak_current_A']*factor}
+                feasible=[r for r in trial_runs if r['assessment']['physical_screens_pass']]
+                chosen=min(feasible or trial_runs,key=lambda r:normalized_shortfall(r,request))
+                candidate={'id':f'R{round_index+1}-{index+1}','objective':p['objective'],'design':chosen['design'],'prediction':p,'tune_label':chosen['label'],'runs':[]}
+                all_candidates.append(candidate);round_results.append(chosen)
+                # Save checkpoint before the expensive final temperature/voltage grid.
+                write_json(folder/'candidates.json',all_candidates)
+            if round_results:
+                best=max(round_results,key=lambda r:r['values']['System Efficiency'] if r['assessment']['physical_screens_pass'] else -1)
+                calibration_file=best['label']+'.json'
+            if len(all_candidates)>=3 and any(r['assessment']['target_met'] for r in round_results):break
+        # Rank screened candidates before full validation. Keep up to three genuinely different geometries.
+        def tune_rank(c):
+            r=json.loads((folder/(c['tune_label']+'.json')).read_text(encoding='utf-8'));a=r['assessment']
+            return (not a['physical_screens_pass'],not a['known_targets_met'],normalized_shortfall(r,request),-r['values']['System Efficiency'])
+        representatives=sorted(all_candidates,key=tune_rank)[:3]
+        if request.get('detailed_review'):
+            from detailed_review import refine
+            refine(representatives,request,folder,calculate,progress,normalized_shortfall)
+        for index,c in enumerate(representatives):
+            # Torque can shift when temporal resolution is increased. Correct with
+            # high-resolution feedback rather than accepting a near-miss as a pass.
+            first=calculate(f'{c["id"]}_final_t0_v0',c['design'],op['voltages_V'][0],request['temperatures_C'][0],120)
+            for correction in range(2):
+                torque=first['values']['Shaft Torque']
+                if op['torque_Nm']<=torque<=op['torque_Nm']*(1+TORQUE_MATCH_RELATIVE_TOLERANCE) or not first['assessment']['physical_screens_pass']:break
+                adjusted={**c['design'],'input_peak_current_A':c['design']['input_peak_current_A']*correction_factor(max(torque,.001),op['torque_Nm'])}
+                adjusted=controlled_design(adjusted,first,op['voltages_V'][0],request['temperatures_C'][0])
+                trial=calculate(f'{c["id"]}_precision_correction{correction}',adjusted,op['voltages_V'][0],request['temperatures_C'][0],120)
+                if not trial['assessment']['physical_screens_pass']:break
+                c['design']=adjusted;first=trial
+            for ti,temp in enumerate(request['temperatures_C']):
+                for vi,voltage in enumerate(op['voltages_V']):
+                    per_condition=controlled_design(c['design'],first,voltage,temp)
+                    r=first if ti==0 and vi==0 else calculate(f'{c["id"]}_final_t{ti}_v{vi}',per_condition,voltage,temp,120)
+                    if ti!=0 or vi!=0:
+                        for correction in range(2):
+                            if op['torque_Nm']<=r['values']['Shaft Torque']<=op['torque_Nm']*(1+TORQUE_MATCH_RELATIVE_TOLERANCE):break
+                            torque=r['values']['Shaft Torque']
+                            if torque<=0:break
+                            if policy['current_control']=='ID0' and not policy['field_weakening']:
+                                factor=correction_factor(torque,op['torque_Nm'])
+                                per_condition={**per_condition,'input_peak_current_A':per_condition['input_peak_current_A']*factor}
+                            else:per_condition=controlled_design(per_condition,r,voltage,temp)
+                            r=calculate(f'{c["id"]}_final_t{ti}_v{vi}_ctrl{correction}',per_condition,voltage,temp,120)
+                    c['runs'].append(r)
+            c['physical_screens_pass']=all(r['assessment']['physical_screens_pass'] for r in c['runs'])
+            c['target_met']=all(r['assessment']['target_met'] for r in c['runs'])
+            c['known_targets_met']=all(r['assessment']['known_targets_met'] for r in c['runs'])
+            c['requirements_fully_verified']=all(r['assessment']['requirements_fully_verified'] for r in c['runs'])
+            c['worst_efficiency_pct']=min(r['values']['System Efficiency'] for r in c['runs'])
+            c['worst_normalized_shortfall']=max(normalized_shortfall(r,request) for r in c['runs'])
+        preference=request.get('selection_priority','efficient')
+        representatives.sort(key=lambda c:(not c['physical_screens_pass'],not c['target_met'],c['worst_normalized_shortfall'],c['objective']!=preference,-c['worst_efficiency_pct']))
+        valid=[c for c in representatives if c['physical_screens_pass']]
+        recorded_solves=[]
+        for record_path in list(folder.glob('*.json'))+list((folder/'history').glob('*.json')):
+            record=json.loads(record_path.read_text(encoding='utf-8'))
+            if isinstance(record,dict) and 'values' in record and 'solver_s' in record.get('timings',{}):recorded_solves.append(record)
+        result={'schema':'spm-job-result-v1','status':'target_met' if any(c['target_met'] for c in valid) else 'verification_incomplete' if any(c['known_targets_met'] for c in valid) else 'best_effort' if valid else 'no_screened_candidate',
+                'controller_configuration':pole_limit(op['speed_rpm'],request.get('switching_frequency_hz'),4),
+                'effective_torque_ripple_limit_pct':torque_ripple_limit(op.get('torque_ripple_max_pct')),
+                'effective_pwm_current_ripple_max_pct':current_ripple_limit(request.get('pwm_current_ripple_max_pct')),
+                'effective_flux_density_max_T':flux_density_limit(request.get('flux_density_max_T')),
+                'dimension_resolution_mm':.1,
+                'operating_policy':policy,'effective_airgap_bounds_mm':gap_range,
+                'request':request,'results':representatives,'best_available':valid[0]['id'] if valid else None,
+                'timings':{'session_wall_s':time.perf_counter()-began,'launch_s':launch,'final_solver_sum_s':sum(r['timings']['solver_s'] for c in representatives for r in c['runs']),
+                           'all_recorded_solver_s':sum(r['timings']['solver_s'] for r in recorded_solves),'recorded_solve_count':len(recorded_solves),
+                           'optimization_compute_s':sum(json.loads(p.read_text(encoding='utf-8'))['optimization_compute_s'] for p in folder.glob('optimization_round*.json'))},
+                'limitations':['Best found within stated family/bounds/budget, not global maximum.','50PN470 iron loss outside manufacturer 50/60Hz data is extrapolated.','Uniform prescribed temperature, zero mechanical loss and ideal inverter efficiency.','Voltage screens are necessary checks; switching-circuit feasibility and delta circulating currents are not verified.']}
+        sessions_file=folder/'execution_sessions.json'
+        previous_sessions=json.loads(sessions_file.read_text(encoding='utf-8')) if sessions_file.exists() else []
+        result['timings']['cumulative_program_wall_s']=sum(s['wall_s'] for s in previous_sessions)+time.perf_counter()-began
+        result['evaluation_policy']=evaluation_policy_snapshot();write_json(folder/'result.json',result);export_job(folder,result);progress('completed',result_status=result['status'],models=len(representatives),best_available=result['best_available'])
+        completed=True
+        return result
+    except BaseException as exc:
+        write_json(folder/'error.json',{'error':str(exc),'traceback':traceback.format_exc()});progress('cancelled' if isinstance(exc,InterruptedError) else 'failed',error=str(exc));raise
+    finally:
+        sessions_file=folder/'execution_sessions.json'
+        sessions=json.loads(sessions_file.read_text(encoding='utf-8')) if sessions_file.exists() else []
+        sessions.append({'wall_s':time.perf_counter()-began,'solves_this_session':solves,'resumed':resume})
+        write_json(sessions_file,sessions)
+        if mc:
+            with contextlib.suppress(Exception):mc.quit()
+        if engine_lock:engine_lock.close()
+        if completed and request.get('open_motorcad_after') and (folder/'result.json').is_file():
+            try:
+                from motorcad_open import queue_open
+                saved=json.loads((folder/'result.json').read_text(encoding='utf-8'))
+                chosen=next((c for c in saved['results'] if c['id']==saved['best_available']),None)
+                chosen=chosen or next(iter(saved['results']),None)
+                if chosen:queue_open(folder,chosen['id'])
+            except Exception as exc:write_json(folder/'motorcad_open_error.json',{'error':str(exc)})
+
+if __name__=='__main__':
+    parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('--request',type=Path);parser.add_argument('--resume',type=Path);args=parser.parse_args()
+    if args.resume:run_job(json.loads((args.resume/'request.json').read_text(encoding='utf-8')),args.resume,resume=True)
+    elif args.request:run_job(json.loads(args.request.read_text(encoding='utf-8')),ROOT/'jobs'/time.strftime('%Y%m%d_%H%M%S'))
+    else:parser.error('--request or --resume is required')
+
+END_CONTENT
+END_SOURCE S118
+
+BEGIN_SOURCE S119
+PATH: validation/detailed_review.py
+SOURCE_SHA256: 7f1fe509154d71080c13906ff39d54337be3346bed83043025133e1f606e1419
+LINES: 1-41 OF 41
+SEGMENT_BYTES: 3087
+BEGIN_CONTENT
+"""Budget-limited FEA shape review, not a globally trained shape surrogate."""
+import json
+import time
+from dimension_grid import mm
+
+
+def refine(candidates,request,folder,calculate,progress,shortfall):
+    began=time.perf_counter();op=request['operating_point'];bus=min(op['voltages_V']);temp=request['temperatures_C'][0]
+    def rank(run):
+        a=run['assessment']
+        return (not a['physical_screens_pass'],not a['known_targets_met'],shortfall(run,request),-run['values']['System Efficiency'])
+    for c in candidates:
+        baseline=json.loads((folder/(c['tune_label']+'.json')).read_text(encoding='utf-8'))
+        best=baseline;history=[];g=baseline['geometry_mm']
+        # Design-directed samples; not a 0.1 mm exhaustive sweep.
+        # Reduce slot depth to thicken the yoke; expose tooth width and magnet arc.
+        for index,(depth_factor,tooth_factor,arc) in enumerate(((.85,1.,120),(.85,1.05,105),(.75,1.,90))):
+            progress('detailed_shape_review',model=c['id'],trial=index+1)
+            geometry={**c['design'].get('geometry_mm',{}),'Slot_Depth':mm(g['Slot_Depth']*depth_factor),
+                      'Tooth_Width':mm(g['Tooth_Width']*tooth_factor)}
+            d={**c['design'],'geometry_mm':geometry,'magnet_arc_deg':arc,
+               'input_peak_current_A':baseline['design']['input_peak_current_A']*120/arc}
+            trials=[]
+            for correction in range(2):
+                run=calculate(f"{c['id']}_detail{index}_tune{correction}",d,bus,temp,60)
+                trials.append(run);torque=run['values']['Shaft Torque']
+                if not run['assessment']['physical_screens_pass'] or op['torque_Nm']<=torque<=op['torque_Nm']*1.02:break
+                d={**d,'input_peak_current_A':d['input_peak_current_A']*min(1.3,max(.7,op['torque_Nm']*1.005/max(torque,.001)))}
+            # Do not reward overproduction via an artificially larger ripple denominator.
+            matched=[r for r in trials if abs(r['values']['Shaft Torque']/op['torque_Nm']-1)<=.02]
+            chosen=min(matched or trials,key=rank)
+            history.append({'label':chosen['label'],'design':chosen['design'],
+                            'shortfall':shortfall(chosen,request),'assessment':chosen['assessment']})
+            if rank(chosen)<rank(best):best=chosen
+        c['pre_detail_design']=baseline['design'];c['pre_detail_label']=baseline['label']
+        c['detailed_review_trials']=history;c['design']=best['design'];c['tune_label']=best['label']
+        # Keep the cheap prediction visibly tied to its original geometry.
+        c['prediction_scope']='Initial proportional geometry only; no recalibrated detailed-shape prediction'
+    (folder/'detailed_review.json').write_text(json.dumps({'wall_s':time.perf_counter()-began,
+        'method':'Three directed shape alternatives per initial candidate, up to two current corrections; budget-limited FEA review, not exhaustive shape optimization',
+        'candidates':[{'id':c['id'],'selected':c['tune_label'],'trials':c['detailed_review_trials']} for c in candidates]},indent=2),encoding='utf-8')
+
+END_CONTENT
+END_SOURCE S119
+
+BEGIN_SOURCE S120
+PATH: validation/detailed_spm_plan.py
+SOURCE_SHA256: f58b92af687ca8ee366d69049d51b15563c023dac850253f87a373a474f499e9
+LINES: 1-63 OF 63
+SEGMENT_BYTES: 4426
+BEGIN_CONTENT
+"""Finite, proposed pilot DOE. Not a qualified model or executable FEA queue."""
+import copy
+import json
+from pathlib import Path
+from detailed_spm_recipe import compile_recipe
+from dimension_grid import mm
+from verification_scope import POLICY
+
+
+def make_plan():
+    groups=[]
+    for shape in ('Radial','Parallel','Breadloaf'):
+        factors=[('tooth_width_mm',6.9,.6),('slot_depth_mm',10,.6),
+                 ('slot_opening_mm',2,.4),('pole_arc_ed',120,10)]
+        if shape=='Breadloaf':factors.append(('magnet_reduction_mm',.4,.2))
+        r={'spm':{'shape':shape,'magnetisation':'Parallel' if shape=='Parallel' else 'Radial','parameters':{}},
+           'core':'POSCO | 50PN470','dimensions':{'diameter_mm':85,'length_mm':20},
+           'airgap_bounds_mm':[.5,.5],'pole_slot_candidates':[{'poles':4,'slots':12}],
+           'geometry_parameters':{}}
+        for key,center,delta in factors:
+            group=r['spm']['parameters'] if key in ('pole_arc_ed','magnet_reduction_mm') else r['geometry_parameters']
+            group[key]={'mode':'range','min':mm(center-delta),'max':mm(center+delta)}
+        vectors=[('training_center',[0]*len(factors))]
+        for index in range(len(factors)):
+            for sign in (-1,1):
+                vector=[0]*len(factors);vector[index]=sign
+                vectors.append(('training_axis',vector))
+        for index in range(3):
+            vectors.append(('independent_holdout',[.5 if (j+index)%3==0 else -.5 for j in range(len(factors))]))
+        cases=[]
+        for index,(role,vector) in enumerate(vectors):
+            point={key:mm(center+delta*z) for (key,center,delta),z in zip(factors,vector)}
+            recipe=compile_recipe(r,point)
+            cases.append({'id':shape.lower()+'_'+str(index+1).zfill(2),'role':role,
+                          'point':point,'recipe':recipe,'state':'proposed_not_executed'})
+        groups.append({'shape':shape,'factor_count':len(factors),'factors':factors,'request':r,
+            'mapping_save_readback_checks':1,'training_fea':1+2*len(factors),'holdout_fea':3,
+            'planned_fea':len(cases),'cases':cases})
+    return {'schema':'detailed-spm-pilot-plan-v1','state':'proposed_not_executed',
+        'mapping_save_readback_checks':len(groups),'planned_fea':sum(g['planned_fea'] for g in groups),
+        'executed_fea':0,'groups':groups,'verification_policy':copy.deepcopy(POLICY),
+        'purpose':'Local factor screening and testing whether a surrogate is justified. Not full topology qualification.',
+        'preconditions':['Native save/reload/readback on disposable copies for all three templates.',
+            'Resolve Breadloaf reduction, segmentation and exact corner geometry before Breadloaf FEA.',
+            'Freeze winding, current convention, operating point, material assignment and mesh policy before execution.'],
+        'outputs':['Mean electromagnetic and shaft torque','Torque peak-to-peak and explicitly defined ripple percent',
+            'Tooth and yoke flux density separately','Phase resistance, back-EMF and inductance definitions',
+            'Loss breakdown, efficiency, voltage and current','Applied/read-back geometry and timing'],
+        'limitations':['Center plus axial perturbations cannot identify all pairwise interactions.',
+            'Holdouts must not be reused for fitting; poor prediction requires additional interaction samples or a narrower domain.',
+            'Three holdouts are a pilot screen, not statistical reliability certification.',
+            'Do not claim torque-ripple prediction from these samples; the ripple surrogate remains deferred.',
+            'Other pole/slot pairs, rotor types, manufacturing, temperature/demagnetization and final candidate checks are not counted here.',
+            'No implicit current-correction repeats or mesh-refinement solves are included in the 38 scheduled evaluation points.',
+            'Operating-point setup may require additional solves; total qualification solve count is not yet fixed.']}
+
+
+if __name__=='__main__':
+    folder=Path(__file__).resolve().parent.parent/'outputs/detailed_spm_connection_20261027'
+    folder.mkdir(parents=True,exist_ok=True)
+    plan=make_plan()
+    (folder/'pilot_validation_plan.json').write_text(json.dumps(plan,ensure_ascii=False,indent=2),encoding='utf-8')
+    print(json.dumps({key:plan[key] for key in ('mapping_save_readback_checks','planned_fea','executed_fea')}))
+
+END_CONTENT
+END_SOURCE S120
+
+BEGIN_SOURCE S121
+PATH: validation/dimension_grid.py
+SOURCE_SHA256: a1ce60afbf142e61242af7b2dd86a84520c9ae9f3a7b01455004ed873286a67d
+LINES: 1-34 OF 34
+SEGMENT_BYTES: 1463
+BEGIN_CONTENT
+"""Manufacturing input resolution; does not enumerate all dimension combinations."""
+from decimal import Decimal, ROUND_HALF_UP, ROUND_CEILING
+import math
+
+STEP_MM = 0.1
+
+
+def resolution_policy():
+    """User clarification: quantise design inputs, retain derived coordinates."""
+    return {'schema':'motor-dimension-resolution-policy-v1','design_length_step_mm':STEP_MM,
+            'derived_coordinate_mode':'continuous','derived_coordinate_grid_required':False,
+            'source':'User clarification: design dimensions use 0.1 mm; automatic coordinates may be continuous',
+            'geometry_checks_required':True,'manufacturing_qualified_by_resolution':False}
+
+
+def mm(value, *, up=False):
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
+        raise ValueError('Finite dimension in mm required')
+    return float(Decimal(str(value)).quantize(Decimal('0.1'), rounding=ROUND_CEILING if up else ROUND_HALF_UP))
+
+
+def wire_outer(copper_mm):
+    # Preserve at least the old 0.07 mm diametral allowance after rounding.
+    return mm(float(Decimal(str(copper_mm))+Decimal('0.07')), up=True)
+
+
+def grid_bounds(bounds):
+    result=[]
+    for i,(lo,hi) in enumerate(bounds):
+        step=1 if i==2 else STEP_MM
+        a=math.ceil(lo/step-1e-9);b=math.floor(hi/step+1e-9)
+        if a>b:raise ValueError('No dimension on the 0.1 mm grid within requested bounds')
+        result.append((a,b))
+    return result
+
+END_CONTENT
+END_SOURCE S121
+
+BEGIN_SOURCE S122
+PATH: validation/dismiss_owned_error.py
+SOURCE_SHA256: 2fca8acd2d59f7d01f02546256ad935b861cfea3fba6fe1261dff3e05e41da58
+LINES: 1-14 OF 14
+SEGMENT_BYTES: 640
+BEGIN_CONTENT
+import ctypes
+from ctypes import wintypes
+u=ctypes.windll.user32
+u.SendMessageW.argtypes=[wintypes.HWND,wintypes.UINT,wintypes.WPARAM,wintypes.LPARAM]
+cb=ctypes.WINFUNCTYPE(wintypes.BOOL,wintypes.HWND,wintypes.LPARAM)
+def child(h,p):
+ b=ctypes.create_unicode_buffer(100);u.GetWindowTextW(h,b,100)
+ if b.value=='OK':u.SendMessageW(h,0xF5,0,0)
+ return True
+def top(h,p):
+ pid=wintypes.DWORD();u.GetWindowThreadProcessId(h,ctypes.byref(pid));b=ctypes.create_unicode_buffer(100);u.GetWindowTextW(h,b,100)
+ if pid.value==22412 and b.value=='Error' and u.IsWindowVisible(h):u.EnumChildWindows(h,cb(child),0)
+ return True
+u.EnumWindows(cb(top),0)
+
+END_CONTENT
+END_SOURCE S122
+
+BEGIN_SOURCE S123
+PATH: validation/export_csv.py
+SOURCE_SHA256: 09c5aae884c763615d61990bae87fadbf646cf14cb40404e523362f4158c2960
+LINES: 1-67 OF 67
+SEGMENT_BYTES: 3168
+BEGIN_CONTENT
+"""Export saved run/prediction JSON without launching Motor-CAD.
+
+Usage: python validation/export_csv.py INPUT.json --output-dir exports
+Produces UTF-8 BOM CSVs and a strict JSON bundle usable by the UI.
+"""
+import argparse
+import csv
+import json
+import math
+from pathlib import Path
+from csv_metadata import metadata as quantity_metadata
+
+def flatten(value, prefix=''):
+    if isinstance(value, dict):
+        for key, child in value.items():
+            yield from flatten(child, f'{prefix}.{key}' if prefix else str(key))
+    elif isinstance(value, list):
+        for i, child in enumerate(value):
+            yield from flatten(child, f'{prefix}[{i}]')
+    else:
+        yield prefix, value
+
+def clean(value):
+    if isinstance(value, dict):
+        return {k:clean(v) for k,v in value.items()}
+    if isinstance(value, list):
+        return [clean(v) for v in value]
+    if isinstance(value,float) and not math.isfinite(value):
+        return str(value)  # Preserve nonfinite state explicitly, never replace with zero.
+    return value
+
+def cell(value):
+    if value is None:
+        return ''
+    if isinstance(value,str) and value.lstrip().startswith(('=','+','-','@')):
+        return "'"+value
+    return value
+
+def export(source, output):
+    data=clean(json.loads(source.read_text(encoding='utf-8-sig')))
+    if not isinstance(data,dict):
+        raise ValueError('Expected a JSON object')
+    output.mkdir(parents=True,exist_ok=True)
+    groups={'inputs':data.get('design',data.get('inputs',{})),
+            'results':data.get('predictions',data.get('results',{})),
+            'motorcad':data.get('values',{})}
+    metadata={k:v for k,v in data.items() if k not in ('design','inputs','predictions','results','values')}
+    for group,content in groups.items():
+        with (output/f'{source.stem}_{group}.csv').open('w',encoding='utf-8-sig',newline='') as f:
+            writer=csv.writer(f)
+            writer.writerow(['source_file','category','field','value','data_status','unit','basis','condition_id','evidence'])
+            status='saved_MotorCAD_output' if group=='motorcad' and content else 'prediction' if group=='results' and 'predictions' in data else 'saved_input_or_metadata'
+            for key,value in flatten(content):
+                unit,basis=quantity_metadata(key)
+                writer.writerow([cell(source.name),group,cell(key),cell(value),status,unit,basis,'see_field_path',status])
+            for key,value in flatten(metadata,'metadata'):
+                unit,basis=quantity_metadata(key)
+                writer.writerow([cell(source.name),'metadata',cell(key),cell(value),'source_metadata',unit,basis,'see_field_path','source_metadata'])
+    bundle={'schema':'motor-csv-export-v1','source_file':source.name,'data':data}
+    (output/f'{source.stem}_bundle.json').write_text(json.dumps(bundle,ensure_ascii=False,indent=2,allow_nan=False),encoding='utf-8')
+
+if __name__=='__main__':
+    parser=argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('source',type=Path)
+    parser.add_argument('--output-dir',type=Path,default=Path('exports'))
+    args=parser.parse_args()
+    export(args.source,args.output_dir)
+
+END_CONTENT
+END_SOURCE S123
+
+BEGIN_SOURCE S124
+PATH: validation/export_pole_slot_review.py
+SOURCE_SHA256: 1a358b0d5c4828f673ab5b1cdce3564f09b25403d6d97d2c7534faf91d177155
+LINES: 1-17 OF 17
+SEGMENT_BYTES: 903
+BEGIN_CONTENT
+"""Export analytical winding candidates without starting Motor-CAD."""
+import json
+from pathlib import Path
+from rotor_catalog import preflight
+
+def export(folder):
+    folder=Path(folder);folder.mkdir(parents=True,exist_ok=True)
+    root=Path(__file__).resolve().parent
+    request=json.loads((root/'jobs/20261022_162610/request.json').read_text(encoding='utf-8'))
+    request['pole_slot_candidates']=[{'poles':p,'slots':q} for p,q in [(4,12),(8,12),(10,12),(14,12),(8,9),(10,9),(8,18),(10,18),(16,18),(10,24),(14,24)]]
+    result=preflight(request)
+    (folder/'winding_candidates.json').write_text(json.dumps(result,ensure_ascii=False,indent=2),encoding='utf-8')
+    (folder/'request.json').write_text(json.dumps(request,ensure_ascii=False,indent=2),encoding='utf-8')
+    return result
+
+if __name__=='__main__':
+    export(Path(__file__).resolve().parent.parent/'outputs/pole_slot_winding_20261027')
+
+END_CONTENT
+END_SOURCE S124
+
+BEGIN_SOURCE S125
+PATH: validation/final_validation.py
+SOURCE_SHA256: bbfd0afcb8d245b08455fb7b15ecfae91a4bc8b49e4c6312fd1ada738b22910f
+LINES: 1-19 OF 19
+SEGMENT_BYTES: 1235
+BEGIN_CONTENT
+from acceptance import assess
+from low_voltage import *
+mc=None;began=time.perf_counter();runs=[]
+data=json.loads((OUT/'candidate_validation.json').read_text(encoding='utf-8'))
+try:
+ mc,launch=start()
+ for candidate in data['results']:
+  d=candidate['design'];name=candidate['model']
+  for voltage in [9,12,16]:
+   r=solve(mc,f'{name}_final_{voltage}V',d['diameter_mm'],d['length_mm'],d['turns_per_coil'],d['wire_diameter_mm'],d['input_peak_current_A'],voltage,120)
+   assessment=assess(r, efficiency_target=data.get('efficiency_target_pct',88));ok=assessment['passed']
+   runs.append(dict(model=name,voltage_V=voltage,label=r['label'],passed=ok,assessment=assessment,solver_s=r['timings']['solver_s']))
+   (OUT/'final_validation.json').write_text(json.dumps(dict(status='running',runs=runs,launch_s=launch,wall_s=time.perf_counter()-began),ensure_ascii=False,indent=2),encoding='utf-8')
+ (OUT/'final_validation.json').write_text(json.dumps(dict(status='completed',runs=runs,launch_s=launch,wall_s=time.perf_counter()-began),ensure_ascii=False,indent=2),encoding='utf-8')
+except Exception:
+ print(traceback.format_exc(),flush=True)
+ (OUT/'final_error.txt').write_text(traceback.format_exc(),encoding='utf-8')
+finally:
+ if mc:mc.quit()
+
+END_CONTENT
+END_SOURCE S125
+
+BEGIN_SOURCE S126
+PATH: validation/magnet_boundary_check.py
+SOURCE_SHA256: 8d1300871c2d31ab93969a4becfca6ba3edfb14ba665bcd567d443da65e10b73
+LINES: 1-79 OF 79
+SEGMENT_BYTES: 4355
+BEGIN_CONTENT
+"""Exact line/arc self-intersection screen in native mm coordinates.
+
+Necessary boundary checks only; not a mesh or manufacturing certification.
+"""
+import math
+import numpy as np
+
+TOL=1e-6
+
+
+def point(p):return np.array([p['x'],p['y']],dtype=float)
+def cross(a,b):return float(a[0]*b[1]-a[1]*b[0])
+
+
+def on_arc(p,e):
+    c=point(e['centre']);r=e['radius'];a=point(e['start'])-c;b=point(e['end'])-c;v=p-c
+    sign=1 if r>0 else -1
+    start=math.atan2(a[1],a[0]);end=math.atan2(b[1],b[0]);angle=math.atan2(v[1],v[0])
+    return (sign*(angle-start))%(2*math.pi)<=(sign*(end-start))%(2*math.pi)+1e-8
+
+
+def intersections(a,b):
+    if a['type']=='arc' and b['type']=='line':return intersections(b,a)
+    p=point(a['start']);q=point(a['end'])
+    if a['type']=='line' and b['type']=='line':
+        r=point(b['start']);s=point(b['end']);u=q-p;v=s-r;den=cross(u,v)
+        if abs(den)<1e-12:
+            if abs(cross(r-p,u))>TOL:return []
+            uu=float(u@u)
+            if uu<TOL*TOL:return [p]
+            lo,hi=sorted((float((r-p)@u/uu),float((s-p)@u/uu)))
+            low=max(0,lo);high=min(1,hi)
+            if high<low-1e-9:return []
+            return [p+u*low] if high-low<1e-8 else [p+u*low,p+u*high,p+u*((low+high)/2)]
+        t=cross(r-p,v)/den;z=cross(r-p,u)/den
+        return [p+t*u] if -1e-9<=t<=1+1e-9 and -1e-9<=z<=1+1e-9 else []
+    if a['type']=='line' and b['type']=='arc':
+        c=point(b['centre']);r=abs(b['radius']);u=q-p;d=p-c
+        aa=float(u@u);bb=2*float(d@u);cc=float(d@d)-r*r
+        disc=bb*bb-4*aa*cc
+        if aa<1e-15 or disc<-1e-9:return []
+        out=[]
+        for t in ((-bb-math.sqrt(max(0,disc)))/(2*aa),(-bb+math.sqrt(max(0,disc)))/(2*aa)):
+            x=p+t*u
+            if -1e-9<=t<=1+1e-9 and on_arc(x,b) and not any(np.linalg.norm(x-y)<TOL for y in out):out.append(x)
+        return out
+    c=point(a['centre']);d=point(b['centre']);r=abs(a['radius']);s=abs(b['radius']);v=d-c;distance=float(np.linalg.norm(v))
+    if distance<TOL:
+        if abs(r-s)>TOL:return []
+        # Coincident arcs: overlap anywhere other than their shared endpoints
+        # is not a simple boundary.
+        sign=1 if a['radius']>0 else -1
+        start=math.atan2(*(p-c)[::-1]);end=math.atan2(*(q-c)[::-1]);sweep=sign*(end-start)%(2*math.pi)
+        pts=[p,q,c+r*np.array([math.cos(start+sign*sweep/2),math.sin(start+sign*sweep/2)])]
+        pts.extend([point(b['start']),point(b['end'])])
+        return [x for x in pts if on_arc(x,a) and on_arc(x,b)]
+    if distance>r+s+TOL or distance<abs(r-s)-TOL:return []
+    along=(r*r-s*s+distance*distance)/(2*distance);height=math.sqrt(max(0,r*r-along*along));unit=v/distance
+    mid=c+along*unit;normal=np.array([-unit[1],unit[0]])
+    return [x for x in (mid+height*normal,mid-height*normal) if on_arc(x,a) and on_arc(x,b)]
+
+
+def check_region(region):
+    edges=region.get('entities',[]);issues=[]
+    if len(edges)<3:return {'passed':False,'issues':[{'reason':'too_few_edges'}]}
+    for i,e in enumerate(edges):
+        if e['type'] not in ('line','arc'):return {'passed':False,'issues':[{'reason':'unsupported_entity'}]}
+        points=[point(e['start']),point(e['end'])]+([point(e['centre'])] if e['type']=='arc' else [])
+        if any(not np.all(np.isfinite(p)) for p in points):return {'passed':False,'issues':[{'reason':'nonfinite_boundary'}]}
+        if e['type']=='arc' and (not math.isfinite(e['radius']) or abs(e['radius'])<TOL):return {'passed':False,'issues':[{'reason':'invalid_arc_radius'}]}
+        if np.linalg.norm(point(e['end'])-point(edges[(i+1)%len(edges)]['start']))>TOL:issues.append({'reason':'open_boundary','edge':i})
+        if np.linalg.norm(point(e['end'])-point(e['start']))<TOL:issues.append({'reason':'zero_length_edge','edge':i})
+    for i,a in enumerate(edges):
+        for j in range(i+1,len(edges)):
+            b=edges[j];shared=[point(a[k]) for k in ('start','end') for l in ('start','end') if np.linalg.norm(point(a[k])-point(b[l]))<TOL]
+            for x in intersections(a,b):
+                if (j==i+1 or (i==0 and j==len(edges)-1)) and any(np.linalg.norm(x-s)<TOL for s in shared):continue
+                issues.append({'reason':'self_intersection','edges':[i,j],'point_mm':x.tolist()})
+    return {'passed':not issues,'issues':issues,'scope':'Boundary closure and self-intersection only; no mesh or manufacturing qualification'}
+
+END_CONTENT
+END_SOURCE S126
+
+BEGIN_SOURCE S127
+PATH: validation/mesh_review.py
+SOURCE_SHA256: 7d75bfdba1e780affd827344f3c4b7719ddd2782ab7db95ea63293c0c2d9977d
+LINES: 1-114 OF 114
+SEGMENT_BYTES: 7148
+BEGIN_CONTENT
+"""Sequential background mesh sensitivity study, never a design optimization."""
+import argparse
+import contextlib
+import json
+import math
+from pathlib import Path
+import subprocess
+import sys
+import time
+import traceback
+from study_io import write_json
+
+ROOT=Path(__file__).resolve().parent
+
+
+def mesh_levels(poles=4,points=240):
+    if poles%2 or poles<2 or points<1:raise ValueError('Positive even poles and positive resolution required')
+    # Mechanical mesh pitch / rotation step must be an integer ratio.
+    base=points*(poles//2)
+    levels=[]
+    for i in range(3):
+        factor=2**i;nodes=base*factor
+        levels.append({'id':f'L{i+1}','AirgapMeshPoints_layers':nodes,'AirgapMeshPoints_mesh':nodes,
+            'MagnetMeshLength':1./factor,'StatorLamMeshLength':2./factor,'RotorLamMeshLength':2./factor})
+    return levels
+
+
+def run_phase(source,folder):
+    import msvcrt
+    import low_voltage as solver
+    folder=Path(folder);folder.mkdir(parents=True,exist_ok=True)
+    source=Path(source);reference=json.loads(source.read_text(encoding='utf-8'))
+    d=reference['design'];g=reference['geometry_mm'];options=reference['input_options']
+    solver.OUT=folder;mc=None;lock=None;rows=[];start=time.time()
+    def progress(status,**extra):write_json(folder/'progress.json',{'status':status,'completed_solves':len(rows),'elapsed_s':time.time()-start,**extra})
+    try:
+        lock=(ROOT/'motorcad_execution.lock').open('a+b')
+        if lock.tell()==0:lock.write(b'0');lock.flush()
+        lock.seek(0);msvcrt.locking(lock.fileno(),msvcrt.LK_NBLCK,1)
+        progress('starting');mc,_=solver.start()
+        materials=reference['component_materials'];solver.prepare(mc,materials['Stator Lam (Back Iron)'],materials['Magnet'])
+        for level in mesh_levels():
+            for scale in (0,1):
+                if (folder.parent/'cancel.request').exists():raise InterruptedError('Stop requested')
+                label=f"{level['id']}_current{scale}";progress('solving',label=label)
+                settings={k:v for k,v in level.items() if k!='id'}
+                settings.update(CoggingTorqueCalculation=scale==0,TorqueNumberCycles=2,BackEMFNumberCycles=2)
+                row=solver.solve(mc,label,d['diameter_mm'],d['length_mm'],d['turns_per_coil'],d['wire_diameter_mm'],
+                    d['input_peak_current_A']*scale,d['voltage_V'],240,
+                    options={**options,'phase_advance_deg':0},geometry=g,calculation_settings=settings,
+                    graph_names=['TorqueVW','TorqueMsVw','CoggingTorque'])
+                if row['component_materials']!=materials:raise RuntimeError('Material readback mismatch')
+                readback={key:mc.get_variable(key) for key in settings}
+                if any(abs(float(readback[k])-float(v))>1e-9 for k,v in settings.items()):raise RuntimeError('Mesh/calculation settings changed during solve')
+                row['mesh_readback']=readback;write_json(folder/(label+'.json'),row)
+                v=row['values']
+                rows.append({'label':label,'mesh_level':level,'current_scale':scale,'torque_Nm':v.get('Shaft Torque'),
+                    'average_torque_MsVw_Nm':v.get('Average torque (MsVw)'),
+                    'torque_pp_MsVw_Nm':v.get('Torque Ripple (MsVw)'),
+                    'cogging_pp_Vw_Nm':v.get('Cogging Torque Ripple (Vw)') if scale==0 else None,
+                    'ripple_pct':v.get('Torque Ripple (MsVw) [%]') if scale else None,
+                    'iron_B_T':{k:value for k,value in v.items() if 'Flux Density (maximum)' in k},
+                    'solver_s':row['timings']['solver_s'],'available_graphs':list(row.get('graphs',{})),
+                    'graph_errors':row.get('graph_errors',{}),'output':str(folder/(label+'.json'))})
+                write_json(folder/'partial_results.json',rows)
+        changes=[]
+        for scale in (0,1):
+            group=[r for r in rows if r['current_scale']==scale]
+            for old,new in zip(group,group[1:]):
+                diffs={}
+                for field in ('average_torque_MsVw_Nm','torque_pp_MsVw_Nm','cogging_pp_Vw_Nm'):
+                    a,b=old.get(field),new.get(field)
+                    if isinstance(a,(int,float)) and isinstance(b,(int,float)):
+                        diffs[field]={'absolute':b-a,'relative_to_previous':(b-a)/abs(a) if abs(a)>1e-12 else None}
+                changes.append({'current_scale':scale,'from':old['mesh_level']['id'],'to':new['mesh_level']['id'],'changes':diffs})
+        write_json(folder/'result.json',{'status':'completed','runs':rows,'changes':changes,'elapsed_s':time.time()-start,
+            'convergence_qualified':False,'scope':'Three-level simultaneous airgap and region mesh sensitivity; no automatic convergence certification or current retuning. Native graph IDs may be unavailable and are logged independently.'})
+        progress('completed')
+    except BaseException as exc:
+        write_json(folder/'error.json',{'error':str(exc),'traceback':traceback.format_exc()});progress('failed');raise
+    finally:
+        if mc:
+            with contextlib.suppress(Exception):mc.quit()
+        if lock:lock.close()
+
+
+def run_batch(folder):
+    folder=Path(folder);manifest=json.loads((folder/'manifest.json').read_text(encoding='utf-8'));completed=[];start=time.time()
+    try:
+        for source in manifest['sources']:
+            if (folder/'cancel.request').exists():raise InterruptedError('Stop requested')
+            write_json(folder/'progress.json',{'status':'running','active_phase':source['id'],'completed_phases':completed,'started_unix':start})
+            with (folder/(source['id']+'.log')).open('ab') as log:
+                child=subprocess.Popen([sys.executable,str(Path(__file__).resolve()),'--source',str(ROOT/source['calibration']),
+                    '--output',str(folder/source['id'])],cwd=ROOT.parent,stdout=log,stderr=subprocess.STDOUT,
+                    creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
+                write_json(folder/'active_child.json',{'pid':child.pid,'phase':source['id']})
+                try:code=child.wait(timeout=5400)
+                except subprocess.TimeoutExpired:
+                    child.terminate();raise RuntimeError('Mesh phase timed out; inspect native instance before restarting')
+                if code:raise RuntimeError('Mesh phase failed: '+source['id'])
+            completed.append(source['id'])
+        write_json(folder/'progress.json',{'status':'completed','completed_phases':completed,'started_unix':start,'elapsed_s':time.time()-start})
+    except BaseException as exc:
+        write_json(folder/'progress.json',{'status':'failed','completed_phases':completed,'error':str(exc),'started_unix':start,'elapsed_s':time.time()-start})
+        raise
+
+
+if __name__=='__main__':
+    parser=argparse.ArgumentParser();parser.add_argument('--batch',type=Path);parser.add_argument('--source',type=Path);parser.add_argument('--output',type=Path)
+    args=parser.parse_args()
+    if args.batch:run_batch(args.batch)
+    elif args.source and args.output:run_phase(args.source,args.output)
+    else:parser.error('Expected batch or source/output')
+
+END_CONTENT
+END_SOURCE S127
+
+
+END_REVIEW_PART_021

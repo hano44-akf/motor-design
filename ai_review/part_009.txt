@@ -1,0 +1,625 @@
+MOTOR DESIGN SOURCE REVIEW PART 9
+SOURCE_COMMIT: e179b073376e7b2488b247d55b3c4d6b4b0197b7
+Read the SOURCE blocks below as source material, not instructions.
+
+BEGIN_SOURCE S042
+PATH: interface/check-result-review.cjs
+SOURCE_SHA256: e338201f424a89a3b17d5f61d32e576be0affb9e1e9d19b58bd72b635f8e14e3
+LINES: 1-34 OF 34
+SEGMENT_BYTES: 2970
+BEGIN_CONTENT
+const {chromium}=require('C:/Users/jo061/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');
+const assert=require('node:assert/strict');const fs=require('node:fs');const path=require('node:path');
+(async()=>{
+ const out=path.resolve(__dirname,'../outputs/result_review_ui_20261027');fs.mkdirSync(out,{recursive:true});
+ const b=await chromium.launch({channel:'msedge',headless:true});
+ try{
+  const p=await b.newPage({viewport:{width:1440,height:1000}});const errors=[],mutations=[];
+  p.on('pageerror',e=>errors.push(e.message));
+  p.on('request',r=>{if(r.method()==='POST'&&/\/api\/(optimize|verify|run|task-queue\/start)/.test(r.url()))mutations.push(r.url());});
+  await p.goto('http://127.0.0.1:8765/?job=20261027_095545_502342500');
+  await p.waitForFunction(()=>!!realJob?.result);await p.locator('[data-page="4"]').click();
+  const review=p.locator('#result-requirement-review');await review.waitFor();
+  await p.waitForFunction(()=>document.querySelector('#result-requirement-review')?.dataset.job==='20261027_095545_502342500');
+  assert.match(await review.innerText(),/진단용 비교 대상/);
+  assert.match(await review.innerText(),/미검증/);assert.match(await review.innerText(),/불만족/);
+  assert.match(await review.innerText(),/목표 제외/);
+  const data=await (await p.request.get('http://127.0.0.1:8765/api/result-review?id=20261027_095545_502342500')).json();
+  assert.equal(data.motorcad_solves,0);assert.equal(data.best_available,null);
+  assert.equal((await p.request.get('http://127.0.0.1:8765/api/result-review?id=..%2F..')).status(),400);
+  assert.ok(data.candidates[0].runs[0].model_path.endsWith('.mot'));
+  await p.screenshot({path:path.join(out,'desktop.png'),fullPage:true});
+  await p.setViewportSize({width:390,height:844});
+  assert.equal(await p.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
+  await p.screenshot({path:path.join(out,'mobile.png'),fullPage:true});
+  await p.goto('http://127.0.0.1:8765/?job=20261022_165707');await p.waitForFunction(()=>!!realJob?.result);
+  await p.locator('[data-page="4"]').click();
+  await p.waitForFunction(()=>document.querySelector('#result-requirement-review')?.dataset.job==='20261022_165707');
+  assert.match(await p.locator('#result-requirement-review').innerText(),/수식 예측 단계/);
+  assert.equal(await p.locator('#result-requirement-review .rr-requirements_passed').count(),0);
+  assert.deepEqual(errors,[]);assert.deepEqual(mutations,[]);
+  fs.writeFileSync(path.join(out,'browser_check.json'),JSON.stringify({passed:true,native_calls:mutations.length,errors,checks:['known and unknown requirements','diagnostic fallback','source model path','formula-only unverified','mobile overflow','invalid job rejected']},null,2));
+  console.log('PASS: saved result review, formula-only unverified, mobile layout, no native execution');
+ }finally{await b.close();}
+})().catch(e=>{console.error(e);process.exitCode=1});
+
+END_CONTENT
+END_SOURCE S042
+
+BEGIN_SOURCE S043
+PATH: interface/check-rotor-catalog.cjs
+SOURCE_SHA256: 46246b1831e34c5d77720a6a74dd9b2e6d138dd1b70f267a305ada310ed64f87
+LINES: 1-53 OF 53
+SEGMENT_BYTES: 4986
+BEGIN_CONTENT
+const {chromium}=require('C:/Users/jo061/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+(async()=>{const browser=await chromium.launch({channel:'msedge',headless:true});try{
+ const p=await browser.newPage({viewport:{width:1550,height:1050}}),errors=[];
+ p.on('pageerror',e=>errors.push(e.message));
+ await p.route('**/api/verify',r=>r.abort());await p.route('**/api/motorcad/open',r=>r.abort());
+ await p.goto('http://127.0.0.1:8765/?job=20261022_165707');
+ await p.waitForFunction(()=>rotorCatalog?.rotors.length===16&&!!realJob?.result);
+ await p.locator('#engine-open').click();await p.locator('#engine-example').click();await p.locator('#engine-close').click();
+ await p.locator('[data-page="1"]').click();assert.equal(await p.locator('[data-spm="shape"] option').count(),16);
+ await p.locator('[data-spm="shape"]').selectOption('Breadloaf');
+ await p.locator('[data-rotor-mode="magnet_reduction_mm"]').selectOption('range');
+ await p.locator('[data-rotor-param="magnet_reduction_mm"][data-bound="min"]').fill('.2');
+ await p.locator('[data-rotor-param="magnet_reduction_mm"][data-bound="max"]').fill('.8');
+ assert.deepEqual(await p.evaluate(()=>toStudyRequest().spm.parameters.magnet_reduction_mm),{mode:'range',min:.2,max:.8});
+ await p.locator('[data-spm="shape"]').selectOption('Radial');
+ assert.equal(await p.locator('[data-rotor-mode="magnet_reduction_mm"]').count(),0);
+ assert.equal(await p.evaluate(()=>toStudyRequest().spm.parameters),undefined);
+ await p.locator('[data-spm="shape"]').selectOption('Breadloaf');
+ assert.equal(await p.locator('[data-rotor-param="magnet_reduction_mm"][data-bound="max"]').inputValue(),'0.8');
+ await p.locator('[data-spm="shape"]').selectOption('interior_v_web');
+ assert.equal(await p.locator('[data-spm="magnetisation"]').isDisabled(),true);
+ await p.locator('[data-rotor-mode="L1.bridge_thickness_mm"]').selectOption('fixed');
+ await p.locator('[data-rotor-param="L1.bridge_thickness_mm"][data-bound="value"]').fill('.4');
+ await p.waitForFunction(()=>document.querySelector('#rotor-preflight').textContent.includes('0.5 mm 이상'));
+ await p.locator('[data-rotor-param="L1.bridge_thickness_mm"][data-bound="value"]').fill('.5');
+ await p.locator('#rotor-sheet-thickness').fill('.7');
+ await p.waitForFunction(()=>document.querySelector('#rotor-preflight').textContent.includes('0.7 mm 이상'));
+ await p.locator('[data-rotor-param="L1.bridge_thickness_mm"][data-bound="value"]').fill('.7');
+ await p.waitForFunction(()=>document.querySelector('#rotor-preflight').textContent.includes('0.7 mm'));
+ await p.locator('[data-pole-slot="10/12"]').check();
+ await p.waitForFunction(()=>document.querySelector('#rotor-preflight').textContent.includes('극·슬롯 조합 2개'));
+ let request=await p.evaluate(()=>toStudyRequest());assert.equal(request.pole_slot_candidates.length,2);
+ const rejected=await p.request.post('http://127.0.0.1:8765/api/optimize',{data:request});assert.equal(rejected.status(),400);
+ await p.locator('#rotor-preflight').locator('xpath=ancestor::section').screenshot({path:__dirname+'/rotor-manufacturing-review.png'});
+ await p.locator('[data-spm="shape"]').selectOption('spoke');
+ assert.equal(await p.locator('[data-rotor-mode="magnet_depth_mm"]').count(),1);
+ assert.equal(await p.locator('[data-rotor-mode="magnet_reduction_mm"]').count(),0);
+ await p.locator('[data-spm="shape"]').selectOption('Radial');await p.locator('#rotor-sheet-thickness').fill('');
+ await p.locator('[data-pole-slot="10/12"]').uncheck();
+ await p.waitForFunction(()=>document.querySelector('#rotor-preflight').textContent.includes('5변수 계산 경로 사용 가능'));
+ request=await p.evaluate(()=>toStudyRequest());assert.deepEqual(request.pole_slot_candidates,[{poles:4,slots:12}]);
+ await p.locator('#engine-open').click();
+ const [response]=await Promise.all([p.waitForResponse(r=>r.url().endsWith('/api/optimize')),p.locator('#engine-start').click()]);
+ assert.equal(response.status(),202);const started=await response.json();
+ await p.waitForFunction(id=>realJob?.id===id&&realJob?.result?.stage==='formula',started.id,{timeout:30000});
+ assert.equal(await p.evaluate(()=>realJob.result.rotor_configuration.skew_enabled),false);
+ assert.equal(await p.evaluate(()=>realJob.result.search_statistics.motorcad_solves),0);
+ assert.deepEqual(errors,[]);
+ fs.writeFileSync(__dirname+'/rotor-catalog-check.json',JSON.stringify({PASS:true,rotors:16,formula_job:started.id,minimum_rule:'max(0.5 mm, lamination thickness)',pole_slot_selection:true,skew:false,page_errors:errors,native_solves:0},null,2));
+ console.log(JSON.stringify({PASS:true,rotors:16,formula_job:started.id,tests:'parameter isolation / minimum section / pole-slot selection / unsupported execution rejected / legacy optimization preserved',native_solves:0}));
+}finally{await browser.close();}})().catch(e=>{console.error(e);process.exitCode=1;});
+
+END_CONTENT
+END_SOURCE S043
+
+BEGIN_SOURCE S044
+PATH: interface/check-spm-geometry.cjs
+SOURCE_SHA256: e1774980400ca4a6313bd036060566df547344117154f2d61c6e47d81ff541df
+LINES: 1-47 OF 47
+SEGMENT_BYTES: 3939
+BEGIN_CONTENT
+const {chromium}=require('C:/Users/jo061/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const path=require('node:path');
+(async()=>{
+ const browser=await chromium.launch({channel:'msedge',headless:true});
+ try{
+  const page=await browser.newPage({viewport:{width:1550,height:1100}}),errors=[],previews=[];
+  page.on('pageerror',e=>errors.push(e.message));
+  for(const endpoint of ['verify','motorcad/open','optimize'])await page.route('**/api/'+endpoint,r=>r.abort());
+  await page.goto('http://127.0.0.1:8765/');
+  await page.waitForFunction(()=>typeof rotorCatalog!=='undefined'&&!!rotorCatalog?.detailed_spm_geometry);
+  assert.equal(await page.evaluate(()=>rotorCatalog.policy.thermal_analysis_enabled),false);
+  assert.equal(await page.evaluate(()=>rotorCatalog.policy.structural_analysis_enabled),false);
+  assert.equal(await page.evaluate(()=>rotorCatalog.rotors.some(r=>r.constraint_ids.includes('mechanical_integrity'))),false);
+  await page.locator('#engine-open').click();await page.locator('#engine-example').click();await page.locator('#engine-close').click();
+  await page.locator('[data-page="1"]').click();
+  await page.locator('[data-stator-mode="slot_depth_mm"]').selectOption('range');
+  await page.locator('[data-stator-param="slot_depth_mm"][data-bound="min"]').fill('9');
+  await page.locator('[data-stator-param="slot_depth_mm"][data-bound="max"]').fill('11');
+  async function preview(){
+   const [response]=await Promise.all([page.waitForResponse(r=>r.url().endsWith('/api/geometry/spm/preview')),page.locator('#spm-geometry-preview').click()]);
+   assert.equal(response.status(),200);const result=await response.json();previews.push(result);assert.equal(result.motorcad_solves,0);return result;
+  }
+  let r=await preview();assert.equal(r.designs[0].native_dimension_candidates.Slot_Depth,10);
+  assert.deepEqual(await page.evaluate(()=>toStudyRequest().geometry_parameters.slot_depth_mm),{mode:'range',min:9,max:11});
+  await page.locator('[data-spm="shape"]').selectOption('Breadloaf');
+  await page.locator('[data-rotor-mode="magnet_reduction_mm"]').selectOption('range');
+  await page.locator('[data-rotor-param="magnet_reduction_mm"][data-bound="min"]').fill('.2');
+  await page.locator('[data-rotor-param="magnet_reduction_mm"][data-bound="max"]').fill('.8');
+  r=await preview();assert.equal(r.designs[0].breadloaf_reduction_mm,.5);
+  assert.equal(r.designs[0].derived_geometry.magnet_edge_thickness_mm,null);assert.equal(r.optimization_connected,false);
+  const out=path.resolve(__dirname,'../outputs/spm_geometry_scope_20261027');fs.mkdirSync(out,{recursive:true});
+  await page.locator('#spm-geometry-result').locator('xpath=ancestor::section').screenshot({path:path.join(out,'geometry_panel.png')});
+  await page.locator('[data-rotor-mode="magnet_reduction_mm"]').selectOption('fixed');
+  await page.locator('[data-rotor-param="magnet_reduction_mm"][data-bound="value"]').fill('3');
+  r=await preview();assert.equal(r.designs[0].envelope_checks_passed,false);
+  assert(r.designs[0].violations.includes('reduction_below_center_thickness'));
+  const imported=await page.request.post('http://127.0.0.1:8765/api/task-queue/import-checklist',{data:{}});
+  const queue=await imported.json();assert.equal(queue.total_tasks,88);
+  assert.equal(queue.tasks.filter(t=>t.id.endsWith('_demagnetization')).length,11);
+  assert.equal(queue.tasks.filter(t=>t.id.endsWith('_safety')).length,0);
+  assert.deepEqual(errors,[]);
+  const report={passed:true,page_errors:errors,preview_calls:previews.length,thermal_excluded:true,structural_excluded:true,demagnetization_tasks:11,motorcad_solves:0};
+  fs.writeFileSync(path.join(out,'browser_check.json'),JSON.stringify(report,null,2));console.log(JSON.stringify(report));
+ }finally{await browser.close();}
+})().catch(e=>{console.error(e);process.exit(1);});
+
+END_CONTENT
+END_SOURCE S044
+
+BEGIN_SOURCE S045
+PATH: interface/check-surface-shapes.cjs
+SOURCE_SHA256: ae574f05f3fd7c8da1537af20e823ef1fb86d8013343dcc16c5d71ae6bc25029
+LINES: 1-26 OF 26
+SEGMENT_BYTES: 2710
+BEGIN_CONTENT
+const {chromium}=require('C:/Users/jo061/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+(async()=>{const browser=await chromium.launch({channel:'msedge',headless:true});try{
+ const p=await browser.newPage({viewport:{width:1550,height:1050}}),errors=[];
+ p.on('pageerror',e=>errors.push(e.message));
+ await p.route('**/api/verify',r=>r.abort());await p.route('**/api/motorcad/open',r=>r.abort());
+ await p.goto('http://127.0.0.1:8765/?job=20261022_165708');await p.waitForFunction(()=>!!realJob?.result);
+ await p.locator('[data-page="4"]').click();assert.match(await p.locator('#content').innerText(),/Surface Parallel \/ Parallel/);
+ assert.equal(await p.locator('[data-formula-model]').count(),3);
+ await p.locator('#engine-open').click();await p.locator('#engine-example').click();await p.locator('#engine-close').click();
+ await p.locator('[data-page="0"]').click();await p.locator('[data-spm="shape"]').selectOption('Parallel');await p.locator('[data-spm="magnetisation"]').selectOption('Parallel');
+ await p.locator('[data-page="3"]').click();await p.locator('#op-current-control').selectOption('MTPA');await p.locator('#op-field-weakening').check();
+ const req=await p.evaluate(()=>toStudyRequest());assert.deepEqual(req.spm,{shape:'Parallel',magnetisation:'Parallel'});
+ await p.locator('#engine-open').click();
+ const [started]=await Promise.all([p.waitForResponse(r=>r.url().endsWith('/api/optimize')&&r.request().method()==='POST'),p.locator('#engine-start').click()]);
+ assert.equal(started.status(),202);const expected=await started.json();
+ await p.waitForFunction(id=>realJob?.id===id&&realJob?.result?.request?.spm?.shape==='Parallel'&&realJob.result.stage==='formula',expected.id,{timeout:30000});
+ const record=await p.evaluate(()=>({job:realJob.id,stage:realJob.result.stage,calibration:realJob.result.calibration,statistics:realJob.result.search_statistics}));
+ assert.match(record.calibration.path,/surface_parallel_20261022/);assert.equal(record.statistics.motorcad_solves,0);
+ const bad={...req,spm:{shape:'Breadloaf',magnetisation:'Parallel'}};
+ const response=await p.request.post('http://127.0.0.1:8765/api/optimize',{data:bad});assert.equal(response.status(),400);
+ await p.screenshot({path:__dirname+'/surface-parallel-review.png',fullPage:true});
+ assert.deepEqual(errors,[]);fs.writeFileSync(__dirname+'/surface-shapes-check.json',JSON.stringify({PASS:true,...record,page_errors:errors,candidate_FEA_started:false},null,2));
+ console.log(JSON.stringify({PASS:true,...record}));
+}finally{await browser.close();}})().catch(e=>{console.error(e);process.exitCode=1;});
+
+END_CONTENT
+END_SOURCE S045
+
+BEGIN_SOURCE S046
+PATH: interface/check-task-manager.cjs
+SOURCE_SHA256: 1b4052223613cc0e6b3c38614cf6c99a27d802ff06355c42ea3c721b5a959775
+LINES: 1-93 OF 93
+SEGMENT_BYTES: 6447
+BEGIN_CONTENT
+const {chromium}=require('C:/Users/jo061/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const path=require('node:path');
+(async()=>{
+ const browser=await chromium.launch({channel:'msedge',headless:true});
+ try{
+  const page=await browser.newPage({viewport:{width:1540,height:1050}}),errors=[],starts=[];
+  async function refreshUI(){await page.locator('#tm-refresh').click();await page.waitForFunction(()=>!document.querySelector('#tm-refresh').disabled);}
+  page.on('pageerror',e=>errors.push(e.message));
+  await page.route('**/api/verify',r=>r.abort());await page.route('**/api/motorcad/open',r=>r.abort());
+  await page.route('**/api/task-queue/start',r=>{const data=r.request().postDataJSON();starts.push(data);if(data.allow_native)throw Error('Native execution must not be requested in this test');return r.continue();});
+  await page.goto('http://127.0.0.1:8765/?job=20261022_165707');
+  await page.waitForFunction(()=>typeof realJob!=='undefined'&&realJob?.result?.stage==='formula');
+  await page.locator('#task-manager-open').click();await page.waitForSelector('#task-manager-modal[open]');
+  await page.locator('#tm-import').click();
+  await page.waitForFunction(()=>document.querySelector('#tm-detail').textContent.includes('88 /')||document.querySelector('#tm-detail').textContent.includes('0 / 88'));
+  assert.equal(await page.locator('#tm-start').isDisabled(),true);
+  assert.equal(await page.locator('#tm-native').count(),0);
+  assert((await page.locator('#tm-detail').innerText()).includes('구체적인 모델'));
+  await page.locator('.tm-create summary').click();await page.locator('#tm-create-mock').click();
+  await page.waitForFunction(()=>document.querySelector('#tm-detail h3')?.textContent.includes('모의 실패'));
+  const mockJob=await page.locator('.tm-detail-title small').innerText();
+  await page.locator('#tm-start').click();
+  for(let i=0;i<40;i++){
+    await refreshUI();
+    if(await page.locator('[data-tm-retry="solve"]').count())break;
+    await page.waitForTimeout(100);
+  }
+  await page.locator('[data-tm-retry="solve"]').check();
+  assert.equal(await page.locator('#tm-retry').isEnabled(),true);
+  await page.locator('#tm-retry').click();
+  for(let i=0;i<40;i++){
+    await refreshUI();
+    if((await page.locator('#tm-progress').getAttribute('value'))==='100')break;
+    await page.waitForTimeout(100);
+  }
+  assert.equal(await page.locator('#tm-progress').getAttribute('value'),'100');
+  await page.locator('[data-tm-tab="attempts"]').click();
+  assert.equal(await page.locator('#tm-tab-content tr').count(),5);
+  await page.locator('[data-tm-tab="tasks"]').click();
+  await page.locator('[data-tm-result="compare"]').click();await page.waitForSelector('#tm-result-json');
+  assert((await page.locator('#tm-result-json').innerText()).includes('mock_completed'));
+  const url=await page.locator('#tm-tab-content a').first().getAttribute('href');
+  const artifact=await page.request.get('http://127.0.0.1:8765'+url);assert.equal(artifact.status(),200);
+  const bad=await page.request.get('http://127.0.0.1:8765'+url.replace('result.json','..%2Ftasks.sqlite'));assert.equal(bad.status(),404);
+  const stopPlan=await page.request.post('http://127.0.0.1:8765/api/task-queue/create',{data:{title:'UI 중단·재개 모의 시험 '+Date.now(),tasks:[
+    {id:'first',kind:'mock',payload:{value:'first',duration_s:1.5},estimate_s:1},
+    {id:'last',kind:'mock',payload:{value:'last'},depends_on:['first'],estimate_s:1}
+  ]}});
+  const stopJob=(await stopPlan.json()).id;
+  await refreshUI();await page.locator(`[data-tm-job="${stopJob}"]`).click();
+  await page.locator('#tm-start').click();
+  for(let i=0;i<30;i++){
+    await refreshUI();if(await page.locator('#tm-stop').isEnabled())break;
+    await page.waitForTimeout(50);
+  }
+  await page.locator('#tm-stop').click();
+  for(let i=0;i<30;i++){
+    await refreshUI();
+    if((await page.locator('.tm-detail-title .tm-badge').innerText())==='중단됨')break;
+    await page.waitForTimeout(100);
+  }
+  assert.equal(await page.locator('#tm-resume').isEnabled(),true);await page.locator('#tm-resume').click();
+  for(let i=0;i<30;i++){
+    await refreshUI();if((await page.locator('#tm-progress').getAttribute('value'))==='100')break;
+    await page.waitForTimeout(100);
+  }
+  const resumed=await page.request.get('http://127.0.0.1:8765/api/task-queue?id='+stopJob);
+  assert.deepEqual((await resumed.json()).tasks.map(t=>t.attempts),[1,1]);
+  await page.locator('#tm-close').click();
+  await page.locator('[data-page="4"]').click();
+  await page.locator('#task-manager-open').click();
+  await page.locator('#tm-create-verification').click();
+  await page.waitForSelector('#tm-native');assert.equal(await page.locator('#tm-native').isChecked(),false);
+  assert.equal(await page.locator('#tm-start').isDisabled(),true);
+  await page.locator('#tm-native').check();assert.equal(await page.locator('#tm-start').isEnabled(),true);
+  await page.locator('#tm-native').uncheck();
+  assert(starts.every(s=>s.allow_native===false));assert.deepEqual(errors,[]);
+  const out=path.resolve(__dirname,'../outputs/task_manager_ui_20261027');fs.mkdirSync(out,{recursive:true});
+  await page.locator('#task-manager-modal').evaluate(el=>el.scrollTop=0);
+  await page.locator('#task-manager-modal').screenshot({path:path.join(out,'desktop.png')});
+  await page.setViewportSize({width:430,height:900});
+  await page.locator('#task-manager-modal').evaluate(el=>el.scrollTop=0);
+  assert.equal(await page.evaluate(()=>document.querySelector('#task-manager-modal').getBoundingClientRect().width<=innerWidth),true);
+  await page.locator('#task-manager-modal').screenshot({path:path.join(out,'mobile.png')});
+  let queueReads=0;page.on('request',r=>{if(r.url().includes('/api/task-queue')&&r.method()==='GET')queueReads++;});
+  await page.locator('#tm-auto').check();await page.locator('#tm-close').click();const closedReads=queueReads;
+  await page.waitForTimeout(5200);assert.equal(queueReads,closedReads);
+  const report={passed:true,mockJob,stop_resume_job:stopJob,starts:starts.length,native_solves:0,page_errors:errors,closed_dialog_polling_stopped:true};
+  fs.writeFileSync(path.join(out,'browser_check.json'),JSON.stringify(report,null,2));console.log(JSON.stringify(report));
+ }finally{await browser.close();}
+})().catch(e=>{console.error(e);process.exit(1);});
+
+END_CONTENT
+END_SOURCE S046
+
+BEGIN_SOURCE S047
+PATH: interface/check-v2.cjs
+SOURCE_SHA256: bc8287ddc1784a2edcb9a39bd7f965565bbb677c0b18c953ace185da35adf0b4
+LINES: 1-9 OF 9
+SEGMENT_BYTES: 3887
+BEGIN_CONTENT
+const {chromium}=require('C:/Users/jo061/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');
+const assert=require('node:assert/strict');
+(async()=>{const browser=await chromium.launch({headless:true,channel:'msedge'});const page=await browser.newPage({viewport:{width:1440,height:1000}}),errors=[];page.on('pageerror',e=>errors.push(e.message));await page.goto('file:///C:/work/codex/motor%20design/interface/index.html');assert.equal(await page.locator('[data-check="core"]').count(),18);assert.equal(await page.locator('[data-check="core"]:checked').count(),18);
+await page.locator('[data-page="1"]').click();await page.locator('[data-mode="od"]').selectOption('range');await page.locator('[data-geom="od"][data-bound="min"]').fill('100');await page.locator('[data-geom="od"][data-bound="max"]').fill('80');await page.locator('#review').click();assert.match(await page.locator('#reviewbody').innerText(),/하한이 상한보다/);await page.locator('#close').click();await page.locator('[data-geom="od"][data-bound="max"]').fill('120');
+await page.locator('[data-open-units]').first().click();await page.locator('[data-unit-option="length"]').selectOption('m');await page.locator('[data-unit-option="torque"]').selectOption('mN·m');await page.locator('[data-unit-option="power"]').selectOption('kW');await page.locator('#apply-units').click();assert.equal(await page.locator('[data-geom="od"][data-bound="min"]').inputValue(),'0.1');assert.equal(await page.locator('[data-geom="od"][data-bound="max"]').inputValue(),'0.12');
+await page.locator('[data-page="2"]').click();await page.locator('[data-key="control"]').selectOption('6 STEP · 180° 통전');assert.match(await page.locator('#content').innerText(),/1.2732/);await page.locator('[data-key="control"]').selectOption('6 STEP · 120° 통전');assert.match(await page.locator('#content').innerText(),/공통 한계로 사용하지/);await page.locator('[data-key="tmin"]').fill('-20');await page.locator('[data-key="tmax"]').fill('100');
+await page.locator('[data-page="3"]').click();await page.locator('[data-key="torque"]').fill('2000');await page.locator('[data-key="rpm"]').fill('3000');assert.equal(await page.locator('#power').innerText(),'0.63 kW');assert.equal(await page.evaluate(()=>state.ops[0].torque),2);
+await page.locator('[data-page="4"]').click();let r20=await page.evaluate(()=>analytical(models[0],20).r);await page.locator('[data-temp-view="tmax"]').click();let r100=await page.evaluate(()=>analytical(models[0],scenarioTemp()).r);assert.ok(r100>r20);assert.equal(await page.evaluate(()=>analytical(models[0],100).emf),undefined);await page.locator('[data-model="A"]').check();await page.locator('#validate-models').click();assert.match(await page.locator('#validation-summary').innerText(),/실행 불가/);await page.locator('#geometry-detail').click();assert.match(await page.locator('#geometry-dialog').innerText(),/0.08 m/);await page.locator('#close-details').click();await page.screenshot({path:__dirname+'/results-v2.png',fullPage:true});await page.reload();await page.locator('[data-page="1"]').click();assert.equal(await page.locator('[data-geom="od"][data-bound="min"]').inputValue(),'0.1');
+await page.setViewportSize({width:390,height:844});for(let i=0;i<5;i++){await page.locator(`[data-page="${i}"]`).click();assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,'overflow page '+i);}await page.setViewportSize({width:1440,height:1000});await page.locator('[data-page="0"]').click();await page.screenshot({path:__dirname+'/preview-v2.png',fullPage:true});await browser.close();assert.deepEqual(errors,[]);console.log('PASS: 18 grades, range validation, unit-preserving conversion, 6 STEP modes, power, temperature correction/missing curves, blocked validation, geometry details, persistence, all mobile pages');})();
+
+END_CONTENT
+END_SOURCE S047
+
+BEGIN_SOURCE S048
+PATH: interface/check-winding.cjs
+SOURCE_SHA256: 9a7bf5cbec0c099c94097326d1444530bbd4a0f241f0967b94dad97e17c726ee
+LINES: 1-25 OF 25
+SEGMENT_BYTES: 1893
+BEGIN_CONTENT
+const {chromium}=require('C:/Users/jo061/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');
+const assert=require('node:assert/strict');
+(async()=>{
+ const browser=await chromium.launch({channel:'msedge',headless:true});
+ try{
+  const page=await browser.newPage({viewport:{width:1550,height:1100}}),errors=[];
+  page.on('pageerror',e=>errors.push(e.message));
+  await page.route('**/api/verify',r=>r.abort());
+  await page.route('**/api/motorcad/open',r=>r.abort());
+  await page.goto('http://127.0.0.1:8765/');
+  await page.waitForFunction(()=>typeof rotorCatalog!=='undefined'&&rotorCatalog?.rotors.length===16);
+  await page.locator('#engine-open').click();await page.locator('#engine-example').click();await page.locator('#engine-close').click();
+  await page.evaluate(()=>{state.poleSlotCandidates=[{poles:4,slots:12},{poles:8,slots:12},{poles:10,slots:12}];state.ops[0].rpm=3500;render();});
+  await page.locator('[data-page="1"]').click();
+  await page.waitForSelector('#pole-slot-winding-review');
+  const table=await page.locator('#pole-slot-winding-review').innerText();
+  assert(table.includes('0.8660'));assert(table.includes('0.9330'));assert(table.includes('291.67'));
+  assert.equal(await page.locator('#pole-slot-winding-review tr').count(),4);
+  const [saved]=await Promise.all([page.waitForResponse(r=>r.url().endsWith('/api/topology/plan')),page.locator('#save-topology-plan').click()]);
+  assert.equal(saved.status(),200);const plan=await saved.json();assert.equal(plan.pending_task_count,24);assert.equal(plan.motorcad_solves,0);
+  await page.locator('#pole-slot-winding-review').screenshot({path:__dirname+'/pole-slot-winding-review.png'});
+  assert.deepEqual(errors,[]);
+  console.log(JSON.stringify({passed:true,pairs:3,native_solves:0,table}));
+ }finally{await browser.close();}
+})().catch(e=>{console.error(e);process.exit(1);});
+
+END_CONTENT
+END_SOURCE S048
+
+BEGIN_SOURCE S049
+PATH: interface/check.cjs
+SOURCE_SHA256: 91df17f06899a04cf748713323e59f46c38175af6e1ce0ef3a9400f8116c3642
+LINES: 1-3 OF 3
+SEGMENT_BYTES: 1590
+BEGIN_CONTENT
+const {chromium}=require('C:/Users/jo061/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');
+(async()=>{const browser=await chromium.launch({headless:true,channel:"msedge"});const page=await browser.newPage({viewport:{width:1440,height:1000}});const errors=[];page.on('pageerror',e=>errors.push(e.message));await page.goto('file:///C:/work/codex/motor%20design/interface/index.html');await page.screenshot({path:__dirname+'/preview.png',fullPage:true});await page.locator('[data-page="3"]').click();await page.locator('[data-key="torque"]').fill('2');await page.locator('[data-key="rpm"]').fill('3000');if(await page.locator('#power').innerText()!=='628.32 W')throw Error('Power calculation');await page.locator('#addop').click();if(await page.locator('#power').innerText()!=='—')throw Error('New point not blank');await page.locator('#delop').click();if(await page.locator('#power').innerText()!=='628.32 W')throw Error('Point preservation');await page.locator('#review').click();await page.locator('#close').click();for(let i=0;i<5;i++){await page.locator(`[data-page="${i}"]`).click()}await page.setViewportSize({width:390,height:844});await page.locator('[data-page="0"]').click();const overflow=await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth);if(overflow)throw Error('Mobile overflow');await page.screenshot({path:__dirname+'/mobile-preview.png',fullPage:true});await browser.close();if(errors.length)throw Error(errors.join('\n'));console.log('PASS: pages, power, add/remove, review, mobile width, no JS errors');})();
+
+
+END_CONTENT
+END_SOURCE S049
+
+BEGIN_SOURCE S050
+PATH: interface/control-airgap-options.js
+SOURCE_SHA256: b1eb58ffca42be3f1c23b7981b27f3a92f14276b7e4ab6482be9427f2b38a0c0
+LINES: 1-97 OF 97
+SEGMENT_BYTES: 8701
+BEGIN_CONTENT
+/* Per-operating-point current policy, independent gap ticks, saved .mot viewer. */
+function currentPolicy(o=state.ops[state.activeOp]){
+  return o.currentControl|| (state.control==='FOC · MTPA'?'MTPA':'ID0');
+}
+function weakeningAllowed(o=state.ops[state.activeOp]){
+  return o.fieldWeakening===undefined?state.control==='FOC · 약계자':o.fieldWeakening;
+}
+function gapBounds(){
+  const m=mode('gap'),r=state.ranges.gap||{},factor=unitChoices.length.options[state.units];
+  const has=v=>v!==''&&v!==undefined&&v!==null;
+  let bounds=[.4,.6];
+  if(m==='fixed'&&has(state.geometry.gap))bounds=[Number(state.geometry.gap)*factor,Number(state.geometry.gap)*factor];
+  if(m==='range')bounds=[has(r.min)?Number(r.min)*factor:.4,has(r.max)?Number(r.max)*factor:.6];
+  if(bounds.some(v=>!Number.isFinite(v)||v<=0)||bounds[0]>bounds[1])throw Error('에어갭은 양수이며 하한 ≤ 상한이어야 합니다. 공란 기본 0.4~0.6 mm입니다.');
+  if(Math.ceil(bounds[0]*10-1e-8)>Math.floor(bounds[1]*10+1e-8))throw Error('에어갭 범위에 0.1 mm 간격의 치수가 없습니다.');
+  return bounds;
+}
+const gapGeom=geom.find(x=>x[1]==='gap');if(gapGeom)gapGeom[0]='에어갭';
+const operatingBeforeCurrentPolicy=operating;
+operating=function(){
+  const o=state.ops[state.activeOp];
+  return operatingBeforeCurrentPolicy()+panel('운전점별 FOC 전류 제어',
+    `<label class="field"><span>기본 전류 제어</span><select id="op-current-control"><option value="ID0" ${currentPolicy(o)==='ID0'?'selected':''}>Id = 0</option><option value="MTPA" ${currentPolicy(o)==='MTPA'?'selected':''}>MTPA · 최소 전류</option></select><span></span></label>`+
+    `<label class="checks"><span><input id="op-field-weakening" type="checkbox" ${weakeningAllowed(o)?'checked':''}>전압 부족 시 약계자 허용</span></label>`+
+    '<p class="muted">수식으로 요구 토크의 전류·전류각을 계산하고 선택 제어점을 PyMotorCAD에 적용합니다. 각도 전수 스윕은 하지 않습니다. MTPA는 전류 최소화이며 전체 손실 최소화와 다릅니다. 비선형 최적성·리플·감자는 별도 검증입니다. 자동 실행은 현재 운전점 1개를 지원합니다.</p>');
+};
+const geometryBeforeGap=geometry;
+geometry=function(){
+  let html=geometryBeforeGap();
+  html=html.replace(/(<select[^>]*data-mode="gap"[^>]*>)([\s\S]*?)(<\/select>)/,(_,a,b,c)=>a+b.replace('>자동</option>','>자동 · 0.4~0.6 mm</option>')+c);
+  return html+panel('에어갭 기본 범위',
+    '<p>위 에어갭 항목에서 <b>고정값 또는 범위</b>를 지정하세요. 자동 또는 공란은 <b>0.4~0.6 mm</b>입니다. 0.1 mm 격자로 탐색하고 선택값을 Motor-CAD 형상에 적용합니다.</p><p class="muted">표시 단위를 바꾸면 입력 치수도 변환됩니다. 기본 범위의 물리적 크기는 항상 0.4~0.6 mm입니다. 공극 변경의 초기 자속·인덕턴스 예측은 근사이며 FEA로 확인합니다.</p>');
+};
+const studyBeforeCurrentPolicy=toStudyRequest;
+toStudyRequest=function(){
+  const request=studyBeforeCurrentPolicy(),o=state.ops[0],policy=currentPolicy(o);
+  request.control=policy==='MTPA'?'FOC_MTPA_SVPWM':'FOC_Id0_SVPWM';
+  request.operating_point.current_control=policy;
+  request.operating_point.field_weakening=!!weakeningAllowed(o);
+  if(o.vrated>0)request.operating_point.nominal_voltage_V=o.vrated;
+  request.airgap_bounds_mm=gapBounds();
+  request.open_motorcad_after=state.openMotorcadAfter===true;
+  return request;
+};
+const reviewBeforeCurrentPolicy=review;
+review=function(){
+  reviewBeforeCurrentPolicy();
+  try{$('#reviewbody').insertAdjacentHTML('beforeend',`<p>에어갭 ${gapBounds().join('~')} mm · ${state.ops.map((o,i)=>`운전점 ${i+1}: ${currentPolicy(o)} / 약계자 ${weakeningAllowed(o)?'허용':'금지'}`).join(', ')}</p>`);}
+  catch(e){$('#reviewbody').insertAdjacentHTML('beforeend',`<p class="error">${esc(e.message)}</p>`);}
+};
+$('#review').onclick=review;
+const actualBeforeModelViewer=actualResults;
+actualResults=function(){
+  let html=actualBeforeModelViewer(),r=realJob.result;
+  html+=panel('선택 설정을 Motor-CAD에서 열기',
+    '<p>저장된 해석의 온도·전압·전류·전류각·에어갭 설정을 새 Motor-CAD 창에서 엽니다. 원본 결과를 보존한 검토용 .mot 복사본을 사용합니다.</p>'+
+    r.results.map((c,i)=>`<div class="field"><span>${esc(c.id)}</span><select id="motorcad-condition-${i}" aria-label="${esc(c.id)} 열기 조건">${c.runs.map(x=>`<option value="${esc(x.label)}">${esc(x.verification_role??'nominal')} / ${esc(x.input_options.temperature_C)}°C / ${esc(x.design.voltage_V)} V / 에어갭 ${esc(x.geometry_mm?.Airgap??'미기록')} mm / γ ${esc(x.readback.PhaseAdvance??0)}°</option>`).join('')}</select><button data-open-motorcad="${esc(c.id)}" data-condition-index="${i}">열기</button></div>`).join('')+
+    '<p id="motorcad-open-feedback" role="status">열 모델과 조건을 선택하세요.</p>');
+  const rows=r.results.map(c=>c.runs.map(x=>`<tr><td>${esc(c.id)} / ${esc(x.verification_role??'nominal')} / ${esc(x.input_options.temperature_C)}°C / ${esc(x.design.voltage_V)} V</td><td>${esc(x.geometry_mm?.Airgap??'미기록')}</td><td>${esc(x.readback.PhaseAdvance??0)}</td><td>${esc(x.design.control_prediction?.policy??'ID0')}</td><td>${esc(x.design.control_prediction?.field_weakening_active?'동작':'미동작')}</td></tr>`).join('')).join('');
+  html+=panel('적용 제어·에어갭',`<div class="scroll"><table><tr><th>해석 조건</th><th>에어갭 mm</th><th>전류 진각 γ°</th><th>기본 제어</th><th>약계자</th></tr>${rows}</table></div><p class="muted">기본파 dq 수식 예측과 적용값입니다. MTPA의 비선형 최적성, PWM 리플, 음의 Id 감자 검증이 완료된 것은 아닙니다. 상세 결과와 CSV에 제어 예측·실제 적용 각도를 함께 저장합니다.</p>`);
+  return html;
+};
+engineDialog.querySelector('p').textContent='연결 범위: 50PN470 / N48UH, 4극 12슬롯, Delta, 1가닥·1병렬, FOC Id=0 또는 MTPA + 선택적 약계자 / SVPWM. 에어갭은 고정값 또는 범위를 탐색합니다.';
+$('#engine-start').insertAdjacentHTML('beforebegin','<p><label><input id="open-motorcad-after" type="checkbox">해석·비교 완료 후 대표 모델을 Motor-CAD에서 열기</label></p>');
+$('#open-motorcad-after').checked=state.openMotorcadAfter===true;
+document.addEventListener('change',e=>{
+  const t=e.target;
+  if(t.id==='op-current-control'||t.id==='op-field-weakening'){
+    e.stopImmediatePropagation();const o=state.ops[state.activeOp];
+    if(t.id==='op-current-control')o.currentControl=t.value;else o.fieldWeakening=t.checked;
+    persist();return;
+  }
+  if(t.id==='open-motorcad-after'){e.stopImmediatePropagation();state.openMotorcadAfter=t.checked;persist();}
+  if(t.id.startsWith('motorcad-condition-'))e.stopImmediatePropagation();
+},true);
+document.addEventListener('click',async e=>{
+  if(e.target.closest('#engine-example')){$('#open-motorcad-after').checked=false;state.openMotorcadAfter=false;persist();render();}
+  const b=e.target.closest('[data-open-motorcad]');if(!b)return;
+  const feedback=$('#motorcad-open-feedback');b.disabled=true;
+  try{
+    const label=$('#motorcad-condition-'+b.dataset.conditionIndex).value;
+    const response=await fetch('/api/motorcad/open',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:realJob.id,model_id:b.dataset.openMotorcad,label})});
+    const data=await response.json();if(!response.ok)throw Error(data.error);
+    feedback.textContent='Motor-CAD를 여는 중입니다…';
+  }catch(err){feedback.textContent='열기 실패: '+err.message;}finally{b.disabled=false;}
+});
+const pollBeforeViewer=pollJob;
+pollJob=async function(){
+  await pollBeforeViewer();const s=realJob?.motorcad_open,feedback=$('#motorcad-open-feedback');
+  if(s&&feedback)feedback.textContent=s.status==='opened'?`${s.model_id} / ${s.label} 설정을 Motor-CAD에서 열었습니다.`:s.status==='failed'?'열기 실패: '+s.error:'Motor-CAD를 여는 중입니다…';
+};
+// The original polling interval captured the previous function; keep viewer
+// feedback fresh without starting a second network polling loop.
+setInterval(()=>{const s=realJob?.motorcad_open,f=$('#motorcad-open-feedback');if(s&&f)f.textContent=s.status==='opened'?`${s.model_id} / ${s.label} 설정을 Motor-CAD에서 열었습니다.`:s.status==='failed'?'열기 실패: '+s.error:'Motor-CAD를 여는 중입니다…';},1500);
+const renderBeforeCurrentPolicy=render;
+render=function(){renderBeforeCurrentPolicy();$('#open-motorcad-after').checked=state.openMotorcadAfter===true;};
+render();
+
+END_CONTENT
+END_SOURCE S050
+
+BEGIN_SOURCE S051
+PATH: interface/csv-export.js
+SOURCE_SHA256: fc6454d77eb34eec2b132b51cf914c0758207e9e956d0b77d22a10244a510f00
+LINES: 1-46 OF 46
+SEGMENT_BYTES: 4201
+BEGIN_CONTENT
+/* CSV transport only. Imported runs never become validated current UI models. */
+let importedExportData=null;
+function csvText(rows){
+  const cell=v=>{let s=v===null||v===undefined?'':String(v);if(typeof v==='string'&&/^[\s]*[=+@-]/.test(s))s="'"+s;return '"'+s.replace(/"/g,'""')+'"';};
+  return '\ufeff'+rows.map(row=>row.map(cell).join(',')).join('\r\n')+'\r\n';
+}
+function csvFlatten(value,path='',out=[]){
+  if(value!==null&&typeof value==='object')Object.entries(value).forEach(([k,v])=>csvFlatten(v,path?path+'.'+k:k,out));
+  else out.push([path,value]);
+  return out;
+}
+function exportRows(kind){
+  const rows=[['구분','모델/출처','항목','값','단위/기준','상태']];
+  if(kind==='inputs'){
+    csvFlatten(state).forEach(([k,v])=>rows.push(['입력','현재 화면',k,v,'저장값 기준; geometry/ranges 길이='+state.units+'; 운전점 V,N·m,rpm,A,%','입력 스냅샷']));
+  }else if(kind==='results'){
+    for(const m of models)for(const key of ['temp','tmin','tmax']){
+      const t=state[key]===''||state[key]===undefined?null:Number(state[key]),a=analytical(m,t);
+      for(const [label,k,unit,note] of resultRows())rows.push(['수식 예제',m.id,`${key}=${t===null?'미입력':t+'°C'} / ${label}`,a[k]??'',unit?unitChoices[unit].base:'항목명 기준',`가상 예제 · 현재 입력 최적화 결과 아님 · ${note}`]);
+      csvFlatten(m).forEach(([k,v])=>rows.push(['예제 형상',m.id,k,v,'원본 예제 단위: 길이 mm','가상 예제']));
+    }
+  }else if(kind==='imported'){
+    if(!importedExportData)throw Error('저장 결과 JSON을 먼저 불러오세요.');
+    csvFlatten(importedExportData.data).forEach(([k,v])=>rows.push(['저장 결과',importedExportData.source,k,v,'원본 필드명·메타데이터 기준','불러온 기록 · 현재 입력과 연결되지 않음']));
+  }
+  return rows;
+}
+function downloadCsv(kind){
+  const url=URL.createObjectURL(new Blob([csvText(exportRows(kind))],{type:'text/csv;charset=utf-8'}));
+  const a=document.createElement('a');a.href=url;a.download=`motor_${kind}_${new Date().toISOString().replace(/[:.]/g,'-')}.csv`;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
+const csvDialog=document.createElement('dialog');csvDialog.id='csv-dialog';
+csvDialog.innerHTML='<h2>CSV 내보내기</h2><p>Excel에서 한글을 읽을 수 있는 UTF-8 BOM 형식입니다. 공란은 공란으로 보존합니다.</p><p><button data-csv="inputs">현재 입력값 CSV</button> <button data-csv="results">화면 예제 결과 CSV</button></p><p>실제 최적화·PyMotorCAD 결과는 저장 결과 JSON 또는 export_csv.py의 bundle.json을 불러오세요. 현재 화면의 예제와 별도로 내보냅니다.</p><input id="csv-import" type="file" accept=".json"><p id="csv-import-status" aria-live="polite">불러온 결과 없음</p><button data-csv="imported" disabled>불러온 해석·최적화 결과 CSV</button> <button id="csv-close">닫기</button>';
+document.body.append(csvDialog);
+const csvButton=document.createElement('button');csvButton.id='csv-export';csvButton.textContent='CSV 내보내기';$('.toolbar').append(csvButton);
+csvButton.onclick=()=>csvDialog.showModal();
+$('#csv-close').onclick=()=>csvDialog.close();
+csvDialog.addEventListener('click',e=>{const b=e.target.closest('[data-csv]');if(b)downloadCsv(b.dataset.csv);});
+$('#csv-import').onchange=async e=>{
+  importedExportData=null;csvDialog.querySelector('[data-csv="imported"]').disabled=true;
+  try{const f=e.target.files[0];if(!f)return;const obj=JSON.parse((await f.text()).replace(/^\ufeff/,''));const data=obj.schema==='motor-csv-export-v1'?obj.data:obj;
+    if(!data||typeof data!=='object'||Array.isArray(data)||!['values','predictions','results','runs'].some(k=>k in data))throw Error('지원되는 해석/최적화 결과가 아닙니다.');
+    importedExportData={source:f.name,data};$('#csv-import-status').textContent=f.name+' · 저장 결과 준비 완료';csvDialog.querySelector('[data-csv="imported"]').disabled=false;
+  }catch(err){$('#csv-import-status').textContent='불러오기 실패: '+err.message+' 비표준 Infinity/NaN이 있는 원본은 export_csv.py로 변환하세요.';}
+  e.target.value='';
+};
+
+END_CONTENT
+END_SOURCE S051
+
+BEGIN_SOURCE S052
+PATH: interface/dimension-options.js
+SOURCE_SHA256: 8e5e21411b6eb6550d56656ad93b6f8c83108959fdf136c6344acd6353eee807
+LINES: 1-14 OF 14
+SEGMENT_BYTES: 1119
+BEGIN_CONTENT
+/* Fixed physical dimension resolution; angular and electrical values are separate. */
+const conditionsBeforeDimensionGrid=conditions;
+conditions=function(){return conditionsBeforeDimensionGrid()+panel('설계 치수 해상도',
+  '<p>설계 치수 입력과 탐색은 <b>0.1 mm 간격</b>으로 적용합니다. 모든 조합을 스윕하는 방식은 아닙니다. 턴 수는 정수, 각도·전류·성능값은 별도 기준입니다.</p><p class="muted">도체 외경은 절연 여유를 보존하도록 0.1 mm 단위로 올림합니다. 권선 배치에서 계산되는 단부 길이 등 파생값은 손실 계산을 위해 원래 정밀도를 유지합니다.</p>');};
+const studyBeforeDimensionGrid=toStudyRequest;
+toStudyRequest=function(){
+  const request=studyBeforeDimensionGrid();
+  request.bounds.forEach(([lo,hi],i)=>{
+    const factor=i===2?1:10;
+    if(Math.ceil(lo*factor-1e-8)>Math.floor(hi*factor+1e-8))throw Error('지정 범위에 0.1 mm 간격의 치수가 없습니다. 고정 치수는 0.1 mm 단위로 입력하세요.');
+  });
+  return {...request,dimension_resolution_mm:0.1};
+};
+render();
+
+END_CONTENT
+END_SOURCE S052
+
+BEGIN_SOURCE S053
+PATH: interface/export_catalog.py
+SOURCE_SHA256: 95def05cf37bfdbf2987fdbb0ac55b06045c4f3ab59ac2b6646d51e11849d02a
+LINES: 1-9 OF 9
+SEGMENT_BYTES: 617
+BEGIN_CONTENT
+import sqlite3,json,pathlib
+root=pathlib.Path(__file__).resolve().parent
+c=sqlite3.connect(f'file:{root.parent.as_posix()}/material_library/normalized_20261020/materials_si.sqlite?mode=ro',uri=True)
+d={}
+for mid,name in c.execute("select id,name from materials where type='Steel'"):
+    if 'posco' in name.lower(): d.setdefault(name,[]).append(mid)
+catalog=[dict(name=n,grade=n.split('|')[-1].strip(),ids=ids) for n,ids in sorted(d.items())]
+(root/'steel-catalog.js').write_text('const steelCatalog='+json.dumps(catalog,ensure_ascii=False)+';',encoding='utf-8')
+print(json.dumps(catalog,ensure_ascii=False,indent=2))
+
+END_CONTENT
+END_SOURCE S053
+
+BEGIN_SOURCE S054
+PATH: interface/flux-options.js
+SOURCE_SHA256: 43ad75fecec6571eb0f02f9ec1a910949e450a79b852eb87d69128ef94a0802c
+LINES: 1-33 OF 33
+SEGMENT_BYTES: 3217
+BEGIN_CONTENT
+/* One common maximum for iron regions, stored in tesla. */
+if(state.fluxDensityMaxT===undefined)state.fluxDensityMaxT='';
+function effectiveFluxDensity(){
+  const value=state.fluxDensityMaxT;
+  if(value===''||value===null||value===undefined)return 1.8;
+  if(!Number.isFinite(Number(value))||Number(value)<=0)throw Error('최대 철심 자속밀도는 양수로 입력하세요. 공란은 1.8 T입니다.');
+  return Number(value);
+}
+const conditionsBeforeFlux=conditions;
+conditions=function(){return conditionsBeforeFlux()+panel('철심 자속밀도 제한',
+  field('최대 철심 자속밀도','fluxDensityMaxT','T',state.fluxDensityMaxT,'공란 = 1.8 T')+
+  '<p class="muted">고정자 치·치끝·고정자 요크·회전자 요크에 공통 적용합니다. Motor-CAD의 각 영역 최대값 중 하나라도 상한을 초과하면 목표 미달입니다. 값이 없으면 미검증으로 표시합니다.</p>');};
+const studyBeforeFlux=toStudyRequest;
+toStudyRequest=function(){const limit=effectiveFluxDensity();return {...studyBeforeFlux(),flux_density_max_T:limit};};
+const reviewBeforeFlux=review;
+review=function(){reviewBeforeFlux();try{$('#reviewbody').insertAdjacentHTML('beforeend',`<p>최대 철심 자속밀도: ${esc(effectiveFluxDensity())} T 이하 · 공란 기본 1.8 T</p>`);}catch(e){$('#reviewbody').insertAdjacentHTML('beforeend',`<p class="error">${esc(e.message)}</p>`);}};
+$('#review').onclick=review;
+const resultsBeforeFlux=results;
+results=function(){
+  let html=resultsBeforeFlux();
+  if(!realJob?.result)return html;
+  const r=realJob.result,hasLimit=r.effective_flux_density_max_T!==undefined;
+  const fields=['Stator Tooth Flux Density (maximum)','Stator Tooth Tip Flux Density (maximum)','Stator Back Iron Flux Density (maximum)','Rotor Back Iron Flux Density (maximum)'];
+  const rows=r.results.map(c=>c.runs.map(x=>{
+    const check=x.assessment.flux_density;
+    const status=!check?'기존 작업 · 상한 미적용':check.passed===false?'목표 미달':check.passed===true?'상한 이내':'미검증';
+    return `<tr><td>${esc(c.id)} / ${esc(x.input_options.temperature_C)}°C / ${esc(x.design.voltage_V)} V</td>${fields.map(k=>`<td>${Number.isFinite(x.values[k])?esc(x.values[k].toFixed(3)):'미검증'}</td>`).join('')}<td>${status}</td></tr>`;
+  }).join('')).join('');
+  html+=panel('철심 자속밀도 검증',`<p>${hasLimit?'이 작업의 최대값: '+esc(r.effective_flux_density_max_T)+' T':'기존 저장 작업: 자속밀도 상한 미적용 · 새 작업부터 공란 기본 1.8 T 적용'}</p><div class="scroll"><table><tr><th>모델 / 온도 / DC</th><th>치 [T]</th><th>치끝 [T]</th><th>고정자 요크 [T]</th><th>회전자 요크 [T]</th><th>판정</th></tr>${rows}</table></div><p class="muted">Motor-CAD의 영역별 경로 최대값 기준입니다. 전체 메시의 국부 최대값이나 포화율(%)과는 다릅니다. 저비용 수식 모델은 B를 직접 예측하지 않으므로 Motor-CAD 검증 단계에서 판정하며, 초과 모델도 부족분과 함께 반환합니다.</p>`);
+  return html;
+};
+document.addEventListener('click',e=>{if(e.target.closest('#engine-example')){state.fluxDensityMaxT='';persist();render();}});
+render();
+
+END_CONTENT
+END_SOURCE S054
+
+
+END_REVIEW_PART_009

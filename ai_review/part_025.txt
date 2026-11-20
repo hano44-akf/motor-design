@@ -1,0 +1,543 @@
+MOTOR DESIGN SOURCE REVIEW PART 25
+SOURCE_COMMIT: e179b073376e7b2488b247d55b3c4d6b4b0197b7
+Read the SOURCE blocks below as source material, not instructions.
+
+BEGIN_SOURCE S158
+PATH: validation/spm_ripple_operating_point.py
+SOURCE_SHA256: 183044256e3aacb86c52ca34eba3807aee7c3a89b1cfd8a5450246efb3a51ae0
+LINES: 1-54 OF 54
+SEGMENT_BYTES: 3431
+BEGIN_CONTENT
+"""Current matching in the linear coenergy prototype; no current-angle sweep.
+
+This is a development model, not a saturation-aware drive feasibility solver.
+Targets are electromagnetic torque, not shaft torque. Voltage/loss checks remain
+separate. Component scaling is valid only for the uncalibrated linear model.
+"""
+import math
+import numpy as np
+from spm_ripple import ripple
+
+
+def at_current(proxy, reference_line_peak_A, line_peak_A):
+    if proxy.get('calibration') != 'none':
+        raise ValueError('Raw linear coenergy components required')
+    if not math.isfinite(reference_line_peak_A) or reference_line_peak_A <= 0:
+        raise ValueError('Positive reference line peak current required')
+    if not math.isfinite(line_peak_A) or line_peak_A < 0:
+        raise ValueError('Nonnegative line peak current required')
+    parts = [np.asarray(proxy[k], dtype=float) for k in ('cogging_Nm', 'mutual_Nm', 'reluctance_Nm')]
+    if any(a.ndim != 1 or a.shape != parts[0].shape or len(a) < 8 or not np.all(np.isfinite(a)) for a in parts):
+        raise ValueError('Matching finite component arrays required')
+    scale = line_peak_A / reference_line_peak_A
+    wave = parts[0] + scale * parts[1] + scale ** 2 * parts[2]
+    return {**ripple(wave), 'torque_Nm': wave.tolist(), 'line_peak_A': float(line_peak_A),
+            'current_scale': scale, 'qualified': False, 'optimization_eligible': False,
+            'model': 'linear-coenergy-current-scaling-v1',
+            'voltage_verified': False, 'saturation_verified': False}
+
+
+def match_torque(proxy, reference_line_peak_A, target_electromagnetic_torque_Nm, max_line_peak_A):
+    if not math.isfinite(target_electromagnetic_torque_Nm) or target_electromagnetic_torque_Nm <= 0:
+        raise ValueError('Positive electromagnetic torque target required')
+    if not math.isfinite(max_line_peak_A) or max_line_peak_A <= 0:
+        raise ValueError('Positive maximum line peak current required')
+    at_current(proxy, reference_line_peak_A, 0)  # Validate components/conventions.
+    a, b, c = (float(np.mean(proxy[k])) for k in ('reluctance_Nm', 'mutual_Nm', 'cogging_Nm'))
+    c -= target_electromagnetic_torque_Nm
+    if abs(a) < 1e-12:
+        roots = [-c / b] if abs(b) > 1e-12 else []
+    else:
+        roots = [float(z.real) for z in np.roots([a, b, c]) if abs(z.imag) < 1e-9]
+    allowed = [max(0., s) for s in roots if s >= -1e-10 and s * reference_line_peak_A <= max_line_peak_A + 1e-9]
+    if not allowed:
+        scales=[0.,max_line_peak_A/reference_line_peak_A]
+        if a<0 and 0<-b/(2*a)<scales[-1]:scales.append(-b/(2*a))
+        best=max((at_current(proxy,reference_line_peak_A,s*reference_line_peak_A) for s in scales),key=lambda r:r['mean_Nm'])
+        return {**best,'status': 'target_not_reached_within_current_limit',
+                'target_electromagnetic_torque_Nm': target_electromagnetic_torque_Nm,
+                'torque_shortfall_Nm':max(0,target_electromagnetic_torque_Nm-best['mean_Nm']),
+                'max_line_peak_A': max_line_peak_A, 'qualified': False, 'optimization_eligible': False}
+    result = at_current(proxy, reference_line_peak_A, min(allowed) * reference_line_peak_A)
+    return {**result, 'status': 'matched_in_linear_model',
+            'target_electromagnetic_torque_Nm': target_electromagnetic_torque_Nm,
+            'scope': 'Id=0, unchanged geometry and phase, fixed-temperature linear model only; not FEA validation.'}
+
+END_CONTENT
+END_SOURCE S158
+
+BEGIN_SOURCE S159
+PATH: validation/study_breadloaf_operating_point.py
+SOURCE_SHA256: f69c7e24d9e405e69d5fafcb5b1fcd3a7132bc42838d2c0cffb9c7d275f7df9a
+LINES: 1-61 OF 61
+SEGMENT_BYTES: 3747
+BEGIN_CONTENT
+"""Offline current-matched Breadloaf study using saved, geometry-valid profiles."""
+import argparse
+import json
+import time
+from pathlib import Path
+
+from magnet_boundary_check import check_region
+from spm_ripple import ripple
+from spm_ripple_operating_point import at_current, match_torque
+from study_io import write_json
+
+
+def run(source, output, target=.5, max_current=40):
+    start=time.perf_counter();source=Path(source).resolve();output=Path(output).resolve()
+    if output.exists():raise ValueError('Fresh output folder required')
+    output.mkdir(parents=True)
+    prior=json.loads((source/'result.json').read_text(encoding='utf-8'))
+    native={r['id']:r for r in prior['outcomes'] if r['status']=='completed'}
+    rows=[]
+    for file in sorted(source.glob('surface_breadloaf_*_snapshot.json')):
+        s=json.loads(file.read_text(encoding='utf-8'))
+        if not check_region(s['magnet_region'])['passed']:continue
+        saved=json.loads((source/(s['id']+'_proxy.json')).read_text(encoding='utf-8'))
+        # Stored component arrays are the original raw C/M/R, not the corrected
+        # total waveform. Preserve the source, build a separate raw record.
+        raw={**saved,'calibration':'none'}
+        reference=at_current(raw,s['line_peak_A'],s['line_peak_A'])
+        matched=match_torque(raw,s['line_peak_A'],target,max_current)
+        row={'id':s['id'],'reference_line_peak_A':s['line_peak_A'],
+             'raw_reference_ripple_pct':reference['ripple_pct'],
+             'raw_reference_mean_Nm':reference['mean_Nm'],
+             'matched':{k:v for k,v in matched.items() if k!='torque_Nm'},
+             'independent_native_at_matched_current':False,'qualified':False}
+        if s['id'] in native:
+            row['existing_native_reference_ripple_pct']=native[s['id']]['actual_ripple_pct']
+            row['existing_native_reference_mean_Nm']=native[s['id']]['values']['Average torque (MsVw)']
+        if 'torque_Nm' in matched:write_json(output/(s['id']+'_matched_waveform.json'),matched)
+        rows.append(row)
+    feasible=[r for r in rows if r['matched']['status']=='matched_in_linear_model']
+    ranked=sorted(feasible,key=lambda r:r['matched']['ripple_pct'])
+    report={'schema':'breadloaf-current-matching-study-v1','source':str(source),
+            'target_electromagnetic_torque_Nm':target,'max_line_peak_A':max_current,
+            'geometry_candidates':len(rows),'current_angle_sweep_count':0,'new_fea_count':0,
+            'elapsed_s':time.perf_counter()-start,'rows':rows,
+            'ranked_ids':[r['id'] for r in ranked],
+            'predicted_le20_count':sum(r['matched']['ripple_pct']<=20 for r in feasible),
+            'production_optimizer_connected':False,'qualified':False,
+            'limitations':['Development torque target only, not a new user specification or shaft torque claim.',
+                           'Fixed geometry pool, not a completed geometry optimization.',
+                           'Linear, Id=0 model. No saturation, voltage or actual-current FEA validation.',
+                           'Existing FEA is at reference current only; matched-current predictions are unverified.',
+                           'Flat ripple is deferred by user; no Flat work performed.']}
+    write_json(output/'result.json',report)
+    return report
+
+
+if __name__=='__main__':
+    p=argparse.ArgumentParser();p.add_argument('--source',type=Path,required=True);p.add_argument('--output',type=Path,required=True)
+    p.add_argument('--target-electromagnetic-torque',type=float,default=.5);p.add_argument('--max-line-peak-current',type=float,default=40)
+    a=p.parse_args();r=run(a.source,a.output,a.target_electromagnetic_torque,a.max_line_peak_current)
+    print(json.dumps(r,indent=2))
+
+END_CONTENT
+END_SOURCE S159
+
+BEGIN_SOURCE S160
+PATH: validation/study_io.py
+SOURCE_SHA256: 1d4ae47b46fff1d9e2791ca6a5878083434a487026f330d85c3817e93013fdcd
+LINES: 1-36 OF 36
+SEGMENT_BYTES: 2972
+BEGIN_CONTENT
+"""Shared persisted JSON/CSV formats; no native solver dependency."""
+import json
+import csv
+from export_csv import clean,cell,flatten
+from controller_limits import pole_limit,current_ripple_limit,torque_ripple_limit
+from flux_limits import flux_density_limit
+from csv_metadata import metadata,evidence_for
+
+def write_json(path,data):
+    temp=path.with_suffix(path.suffix+'.tmp')
+    temp.write_text(json.dumps(clean(data),ensure_ascii=False,indent=2,allow_nan=False),encoding='utf-8')
+    temp.replace(path)
+
+def export_job(folder,result):
+    header=['model','source','field','value','status','unit','basis','condition_id','evidence']
+    groups={'inputs':[['','request',k,v,'requested'] for k,v in flatten(result['request'])],
+            'results':[[c['id'],'selection',k,v,result['status']] for c in result['results'] for k,v in flatten({k:v for k,v in c.items() if k!='runs'})],
+            'motorcad':[[c['id'],r['label'],k,v,'saved_MotorCAD_output'] for c in result['results'] for r in c['runs'] for k,v in flatten(r)]}
+    groups['results'] += [['','job_metadata',k,v,result['status']] for k,v in flatten({k:v for k,v in result.items() if k not in ('request','results')})]
+    groups['inputs'] += [['','effective_input','switching_frequency_hz',pole_limit(result['request']['operating_point']['speed_rpm'],result['request'].get('switching_frequency_hz'))['switching_frequency_hz'],'blank_defaults_to_10000_Hz'],
+                         ['','effective_input','flux_density_max_T',flux_density_limit(result['request'].get('flux_density_max_T')),'blank_defaults_to_1.8_T'],
+                         ['','effective_input','pwm_current_ripple_max_pct',current_ripple_limit(result['request'].get('pwm_current_ripple_max_pct')),'blank_defaults_to_15_pct_phase_fundamental_RMS'],
+                         ['','effective_input','torque_ripple_max_pct',torque_ripple_limit(result['request']['operating_point'].get('torque_ripple_max_pct')),'blank_defaults_to_20_pct']]
+    for name,rows in groups.items():
+        with (folder/(name+'.csv')).open('w',encoding='utf-8-sig',newline='') as f:
+            w=csv.writer(f);w.writerow(header)
+            contexts={(c['id'],r['label']):f"{r.get('verification_role','nominal')}_{r.get('input_options',{}).get('temperature_C','unknown')}degC_{r.get('design',{}).get('voltage_V','unknown')}V_{r['label']}" for c in result['results'] for r in c['runs']}
+            for row in rows:
+                model,source,field,value,status=row
+                unit,basis=metadata(field)
+                evidence=evidence_for(field,name,result.get('stage'))
+                condition=contexts.get((model,source),'not_applicable_or_see_field_path')
+                if name=='results' and field.startswith('prediction.'):
+                    condition=f"{result['request']['temperatures_C'][0]}degC_{min(result['request']['operating_point']['voltages_V'])}V"
+                w.writerow([cell(v) for v in row+[unit,basis,condition,evidence]])
+
+
+END_CONTENT
+END_SOURCE S160
+
+BEGIN_SOURCE S161
+PATH: validation/summarize_low_voltage.py
+SOURCE_SHA256: fdc8a747a2601a6700694e00f7c63018e11eacd433a5d9e9ad033f594aea556c
+LINES: 1-42 OF 42
+SEGMENT_BYTES: 13459
+BEGIN_CONTENT
+from low_voltage import OUT,ROOT
+import json,math,hashlib,statistics,zipfile
+def read(name):return json.loads((OUT/name).read_text(encoding='utf-8'))
+opt=read('optimization.json');tuning=read('candidate_validation.json');final=read('final_validation.json')
+if final['status']!='completed':raise RuntimeError('Final verification still running')
+details=[read(r['label']+'.json') for r in final['runs']]
+summary=[];checks=[]
+for r in details:
+ v=r['values'];d=r['design'];model=r['label'][0]
+ p=v['Shaft Torque']*3500*math.pi/30
+ errors={'shaft_power_pct':abs(p-v['Output Power'])/v['Output Power']*100,'copper_loss_pct':abs(3*v['Phase Current (rms)']**2*v['Phase Resistance']-v['Armature DC Copper Loss (on load)'])/v['Armature DC Copper Loss (on load)']*100,'power_balance_pct':abs(v['Output Power']+v['Total Losses (on load)']-v['Input Power'])/v['Input Power']*100,'delta_current_pct':abs(v['Line Current (rms)']-math.sqrt(3)*v['Phase Current (rms)'])/v['Line Current (rms)']*100,'delta_resistance_pct':abs(v['Line-Line Resistance']-(2/3)*v['Phase Resistance'])/v['Line-Line Resistance']*100}
+ checks.append(dict(model=model,voltage_V=d['voltage_V'],errors_pct=errors))
+ ok=v['Shaft Torque']>=.5 and v['System Efficiency']>=88 and not r['voltage_limit_exceeded'] and r['readback']['NumberStrandsHand']==1 and r['readback']['ParallelPaths']==1 and r['readback']['WindingConnection']==1
+ active_mass=sum(v[k] for k in ['Weight Stator Lam','Weight Rotor Lam','Weight Magnet','Armature Copper [Total] Weight'])
+ summary.append(dict(model=model,voltage_V=d['voltage_V'],design=d,shaft_torque_Nm=v['Shaft Torque'],shaft_power_W=v['Output Power'],efficiency_pct=v['System Efficiency'],dc_current_A=v['DC Supply Current (mean)'],phase_current_rms_A=v['Phase Current (rms)'],line_current_rms_A=v['Line Current (rms)'],phase_resistance_ohm=v['Phase Resistance'],line_resistance_ohm=v['Line-Line Resistance'],bemf_LL_fundamental_rms_V=v['Back EMF Line-Line Voltage (peak) (fundamental)']/math.sqrt(2),terminal_LL_rms_V=v['Line-Line Terminal Voltage (rms)'],supply_LL_rms_V=v['Line-Line Supply Voltage (rms)'],total_loss_W=v['Total Losses (on load)'],copper_loss_W=v['Armature DC Copper Loss (on load)'],current_density_Arms_mm2=v['Armature Conductor Current Density'],fill=v['Copper Slot Fill (Slot Area)'],active_mass_kg=active_mass,Ld_mH=v['D Axis Inductance'],Lq_mH=v['Q Axis Inductance'],torque_ripple_pct=v['Torque Ripple (MsVw) [%]'],passed=ok,timings=r['timings']))
+ calibration=read('pilot_4p.json');screen=read('pilot_corrected.json')
+ tuning_runs=[read(label+'.json') for label in tuning['history']]
+ timing=dict(optimizer_arithmetic_s=opt['optimization_compute_s'],surrogate_evaluations=opt['evaluations'],calibration_solver_s=calibration['timings']['solver_s'],calibration_end_to_end_s=calibration['timings']['total_s'],rejected_6pole_screen_solver_s=screen['timings']['solver_s'],candidate_tuning_solver_s=sum(r['timings']['solver_s'] for r in tuning_runs),candidate_tuning_batch_s=tuning['wall_s'],final_solver_sum_s=sum(r['timings']['solver_s'] for r in details),final_solver_min_s=min(r['timings']['solver_s'] for r in details),final_solver_max_s=max(r['timings']['solver_s'] for r in details),final_batch_wall_s=final['wall_s'],final_launch_s=final['launch_s'],material_preparation=read('startup_timing.json'))
+ # Summed automated stages, explicitly not an uninterrupted wall-clock stopwatch.
+ timing['optimization_automated_stage_sum_s']=timing['calibration_end_to_end_s']+timing['optimizer_arithmetic_s']+timing['candidate_tuning_batch_s']
+ convergence=[]
+ for candidate in tuning['results']:
+  coarse=read(candidate['at_9V']+'.json')['values'];fine=next(s for s in summary if s['model']==candidate['model'] and s['voltage_V']==9)
+  convergence.append(dict(model=candidate['model'],torque_change_pct=100*(fine['shaft_torque_Nm']/coarse['Shaft Torque']-1),efficiency_change_percentage_points=fine['efficiency_pct']-coarse['System Efficiency']))
+ result=dict(requirements={'shaft_torque_Nm_min':.5,'rpm':3500,'dc_voltage_checks_V':[9,12,16],'temperature_C':20,'core':'POSCO | 50PN470','magnet':'JL Mag Rare-Earth | N48UH','strands':1,'parallel_paths':1,'connection':'delta','efficiency_pct_min':88,'control':'sinusoidal current, phase advance 0, ideal SVPWM voltage envelope','mechanical_loss_W':0,'inverter_efficiency_pct':100},all_checks_pass=all(s['passed'] for s in summary),results=summary,timing=timing,coarse_to_fine=convergence,identity_checks=checks,optimization=opt)
+ (OUT/'final_comparison.json').write_text(json.dumps(result,ensure_ascii=False,indent=2),encoding='utf-8')
+ lines=['# 12 V · 3,500 rpm · 0.5 N·m 최적화 및 PyMotorCAD 비교 검증','',f"최종 판정: {'9개 해석점 모두 조건 충족(모델 기준)' if result['all_checks_pass'] else '일부 조건 미충족 — 아래 결과 확인 필요'}",'', '## 공통 조건','', '- POSCO 50PN470: 고정자 요크·치 및 회전자 철심 / JL Mag Rare-Earth N48UH: 자석.', '- 20°C를 자석·권선·철심에 직접 지정. Δ결선, 1가닥, 1병렬 경로.', '- 목표 축 출력: 0.5 × 3,500 × 2π / 60 = 183.26 W. 토크는 0.5 N·m 이상, 효율은 88% 이상으로 판정.', '- 9 / 12 / 16 V 모두 같은 속도·토크 조건. 정현파 전류, 위상전진각 0°. 인버터 손실 0 및 기계 손실 0 W 가정.', '- 기계 손실 0 W는 앞서 합의한 공란 기본값이다. 실물 손실이 추가되면 효율은 낮아진다.','', '## 대표 3개 설계안','', '|항목|A 소형|B 균형|C 고효율|','|---|---:|---:|---:|']
+ nine=[next(s for s in summary if s['model']==name and s['voltage_V']==9) for name in 'ABC']
+ for label,fn in [('외경 [mm]',lambda s:s['design']['diameter_mm']),('적층 길이 [mm]',lambda s:s['design']['length_mm']),('극수 / 슬롯수',lambda s:'4 / 12'),('코일당 턴수',lambda s:s['design']['turns_per_coil']),('상당 직렬턴수',lambda s:4*s['design']['turns_per_coil']),('나선경 [mm]',lambda s:s['design']['wire_diameter_mm']),('절연 포함 외경 [mm]',lambda s:round(s['design']['wire_diameter_mm']+.07,3)),('활성부 질량 [kg]',lambda s:round(s['active_mass_kg'],4)),('상 저항 [Ω]',lambda s:s['phase_resistance_ohm']),('선간 저항 [Ω]',lambda s:s['line_resistance_ohm']),('역기전력 선간 기본파 [Vrms]',lambda s:round(s['bemf_LL_fundamental_rms_V'],4)),('상 전류 [Arms]',lambda s:s['phase_current_rms_A']),('선전류 [Arms]',lambda s:s['line_current_rms_A']),('전류밀도 [Arms/mm²]',lambda s:s['current_density_Arms_mm2']),('동손 [W]',lambda s:s['copper_loss_W']),('총 손실 [W]',lambda s:s['total_loss_W']),('토크 리플 [%]',lambda s:s['torque_ripple_pct'])]:lines.append('|'+label+'|'+'|'.join(str(fn(s)) for s in nine)+'|')
+ lines+=['','활성부 질량은 고정자·회전자 철심, 자석, 권선의 합이다. 예제에서 상속된 하우징·베어링·축단은 최적화하지 않아 전체 모터 질량으로 사용하지 않는다.','', '## 9·12·16 V 최종 해석','', '|모델|DC V|축 토크 N·m|출력 W|효율 %|DC 전류 A|요구 선간 Vrms|가용 선간 Vrms|판정|','|---|---:|---:|---:|---:|---:|---:|---:|---|']
+ for s in summary:lines.append(f"|{s['model']}|{s['voltage_V']}|{s['shaft_torque_Nm']:.5f}|{s['shaft_power_W']:.2f}|{s['efficiency_pct']:.3f}|{s['dc_current_A']:.3f}|{s['terminal_LL_rms_V']:.3f}|{s['supply_LL_rms_V']:.3f}|{'충족' if s['passed'] else '미충족'}|")
+ lines+=['','DC 전압이 달라도 이상 인버터의 전류 제어로 같은 전류·속도를 유지하므로 전자기 토크와 모터 손실은 거의 동일하다. DC 전류 및 전압 여유가 달라진다. 이는 각 전압에서 해석을 실제 재실행한 결과다.','', '## 최적화 방식 및 한계','', '- 처음 6극·18슬롯 저전압안을 해석했으나 효율 약 86.0%로 탈락. 4극·12슬롯으로 변경해 탐색했다.', '- 외경 55~100 mm, 적층 20~65 mm, 코일당 1~8턴(정수), 선경 0.8~2.2 mm 범위. 공극·치폭·자석 두께 등은 기준 형상에서 외경과 비례 변화.', '- Motor-CAD 파일럿 해석으로 보정한 수식 대리모델에 차분진화(DE)를 적용. 32개체·100세대·3개 목적에서 9,696회 저비용 평가.', '- A: 부피 최소, B: 부피·손실 균형, C: 손실 최소. 전체 극·슬롯·자석 형상을 포괄한 전역 최적해를 보장하지 않는다.', '- 슬롯 입구 통과 여유를 고려해 선경을 조정하고 9 V FEA에서 전류를 재조정했다. 초기 대리모델의 토크 예측과 실제 FEA에는 수 % 차이가 있었다. 최종 값은 FEA 보정 후 값이다.', '- 세 안 모두 적층 길이 하한 20 mm에 도달했다. 더 짧은 모터까지 포함하려면 탐색 범위를 확장하고 제조·엔드턴 조건을 추가해야 한다.','', '## 측정 시간','', '|구분|시간|','|---|---:|',f"|수식 최적화 연산만 (9,696회)|{timing['optimizer_arithmetic_s']:.3f}초|",f"|4극 파일럿 보정 해석|{timing['calibration_solver_s']:.2f}초|",f"|후보 토크 조정 FEA {len(tuning_runs)}회 합계|{timing['candidate_tuning_solver_s']:.2f}초|",f"|후보 조정 배치 전체 (실행·설정·저장 포함)|{timing['candidate_tuning_batch_s']:.2f}초|",f"|최적화 자동 실행 단계 합계 (파일럿 설정/해석/저장 + 수식 탐색 + 후보 조정)|{timing['optimization_automated_stage_sum_s']:.2f}초|",f"|최종 FEA 1회 범위 (120점/주기·2주기)|{timing['final_solver_min_s']:.2f}~{timing['final_solver_max_s']:.2f}초|",f"|최종 3모델 × 3전압 FEA 9회 합계|{timing['final_solver_sum_s']:.2f}초|",f"|최종 검증 배치 전체 (실행·설정·저장 포함)|{timing['final_batch_wall_s']:.2f}초|",f"|최종 배치 Motor-CAD 시작/연결|{timing['final_launch_s']:.2f}초|",'', '각 시간은 perf_counter로 측정했다. 자동 실행 단계 합계는 서로 다른 스크립트의 실행시간을 더한 값이며, 처음부터 끝까지 중단 없이 측정한 벽시계 시간이 아니다. 코드 작성·검토·실패한 초기 선경 설정·재질 가져오기 시간은 이 합계에서 제외했다. 따라서 수식 탐색 시간만을 전체 설계 소요시간으로 해석하면 안 된다.','', '## 수치 재확인','', '|모델|60점·1주기 → 120점·2주기 토크 변화 %|효율 변화 %p|','|---|---:|---:|']
+ for c in convergence:lines.append(f"|{c['model']}|{c['torque_change_pct']:.4f}|{c['efficiency_change_percentage_points']:.4f}|")
+ lines+=['','시간 샘플 수를 늘린 비교이며 별도의 공간 메시 수렴성 연구는 아니다.',f"전력수지·축 출력·동손·Δ전류·Δ저항 정의 검사 최대 상대 차이: {max(e for c in checks for e in c['errors_pct'].values()):.4f}% (CSV 반올림 포함).",'', '## 해석 결과를 사용할 때의 조건','', '- 50PN470의 보유 철손 표는 50/60 Hz 중심이며, 이번 기본 전기 주파수는 116.67 Hz이다. 효율 88% 판정은 Motor-CAD 철손 모델의 외삽을 포함한 예측이며 실측 인증이 아니다.', '- A안은 효율 여유가 매우 작다. 실제 기계·제어기 손실, 온도 상승, 제조 공차를 고려하면 B/C를 먼저 검토하는 것이 적절하다.', '- Δ결선의 3차 고조파 순환전류 및 실제 PWM에 의한 추가 손실을 별도의 회로 결합/인버터 파형 해석으로 검증하지 않았다. 기본 정현파 전류 FEA 기준이다.', '- 온도는 지정값 20°C이며 연속 운전 온도상승·냉각·감자·기계강도·권선 삽입 공정과 절연 등급은 미검증이다.', '- 선경은 직접 입력한 설계치이며 구매 가능한 선재 규격/절연 규격 선정은 후속 필요하다.', '- Ld/Lq는 Motor-CAD 출력값이지만 별도 인덕턴스 시험/전류 스윕을 수행하지 않았다.', '- 효율은 Pshaft/(Pshaft+모델손실)과 대조했다. 인버터 효율 100%, 기계 손실 0 W 조건을 유지해야 동일 결과를 얻는다.','', '## 재현 파일','', '- A_final_9V/12V/16V.mot, B_final_*.mot, C_final_*.mot: 실제 검증 모델 9개', '- 같은 이름의 .csv 및 .json: Motor-CAD 원본 출력·API 입력 재확인·측정 시간', '- material_assignments.json: 재질 지정 결과', '- optimization.json: 탐색 범위·예측값·연산 시간', '- final_comparison.json: 최종 비교 결과와 검사값', '- 실행 코드: low_voltage.py → optimize_low_voltage.py → validate_candidates.py → final_validation.py → summarize_low_voltage.py','']
+ (OUT/'최적화_검증결과.md').write_text('\n'.join(lines),encoding='utf-8')
+ # Portable design inputs and numeric outputs; omit large generated solver scratch folders.
+ with zipfile.ZipFile(OUT/'대표3모델_검증결과.zip','w',zipfile.ZIP_DEFLATED) as z:
+  for p in OUT.glob('*_final_*'):
+   if p.is_file() and p.suffix in ['.mot','.csv','.json']:z.write(p,p.name)
+  for name in ['최적화_검증결과.md','final_comparison.json','material_assignments.json','optimization.json','final_validation.json','candidate_validation.json','startup_timing.json']:z.write(OUT/name,name)
+  for name in ['low_voltage.py','optimize_low_voltage.py','validate_candidates.py','final_validation.py','summarize_low_voltage.py']:z.write(ROOT/name,'scripts/'+name)
+ print(json.dumps({'all_pass':result['all_checks_pass'],'timing':timing,'summary':[{k:s[k] for k in ['model','voltage_V','shaft_torque_Nm','efficiency_pct','dc_current_A','passed']} for s in summary]},ensure_ascii=False,indent=2))
+
+END_CONTENT
+END_SOURCE S161
+
+BEGIN_SOURCE S162
+PATH: validation/summarize_validation.py
+SOURCE_SHA256: 6055a54a4a899ce1270134f8d70cc908bf535e396540193dcf1e39299012283f
+LINES: 1-45 OF 45
+SEGMENT_BYTES: 7336
+BEGIN_CONTENT
+from pathlib import Path
+import csv,json,math
+ROOT=Path(__file__).resolve().parent
+OUT=ROOT/'run_20261021_400V'
+report=json.loads((OUT/'report.json').read_text(encoding='utf-8'))
+if report['status']!='solved':raise RuntimeError('All three solver runs must succeed')
+summaries=[];checks=[]
+def compare(temp,name,calc,reference,basis):
+ err=abs(calc-reference)/max(abs(reference),1e-12)*100
+ checks.append(dict(temperature_C=temp,name=name,calculated=calc,motorcad=reference,error_pct=err,basis=basis))
+for scenario in report['scenarios']:
+ t=scenario['temperature_C'];p=OUT/f'results_{t}C.csv'
+ content=p.read_text(encoding='cp1252',errors='replace')
+ values={}
+ for row in csv.reader(content.splitlines(),delimiter=';'):
+  if len(row)<2:continue
+  try:values.setdefault(row[0],float(row[1]))
+  except ValueError:pass
+ def v(key):return values[key]
+ outside='Operating point outside voltage limit' in content
+ if outside:raise RuntimeError(f'{t}C exceeds voltage limit')
+ speed=v('Shaft Speed');omega=speed*math.pi/30
+ R=v('Phase Resistance');irms=v('Phase Current (rms)');ipeak=v('Phase Current (peak)')
+ rho=v('Armature Conductor Resistivity');mlt=v('Armature Conductor MLT')*.001
+ n=v('Armature Turns per Phase');area=v('Armature Turn CSA')*1e-6
+ compare(t,'상 저항 ρ×MLT×N/A',rho*mlt*n/area,R,'Motor-CAD에서 산출한 MLT·단면적을 사용한 일관성 검사')
+ compare(t,'동손 3×Irms²×R',3*irms**2*R,v('Armature DC Copper Loss (on load)'),'Motor-CAD 전류·저항 기반 일관성 검사')
+ compare(t,'축 출력 T×ω',v('Shaft Torque')*omega,v('Output Power'),'단위·출력 정의 검사')
+ compare(t,'전력 수지 Pout+loss',v('Output Power')+v('Total Losses (on load)'),v('Input Power'),'전력 수지 검사')
+ compare(t,'효율 Pout/Pin',100*v('Output Power')/v('Input Power'),v('System Efficiency'),'효율 정의 검사')
+ compare(t,'dq 토크 1.5×p×ψd×Iq',1.5*3*v('Flux linkage D (On load)')*.001*ipeak,v('Average torque (DQ)'),'Motor-CAD 쇄교자속 사용, Id=0; 독립 자속 예측 검증 아님')
+ compare(t,'Kt(첨두 전류 기준)×Ipeak',v('Torque Constant (Kt)')*ipeak,v('Average torque (MsVw)'),'Motor-CAD Kt는 이 모델에서 상 첨두전류 기준')
+ compare(t,'Ke(선간 기본파 첨두)×ω',v('Back EMF Constant (Ke) (fundamental)')*omega,v('Back EMF Line-Line Voltage (peak) (fundamental)'),'CSV 반올림 영향 포함; 선간 전체 RMS와 구분')
+ br=1.105*(1-.0012*(t-20))
+ compare(t,'Br 선형 온도 보정',br,v('Magnet Br (Used)'),'예제 자석의 αBr=-0.12%/°C 가정; 제조사 다온도 곡선 검증 아님')
+ summaries.append(dict(temperature_C=t,phase_resistance_ohm=R,back_emf_LL_rms_total_V=v('Back EMF Line-Line Voltage (rms)'),back_emf_LL_rms_fundamental_V=v('Back EMF Line-Line Voltage (peak) (fundamental)')/math.sqrt(2),shaft_torque_Nm=v('Shaft Torque'),shaft_power_W=v('Output Power'),system_efficiency_pct=v('System Efficiency'),total_loss_W=v('Total Losses (on load)'),dc_copper_loss_W=v('Armature DC Copper Loss (on load)'),Ld_mH=v('D Axis Inductance'),Lq_mH=v('Q Axis Inductance'),voltage_limit_exceeded=outside))
+data=dict(model=report['geometry'],settings=report['settings'],summaries=summaries,checks=checks,limitations=['Template derivative, not optimized or independently sized from targets','Generic template materials; not JL MAG/POSCO qualification','20/60/100 C are prescribed uniform component temperatures, not a thermal solution','Higher-temperature magnet values use a linear coefficient, not measured multi-temperature curves','Consistency checks partly reuse Motor-CAD geometry/flux/results; independent analytical electromagnetic prediction is not validated','Single current angle and speed, no mesh/time-step convergence study, demagnetization or 6-step verification'])
+(OUT/'comparison.json').write_text(json.dumps(data,ensure_ascii=False,indent=2),encoding='utf-8')
+lines=['# 검증용 모터 PyMotorCAD 1차 실행 결과','', '상태: 20·60·100°C 전자기 해석 완료. 400 V 운전점에서 전압 한계 초과 표시는 없음.','', '## 모델과 실행 범위','', '- 설치 예제 Electromagnetic_Model.mot에서 파생한 6극·18슬롯 SPM. 독립 신규 최적화 설계는 아님.', '- 고정자 외경 130 mm, 적층/자석 길이 75 mm, 공극 1 mm, 자석 두께 4 mm.', '- 40 turn/coil, 240 turn/phase, Y결선, 상 전류 5 Apeak(3.5355 Arms), 1,500 rpm, 위상전진각 0°.', '- 초기 300 V 시도는 전압 한계 초과로 탈락. 최종 검증 조건은 400 V. 초기 결과는 별도 보존.', '- 재질은 원본 예제의 일반 재질을 유지. JL MAG/POSCO 적용 검증은 별도 필요.','', '## 온도별 Motor-CAD 결과','', '|온도 °C|상 저항 Ω|역기전력 선간 기본파 Vrms|축 토크 N·m|축 출력 W|시스템 효율 %|총 손실 W|','|---:|---:|---:|---:|---:|---:|---:|']
+for s in summaries:lines.append('|'+ '|'.join(f'{s[k]:.4f}' for k in ['temperature_C','phase_resistance_ohm','back_emf_LL_rms_fundamental_V','shaft_torque_Nm','shaft_power_W','system_efficiency_pct','total_loss_W'])+'|')
+lines+=['','## 수식 대조','', '아래는 기본 수식 및 정의의 일관성 검사다. 저항 계산의 MLT·단면적과 토크 계산의 쇄교자속 등 일부 입력을 Motor-CAD에서 사용했다. 따라서 독립 초기설계 계산기의 예측 정확도가 검증된 것은 아니다. CSV는 표시 자릿수로 반올림되어 있다.','', '|검사|3개 온도 중 최대 상대 차이 %|','|---|---:|']
+for name in dict.fromkeys(c['name'] for c in checks):lines.append(f"|{name}|{max(c['error_pct'] for c in checks if c['name']==name):.5f}|")
+lines+=['','## 중요한 발견 및 한계','', '- Motor-CAD의 Kt는 이 예제에서 상 첨두전류 기준이다. UI의 Arms 기준 값으로 표시하려면 √2 배 변환이 필요하다.', '- Motor-CAD 기본파 Ke는 이 예제에서 선간 첨두전압/기계 각속도 기준이다. 선간 RMS·krpm 기준으로 명시적으로 변환해야 한다.', '- 전체 RMS와 기본파 RMS는 고조파 때문에 다르다. 비교 표에는 기본파 RMS를 사용했다.', '- 20/60/100°C는 권선·자석·철심에 지정한 온도다. 주위 온도를 입력해 열평형을 계산한 결과가 아니다.', '- 예제 자석의 Br은 -0.12%/°C 선형 보정이다. 온도별 실측곡선과 감자 검증은 완료되지 않았다.', '- Ld/Lq는 출력에 존재하지만 별도 인덕턴스 성능 시험은 비활성화했다. 해당 값의 별도 수렴성 검증은 수행하지 않았다.', '- 망·시간 간격 수렴성, 6 STEP, 감자, 기계 강도, 제어기 손실 모델과 연속 정격은 검증 범위 밖이다.', '- 결과의 시스템 효율 표기는 Motor-CAD 출력 명칭을 유지했다. 제품의 모터 효율/인버터 포함 효율 매핑은 추가 확인이 필요하다.','', '## 파일','', '- validation_20C.mot / validation_60C.mot / validation_100C.mot: 실제 해석 모델', '- results_20C.csv / results_60C.csv / results_100C.csv: Motor-CAD 원본 결과', '- comparison.json: 구조화 비교값 및 수식 오차', '- report.json: 실행 로그와 API 원값','']
+(OUT/'검증결과.md').write_text('\n'.join(lines),encoding='utf-8')
+print(json.dumps({'summaries':summaries,'max_check_difference_pct':max(c['error_pct'] for c in checks)},ensure_ascii=False,indent=2))
+
+END_CONTENT
+END_SOURCE S162
+
+BEGIN_SOURCE S163
+PATH: validation/task_adapters.py
+SOURCE_SHA256: 730f79b89315534a1ae0081b3202b9ab793b73e65d2438ca3dd3bf72b7f4cab6
+LINES: 1-91 OF 91
+SEGMENT_BYTES: 6165
+BEGIN_CONTENT
+"""Named task recipes. No arbitrary shell commands; native imports are lazy."""
+import copy
+import json
+from pathlib import Path
+import re
+import time
+from task_store import ROOT,NATIVE,project_file,file_digest
+
+
+def prepare_spec(spec):
+    spec=copy.deepcopy(spec);kind=spec.get('kind');payload=spec.get('payload',{})
+    files=list(spec.get('input_files',[]))
+    if not isinstance(payload,dict):raise ValueError('Task payload required')
+    if kind=='formula':
+        from formula_job import validate_formula,calibration_path
+        validate_formula(payload['request']);files.append(str(calibration_path(payload['request'])))
+    elif kind=='motorcad_verify':
+        from model_capabilities import validate_for_model
+        request=payload['request'];validate_for_model(request,'verification')
+        source=request.get('formula_source_job','')
+        if not re.fullmatch(r'\d{8}_\d{6}(?:_\d+)?',source):raise ValueError('Saved formula job required')
+        path=project_file(ROOT/'validation/jobs'/source/'result.json');saved=json.loads(path.read_text(encoding='utf-8'))
+        selected=request.get('selected_model_ids',[])
+        if saved.get('stage')!='formula' or not isinstance(selected,list) or not selected or len(set(selected))!=len(selected) or not set(selected)<={m['id'] for m in saved['results']}:
+            raise ValueError('Distinct saved candidate IDs required')
+        # Keep source geometry/material/load requirements immutable; allowed
+        # verification changes select saved candidates and operating conditions.
+        original=saved['request']
+        for field in ('core','magnet','spm','connection','strands','paths','bounds','airgap_bounds_mm','control'):
+            if request.get(field)!=original.get(field):raise ValueError('Saved formula input mismatch: '+field)
+        for field in ('torque_Nm','speed_rpm','current_control','field_weakening'):
+            if request['operating_point'].get(field)!=original['operating_point'].get(field):raise ValueError('Saved load/control mismatch: '+field)
+        if not set(request['operating_point']['voltages_V'])<=set(original['operating_point']['voltages_V']):raise ValueError('Select saved voltage conditions')
+        if not set(request.get('temperatures_C',[20]))<=set(original.get('temperatures_C',[20])):raise ValueError('Select saved temperature conditions')
+        files.append(str(path))
+    elif kind in ('motorcad_diagnostic','motorcad_mesh'):
+        path=project_file(payload.get('source',''));reference=json.loads(path.read_text(encoding='utf-8'))
+        from model_capabilities import validate_for_model
+        # Current diagnostic recipes are intentionally confined to saved paired
+        # Surface 4p/12s references; generic native paths are not executable yet.
+        options=reference.get('input_options',{});native=reference.get('readback',{})
+        if options.get('shape') not in ('Radial','Parallel') or native.get('Pole_Number')!=4 or native.get('Slot_Number')!=12:
+            raise ValueError('Diagnostic recipe requires a saved supported 4p/12s Surface reference')
+        expected_direction={'Radial':'Radial','Parallel':'Parallel'}[options['shape']]
+        mats=reference.get('component_materials',{})
+        if options.get('magnetisation')!=expected_direction or options.get('connection')!='delta' or options.get('strands')!=1 or options.get('paths')!=1 or options.get('temperature_C')!=20:
+            raise ValueError('Diagnostic control/winding conditions are outside the current recipe')
+        if mats.get('Magnet')!='JL Mag Rare-Earth | N48UH' or any(mats.get(k)!='POSCO | 50PN470' for k in ('Stator Lam (Back Iron)','Stator Lam (Tooth)','Rotor Lam (Back Iron)')):
+            raise ValueError('Diagnostic material reference is not supported')
+        files.append(str(path))
+    elif kind=='mock':
+        duration=payload.get('duration_s',0)
+        if isinstance(duration,bool) or not isinstance(duration,(int,float)) or not 0<=duration<=30:raise ValueError('Mock duration 0..30 seconds required')
+        fail=payload.get('fail_until_attempt',0)
+        if isinstance(fail,bool) or not isinstance(fail,int) or not 0<=fail<=10:raise ValueError('Mock failure count 0..10 required')
+    elif kind!='manual_check':raise ValueError('Unsupported task kind')
+    if kind in NATIVE:
+        files.append(str(project_file('validation/baseline.mot')))
+    material=ROOT/'material_library/normalized_20261020/materials_si.sqlite'
+    if kind!='mock' and material.is_file():files.append(str(material))
+    spec['input_files']=sorted({str(project_file(p)) for p in files})
+    return spec
+
+
+def execute(kind,payload,folder,attempt):
+    folder=Path(folder);folder.mkdir(parents=True,exist_ok=True)
+    if kind=='mock':
+        time.sleep(payload.get('duration_s',0))
+        if attempt<=payload.get('fail_until_attempt',0):raise RuntimeError('Requested mock failure')
+        result={'status':'mock_completed','value':payload.get('value'),'attempt':attempt,'motorcad_solves':0}
+        from study_io import write_json
+        write_json(folder/'result.json',result)
+    elif kind=='formula':
+        from formula_job import run_formula
+        run_formula(payload['request'],folder)
+    elif kind=='motorcad_verify':
+        from verify_formula_job import run_verification
+        run_verification(payload['request'],folder)
+    elif kind=='motorcad_diagnostic':
+        from background_validation import diagnostics
+        diagnostics(project_file(payload['source']),folder)
+    elif kind=='motorcad_mesh':
+        from mesh_review import run_phase
+        run_phase(project_file(payload['source']),folder)
+    else:raise ValueError('Task has no executable recipe')
+    result_path=folder/'result.json'
+    if not result_path.is_file():raise RuntimeError('Task returned without a persisted result')
+    result=json.loads(result_path.read_text(encoding='utf-8'))
+    return {'result_file':str(result_path),'result_sha256':file_digest(result_path),
+            'calculation_status':result.get('status'),'evaluation_passed':None,
+            'scope':'Task completion is separate from motor requirement acceptance; inspect saved result.'}
+
+END_CONTENT
+END_SOURCE S163
+
+BEGIN_SOURCE S164
+PATH: validation/task_queue.py
+SOURCE_SHA256: 2bc579fc40b4c58428177bdb2c960dac7f182db5a8d5e8c45f6a235f884bc000
+LINES: 1-138 OF 138
+SEGMENT_BYTES: 7433
+BEGIN_CONTENT
+"""Detached sequential task worker and CLI. Default execution never enables FEA."""
+import argparse
+import contextlib
+import json
+import os
+from pathlib import Path
+import subprocess
+import sys
+import time
+import traceback
+from task_store import TaskStore,DEFAULT_DB,NATIVE,import_checklist,ROOT
+from task_adapters import prepare_spec,execute
+from study_io import write_json
+
+
+@contextlib.contextmanager
+def worker_lock(db_path):
+    handle=Path(db_path).with_suffix('.worker.lock').open('a+b')
+    try:
+        if handle.tell()==0:handle.write(b'0');handle.flush()
+        handle.seek(0)
+        if os.name=='nt':
+            import msvcrt
+            try:msvcrt.locking(handle.fileno(),msvcrt.LK_NBLCK,1)
+            except OSError as exc:raise ValueError('A task worker is already active for this store') from exc
+        else:
+            import fcntl
+            try:fcntl.flock(handle,fcntl.LOCK_EX|fcntl.LOCK_NB)
+            except OSError as exc:raise ValueError('A task worker is already active for this store') from exc
+        yield
+    finally:handle.close()
+
+
+def create_plan(store,title,tasks):
+    return store.create(title,[prepare_spec(spec) for spec in tasks])
+
+
+def run(store,job,allow_native=False,resume=False,retry_ids=(),reviewed=False):
+    with worker_lock(store.path):
+        store.begin_worker(job)
+        if resume:store.set_stop(job,False)
+        try:
+            for ident in retry_ids:store.retry(job,ident,reviewed)
+        except BaseException:
+            store.finish_worker(job);raise
+        while True:
+            task=store.claim(job,allow_native)
+            if task is None:break
+            attempt_dir=Path(task['output_dir']);output=attempt_dir/'output'
+            envelope={'kind':task['kind'],'payload':task['payload'],'attempt':task['attempt'],'output_dir':str(output)}
+            write_json(attempt_dir/'task_input.json',envelope)
+            process=None;timed_out=False;code=None
+            try:
+                with (attempt_dir/'worker.log').open('ab') as log:
+                    process=subprocess.Popen([sys.executable,str(Path(__file__).resolve()),'--child',str(attempt_dir/'task_input.json')],
+                        cwd=ROOT,stdout=log,stderr=subprocess.STDOUT,creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
+                    store.child_started(job,task['id'],task['attempt'],process.pid)
+                    started=time.monotonic();stop_signalled=False
+                    while process.poll() is None:
+                        if time.monotonic()-started>task['timeout_s']:
+                            timed_out=True;process.terminate();process.wait(timeout=20);break
+                        if task['kind'] in NATIVE and not stop_signalled and store.is_stopped(job):
+                            # Both native conventions are supported. Existing
+                            # scripts stop at the next solve boundary.
+                            (attempt_dir/'cancel.request').touch()
+                            output.mkdir(exist_ok=True);(output/'cancel.request').touch();stop_signalled=True
+                        time.sleep(.2)
+                    code=process.returncode
+                if timed_out:raise RuntimeError('Task timeout; review partial output and any native instance before retry')
+                if code:raise RuntimeError(f'Task child exited {code}; see {attempt_dir / "worker.log"}')
+                receipt=json.loads((output/'receipt.json').read_text(encoding='utf-8'))
+                store.finish(job,task['id'],task['attempt'],output=receipt)
+            except BaseException as exc:
+                if process is not None and process.poll() is None:
+                    process.terminate()
+                    with contextlib.suppress(Exception):process.wait(timeout=20)
+                store.finish(job,task['id'],task['attempt'],error=str(exc))
+                if task['kind'] in NATIVE or isinstance(exc,(KeyboardInterrupt,SystemExit)):break
+        return store.finish_worker(job)
+
+
+def launch(store,job,allow_native=False,resume=False,retry_ids=(),reviewed=False):
+    snapshot=store.snapshot(job)
+    if not snapshot['implementation_compatible']:raise ValueError('Implementation changed; register a new plan')
+    for ident in retry_ids:
+        task=next((t for t in snapshot['tasks'] if t['id']==ident),None)
+        if not task or task['state']!='failed':raise ValueError('Select failed task IDs only')
+        if task['reason']=='input_changed':raise ValueError('Input changed; register a new plan')
+        if (task['kind'] in NATIVE or task['reason'] in ('interrupted_worker_review_required','completed_artifact_changed')) and not reviewed:
+            raise ValueError('Review partial results/process before retry')
+    # Detect an already running queue before reporting a detached start.
+    with worker_lock(store.path):pass
+    log_dir=store.path.parent/'worker_logs';log_dir.mkdir(exist_ok=True)
+    log_path=log_dir/(job+'_'+str(time.time_ns())+'.log')
+    command=[sys.executable,str(Path(__file__).resolve()),'--db',str(store.path),'--run',job]
+    if allow_native:command.append('--allow-native')
+    if resume:command.append('--resume')
+    if reviewed:command.append('--reviewed')
+    for task in retry_ids:command.extend(['--retry',task])
+    with log_path.open('ab') as log:
+        process=subprocess.Popen(command,cwd=ROOT,stdout=log,stderr=subprocess.STDOUT,creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
+    return {'id':job,'worker_pid':process.pid,'worker_log':str(log_path),'native_enabled':allow_native,
+            'note':'Detached worker started; task status and errors are persisted. No completion wait.'}
+
+
+def worker_active(store):
+    try:
+        with worker_lock(store.path):return False
+    except ValueError:return True
+
+
+def main():
+    parser=argparse.ArgumentParser();parser.add_argument('--db',type=Path,default=DEFAULT_DB)
+    parser.add_argument('--plan',type=Path);parser.add_argument('--import-checklist',type=Path)
+    parser.add_argument('--run');parser.add_argument('--status');parser.add_argument('--stop')
+    parser.add_argument('--allow-native',action='store_true');parser.add_argument('--resume',action='store_true')
+    parser.add_argument('--retry',action='append',default=[]);parser.add_argument('--reviewed',action='store_true')
+    parser.add_argument('--child',type=Path)
+    args=parser.parse_args()
+    if args.child:
+        data=json.loads(args.child.read_text(encoding='utf-8'));out=Path(data['output_dir'])
+        try:
+            receipt=execute(data['kind'],data['payload'],out,data['attempt']);write_json(out/'receipt.json',receipt)
+        except BaseException as exc:
+            out.mkdir(exist_ok=True,parents=True);write_json(out/'task_error.json',{'error':str(exc),'traceback':traceback.format_exc()});raise
+        return
+    store=TaskStore(args.db)
+    if args.plan:
+        data=json.loads(args.plan.read_text(encoding='utf-8'));result={'id':create_plan(store,data['title'],data['tasks'])}
+    elif args.import_checklist:result={'id':import_checklist(store,args.import_checklist)}
+    elif args.status:result=store.snapshot(args.status)
+    elif args.stop:store.set_stop(args.stop);result=store.snapshot(args.stop)
+    elif args.run:result=run(store,args.run,args.allow_native,args.resume,args.retry,args.reviewed)
+    else:result=store.list_jobs()
+    print(json.dumps(result,ensure_ascii=True))
+
+
+if __name__=='__main__':main()
+
+END_CONTENT
+END_SOURCE S164
+
+
+END_REVIEW_PART_025
